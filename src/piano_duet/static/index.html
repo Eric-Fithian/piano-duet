@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#151a1b">
+  <title>Piano Duet — a conversation at the piano</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/score.css">
+  <script src="/notation-assets/vexflow.js" defer></script>
+  <script type="module" src="/static/app.mjs"></script>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <a class="brand" href="/" aria-label="Piano Duet home"><span class="mark" aria-hidden="true">ⅱ</span> DUET<span class="brand-sub">A conversation at the piano</span></a>
+      <span class="local"><span class="dot"></span> Entirely on your Mac</span>
+    </header>
+    <main>
+      <section class="intro">
+        <div><p class="eyebrow">YOUR PIANO. A NEW MUSICAL PARTNER.</p><h1>Play something.<br><em>See where it goes.</em></h1></div>
+        <p class="intro-copy">A little melody. A handful of chords.<br>Play your piano, leave a pause, and hear<br class="wide"> an AI pianist pick up the conversation.</p>
+      </section>
+      <div class="mode-switch" role="group" aria-label="Playing mode"><button id="duetMode" aria-pressed="true">Duet mode</button><button id="learningMode" aria-pressed="false">Learning mode</button><span id="modeDescription">Trade musical ideas with your AI piano partner.</span></div>
+      <div class="workspace">
+        <section class="performance" aria-label="Piano conversation">
+          <div class="performance-top"><div class="status-label"><span id="statusDot" class="dot"></span><span id="status" role="status" aria-live="polite">Getting the piano ready…</span></div><span id="turnCount">YOUR FIRST CONVERSATION</span></div>
+          <section id="learningPanel" class="learning-panel" aria-label="Learning round" hidden>
+            <ol class="learning-steps"><li id="ideaStep" aria-current="step">1. Your idea</li><li id="listenStep">2. Listen</li><li id="repeatStep">3. Play back</li><li id="scoreStep">4. Your score</li></ol>
+            <p id="learningInstruction">Play an idea you like. Aria will suggest a version to practice.</p>
+            <div class="learning-actions"><button id="replayTarget" class="secondary" disabled>Hear target again</button><button id="newRound" class="text-button">Start a new round</button></div>
+            <div id="learningResult" class="learning-result" role="status" hidden><strong id="learningScore"></strong><p id="learningFeedback"></p><small>Approximate microphone score · pitches and relative rhythm; a consistent slower tempo is fine.</small></div>
+            <details id="surpriseDetails" hidden><summary id="surpriseSummary">Note-by-note surprise</summary><p class="analysis-help">Surprise = 1 − P(your pitch), given your original preceding notes. Probabilities are across piano pitches, summed over velocities. Suggested changes keep your timing. Unexpected does not necessarily mean wrong.</p><div class="analysis-scroll" tabindex="0" role="region" aria-label="Note surprise details"><table><thead><tr><th scope="col">Note</th><th scope="col">Time</th><th scope="col">Played</th><th scope="col">Probability</th><th scope="col">Surprise</th><th scope="col">Expected</th><th scope="col">Target</th></tr></thead><tbody id="surpriseRows"></tbody></table></div></details>
+          </section>
+          <div class="view-switch" role="group" aria-label="Conversation display"><button id="sheetView" aria-pressed="true">Sheet music</button><button id="rollView" aria-pressed="false">Piano roll</button></div>
+          <div id="sheetPanel">
+            <div class="notation-controls">
+              <label>Tempo <select id="scoreTempo"><option value="auto">Estimate</option><option value="manual">Set BPM</option></select></label>
+              <label id="bpmLabel" hidden>♩ BPM <input id="scoreBpm" type="number" min="30" max="240" step="1" value="120" required></label>
+              <label>Meter <select id="scoreMeter"><option>4/4</option><option>3/4</option><option>6/8</option></select></label>
+              <label>Spelling <select id="scoreAccidentals"><option value="auto">Use key</option><option value="sharps">Sharps ♯</option><option value="flats">Flats ♭</option></select></label>
+            </div>
+            <p class="notation-help">Approximate written rhythms. Tempo and meter change the score; playback keeps your timing.</p>
+            <div id="scoreError" class="error" role="alert" hidden></div>
+            <div id="sheetMusic" role="region" tabindex="0" aria-label="Sheet music for the full conversation"></div>
+          </div>
+          <div id="rollPanel" class="roll-wrap" hidden><canvas id="roll" aria-label="Notes you played in amber and the AI reply in blue"></canvas><div id="emptyRoll"><span class="empty-symbol" aria-hidden="true">♪</span><p>Every conversation starts with a few notes.</p><span>Your piano will appear here when you finish a phrase.</span></div></div>
+          <div class="roll-footer"><div class="legend"><span><i class="swatch you"></i>You</span><span><i class="swatch partner"></i><span id="partnerLabel">Duet</span></span></div><span id="timing">Listening happens here. Nothing leaves your Mac.</span></div>
+          <div class="transport"><div class="transport-primary"><button id="start" class="primary" disabled><span aria-hidden="true">●</span> Enable microphone</button><button id="answer" class="secondary" disabled>Answer now <kbd>space</kbd></button><button id="stop" class="stop" disabled aria-label="Stop listening and playback">■ Stop</button></div><button id="demo" class="text-button" disabled>Try a phrase <span aria-hidden="true">↗</span></button></div>
+          <div id="message" class="message" role="status">Place your laptop near your piano. Start with a short phrase, then give Duet a moment to reply.</div>
+          <div id="error" class="error" role="alert" hidden></div>
+          <div class="session-actions"><button id="reset" class="text-button" disabled>New conversation</button><button id="export" class="text-button" disabled>Save MIDI ↓</button></div>
+        </section>
+        <aside class="controls" aria-label="Duet settings">
+          <div class="panel-heading"><h2>Make room for a duet</h2><span>01 — LISTEN</span></div>
+          <label for="microphone">Microphone</label><select id="microphone"><option value="">System default</option></select>
+          <div class="meter-row"><span>INPUT LEVEL</span><span id="levelText">OFF</span></div><div class="meter" role="meter" aria-label="Microphone input level" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="level"></div></div>
+          <p class="setting-help">Stay quiet for the first second while the microphone calibrates.</p>
+          <label class="check-setting" for="autoReply"><input id="autoReply" type="checkbox" checked> Reply after a pause</label><p class="setting-help">No time limit on your turn. Turn this off to play through rests, then use Answer now or space.</p>
+          <div class="slider-label"><label for="pause">Leave a pause</label><output id="pauseValue">0.9 s</output></div><input id="pause" type="range" min="0.4" max="2" value="0.9" step="0.1"><p class="setting-help">How long Duet waits before taking its turn when automatic replies are on.</p>
+          <div class="panel-heading second"><h2>The reply</h2><span>02 — RESPOND</span></div>
+          <div class="key-follow" role="status" aria-live="polite"><span class="key-caption">KEY OF YOUR LATEST PHRASE</span><strong id="keyName">Listening for a key…</strong><p id="keyDetail">Each reply follows the key of just your latest phrase.</p></div>
+          <div id="learningSettings" hidden><div class="slider-label"><label for="surprise">Correct above surprise</label><output id="surpriseValue">98.0%</output></div><input id="surprise" type="range" min="80" max="99.9" value="98" step="0.1" aria-describedby="surpriseHelp"><p id="surpriseHelp" class="setting-help">Higher thresholds preserve more of your idea. Only pitches change; rhythm and note lengths stay yours. Applies to the next idea.</p></div>
+          <div id="duetSettings">
+          <div class="slider-label"><label for="length">Reply length</label><output id="lengthValue">~5 s</output></div><input id="length" type="range" min="2" max="12" value="5" step="1"><p class="setting-help">A target, with room to finish the musical phrase.</p>
+          <div class="slider-label spaced"><label for="difficulty">Reply difficulty</label><output id="difficultyValue">3 · Moderate</output></div><input id="difficulty" type="range" min="1" max="5" value="3" step="1" aria-describedby="difficultyHelp"><div class="range-ends"><span>Gentle</span><span>Expert</span></div><p id="difficultyHelp" class="setting-help">Lower levels use slower notes, smaller chords, and less hand movement. Applies to the next reply.</p>
+          <div class="slider-label spaced"><label for="temperature">Adventurousness</label><output id="temperatureValue">Balanced</output></div><input id="temperature" type="range" min="0.5" max="1.3" value="0.95" step="0.05"><div class="range-ends"><span>Familiar</span><span>Unexpected</span></div>
+          </div>
+          <div class="slider-label spaced"><label for="volume">Piano volume</label><output id="volumeValue">65%</output></div><input id="volume" type="range" min="0" max="100" value="65" step="1">
+          <details><summary>Microphone fine-tuning</summary><div class="slider-label"><label for="gate">Noise gate</label><output id="gateValue">−48 dB</output></div><input id="gate" type="range" min="-65" max="-25" value="-48" step="1"><p class="setting-help">Raise this if room noise keeps a phrase open.</p><div class="slider-label"><label for="threshold">Note confidence</label><output id="thresholdValue">0.75</output></div><input id="threshold" type="range" min="0.1" max="0.9" value="0.75" step="0.05"><p class="setting-help">Raise this to reject extra notes; lower it for soft playing.</p></details>
+        </aside>
+      </div>
+      <section class="how"><p><span>01</span> Play your real piano.<small>Both hands, chords, and your own timing.</small></p><p><span>02</span> Leave a little space.<small>Or press space when you want a reply.</small></p><p><span>03</span> Follow the conversation.<small>Listen, then play something back.</small></p></section>
+    </main>
+    <footer><span>Built for listening. Inspired by Google’s AI Duet.</span><span><a href="https://github.com/EleutherAI/aria" target="_blank" rel="noreferrer">Aria piano transformer</a><span class="footer-divider">/</span><a href="/static/credits.html" target="_blank">Models & credits</a></span></footer>
+  </div>
+</body>
+</html>

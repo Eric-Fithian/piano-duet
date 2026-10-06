@@ -1,0 +1,1 @@
+"""Local microphone piano duet."""
