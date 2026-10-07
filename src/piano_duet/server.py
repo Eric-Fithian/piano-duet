@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from threading import Event
 from typing import Literal
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import httpx
 import numpy as np
@@ -20,11 +20,14 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from piano_duet.assessment import assess
 from piano_duet.assets import NOTATION, SAMPLES, require_assets
 from piano_duet.generation import PianoGenerator
 from piano_duet.key_tracking import KeyTracker
 from piano_duet.learning import analyze_phrase, compare_performance
 from piano_duet.notes import Note, midi_bytes
+from piano_duet.practice import next_task
+from piano_duet.profile import DATABASE, LearnerStore
 from piano_duet.transcription import SAMPLE_RATE, PianoTranscriber
 
 STATIC = Path("src/piano_duet/static")
@@ -56,6 +59,24 @@ def main(port=8765, open_browser=True):
 
 class ExportRequest(BaseModel):
     notes: list[Note] = Field(min_length=1)
+
+
+class PracticeRequest(BaseModel):
+    focus: Literal["guided", "technique", "reading", "theory", "ear", "repertoire"] = "guided"
+    piece: UUID | None = None
+
+
+class AidRequest(BaseModel):
+    kind: Literal["reveals", "hearings", "hints"]
+
+
+class ExcludeRequest(BaseModel):
+    excluded: bool
+
+
+class PieceRequest(BaseModel):
+    attempt: UUID
+    title: str = Field(min_length=1, max_length=80)
 
 
 class DuetEngine:
@@ -225,11 +246,12 @@ class DuetEngine:
         )
 
 
-def create_app(port=8765, open_browser=False, engine_factory=DuetEngine):
+def create_app(port=8765, open_browser=False, engine_factory=DuetEngine, profile_path=DATABASE):
     executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="piano-inference")
 
     @asynccontextmanager
     async def lifespan(app):
+        app.state.store = LearnerStore(profile_path)
         print("Loading local piano models and warming up the GPU…", flush=True)
         app.state.engine = await asyncio.get_running_loop().run_in_executor(
             executor, engine_factory
@@ -280,6 +302,87 @@ def create_app(port=8765, open_browser=False, engine_factory=DuetEngine):
             "sample_rate": SAMPLE_RATE,
         }
 
+    @app.get("/api/profile")
+    async def profile():
+        return await asyncio.to_thread(app.state.store.profile)
+
+    @app.get("/api/profile/export")
+    async def export_profile():
+        return JSONResponse(
+            {
+                "format": 1,
+                "attempts": await asyncio.to_thread(app.state.store.attempts),
+                "pieces": app.state.store.pieces(),
+            },
+            headers={"Content-Disposition": 'attachment; filename="piano-learning-history.json"'},
+        )
+
+    @app.get("/api/attempts/{attempt_id}")
+    async def attempt_detail(attempt_id: UUID):
+        rows = await asyncio.to_thread(app.state.store.attempts)
+        found = [row for row in rows if row["id"] == str(attempt_id)]
+        if not found:
+            raise HTTPException(404, "Unknown performance")
+        return found[0]
+
+    @app.post("/api/attempts/{attempt_id}/exclude")
+    async def exclude_attempt(attempt_id: UUID, payload: ExcludeRequest):
+        rows = await asyncio.to_thread(app.state.store.attempts)
+        if not any(row["id"] == str(attempt_id) for row in rows):
+            raise HTTPException(404, "Unknown performance")
+        await asyncio.to_thread(app.state.store.exclude, str(attempt_id), payload.excluded)
+        return await asyncio.to_thread(app.state.store.profile)
+
+    @app.get("/api/pieces")
+    async def pieces():
+        return app.state.store.pieces()
+
+    @app.post("/api/pieces")
+    async def save_piece(payload: PieceRequest):
+        if not payload.title.strip():
+            raise HTTPException(400, "Give the piece a name")
+        rows = await asyncio.to_thread(app.state.store.attempts)
+        attempt = next((row for row in rows if row["id"] == str(payload.attempt)), None)
+        if not attempt or not attempt["notes"]:
+            raise HTTPException(404, "No recognized performance to save")
+        notes = [Note.model_validate(n) for n in attempt["notes"]]
+        origin = min(n.start for n in notes)
+        piece = {
+            "id": str(uuid4()),
+            "title": payload.title.strip(),
+            "challenge": 1,
+            "notes": [n.model_copy(update={"start": n.start - origin}).model_dump() for n in notes],
+            "key": KeyTracker().observe(notes),
+            "bpm": None,
+        }
+        app.state.store.add_piece(piece)
+        return piece
+
+    @app.post("/api/practice/next")
+    async def practice_next(payload: PracticeRequest):
+        if app.state.busy:
+            raise HTTPException(409, "Finish the current performance first")
+        if payload.piece and not any(
+            p["id"] == str(payload.piece) for p in app.state.store.pieces()
+        ):
+            raise HTTPException(404, "Unknown practice piece")
+        return await asyncio.to_thread(
+            next_task,
+            app.state.store,
+            payload.focus,
+            None,
+            str(payload.piece) if payload.piece else None,
+        )
+
+    @app.post("/api/practice/{task_id}/aid")
+    async def practice_aid(task_id: UUID, payload: AidRequest):
+        if app.state.busy:
+            raise HTTPException(409, "Finish the current performance first")
+        task = app.state.store.task(str(task_id))
+        if not task or task["completed"]:
+            raise HTTPException(409, "Choose an unfinished exercise first")
+        return app.state.store.aid(str(task_id), payload.kind)
+
     @app.post("/api/export")
     async def export(payload: ExportRequest):
         return Response(
@@ -296,15 +399,32 @@ def create_app(port=8765, open_browser=False, engine_factory=DuetEngine):
         temperature: float = Query(0.95, ge=0.5, le=1.3),
         threshold: float = Query(0.75, ge=0.1, le=0.9),
         difficulty: int = Query(3, ge=1, le=5),
-        mode: Literal["duet", "learning"] = "duet",
+        mode: Literal["duet", "learning", "practice"] = "duet",
         stage: Literal["idea", "repeat"] = "idea",
         lesson: UUID | None = None,
         surprise: float = Query(0.98, ge=0, le=1),
+        task: UUID | None = None,
+        attempt: UUID | None = None,
+        source: Literal["microphone", "demo"] = "microphone",
     ):
         if mode == "learning" and lesson is None:
             raise HTTPException(400, "Learning requests require a round identifier")
+        if task is not None and mode != "practice":
+            raise HTTPException(400, "An exercise target can only be used in guided practice")
         if app.state.busy:
             raise HTTPException(409, "The previous response is still finishing. Please retry.")
+        practice_task = app.state.store.task(str(task)) if task else None
+        if mode == "practice" and (not practice_task or practice_task["completed"]):
+            raise HTTPException(409, "Choose an unfinished exercise before playing")
+        if (
+            mode == "practice"
+            and practice_task["family"] == "ear"
+            and not practice_task["context"]["hearings"]
+        ):
+            raise HTTPException(400, "Hear the melody before playing it back")
+        attempt_id = str(attempt or uuid4())
+        if app.state.store.has_attempt(attempt_id):
+            raise HTTPException(409, "This performance has already been saved")
         data = bytearray()
         async for chunk in request.stream():
             data.extend(chunk)
@@ -318,11 +438,23 @@ def create_app(port=8765, open_browser=False, engine_factory=DuetEngine):
             )
         # Web Audio floats can exceed full scale; one gain for the phrase preserves dynamics.
         peak = float(np.max(np.abs(audio)))
+        audio_context = {
+            "seconds": len(audio) / SAMPLE_RATE,
+            "peak": peak,
+            "rms": round(float(np.sqrt(np.mean(audio.astype(np.float64) ** 2))), 6),
+            "note_threshold": threshold,
+        }
         if peak > 1:
             audio /= peak
         # Recheck after reading the body: another request could have entered during the await.
         if app.state.busy:
             raise HTTPException(409, "The previous response is still finishing. Please retry.")
+        if mode == "practice":
+            practice_task = app.state.store.task(str(task))
+            if practice_task["completed"]:
+                raise HTTPException(
+                    409, "This exercise was completed while the audio was being received"
+                )
         app.state.busy = True
         loop = asyncio.get_running_loop()
         queue = asyncio.Queue()
@@ -331,30 +463,121 @@ def create_app(port=8765, open_browser=False, engine_factory=DuetEngine):
         def emit(event):
             loop.call_soon_threadsafe(queue.put_nowait, event)
 
-        if mode == "learning":
-            future = executor.submit(
-                app.state.engine.learn,
-                audio,
-                str(session),
-                str(lesson),
-                stage,
-                surprise,
-                threshold,
-                emit,
-                cancel,
-            )
-        else:
-            future = executor.submit(
-                app.state.engine.respond,
-                audio,
-                str(session),
-                seconds,
-                temperature,
-                threshold,
-                emit,
-                cancel,
-                difficulty,
-            )
+        def perform():
+            engine = app.state.engine
+            prompt = practice_task or {
+                "title": "Duet phrase" if mode == "duet" else "Your musical idea",
+                "target": [],
+                "family": "creating",
+                "challenge": 1,
+            }
+            if mode == "learning" and stage == "repeat":
+                pending = engine.lesson
+                if pending and pending["id"] == str(lesson) and pending["session"] == str(session):
+                    prompt = {
+                        "title": "Play back the variation",
+                        "family": "imitation",
+                        "challenge": 1,
+                        "target": [n.model_dump() for n in pending["notes"]],
+                        "key": pending["key"],
+                    }
+            context = {
+                "notation_visible": False,
+                "hearings": 0,
+                "reveals": 0,
+                "hints": 0,
+                "familiar": False,
+                **prompt.get("context", {}),
+                "source": source,
+                "family": prompt["family"],
+                "audio": audio_context,
+                "session": str(session),
+            }
+            saved_assessment = None
+
+            def observed(event):
+                nonlocal saved_assessment
+                if event["type"] == "heard" and not cancel.is_set():
+                    if mode == "duet":
+                        prompt["preceding_music"] = [n.model_dump() for n in engine.history]
+                        context["reply_settings"] = {
+                            "difficulty": difficulty,
+                            "temperature": temperature,
+                            "seconds": seconds,
+                        }
+                    if mode == "learning":
+                        context["surprise_threshold"] = surprise
+                    notes = [Note.model_validate(n) for n in event["notes"]]
+                    context["estimated_key"] = (
+                        (KeyTracker().observe(notes) if notes else None)
+                        if mode == "practice"
+                        else event.get("key")
+                    )
+                    saved_assessment = assess(
+                        prompt, notes, context, engine.transcriber.last_quality
+                    )
+                    inputs = {
+                        "mode": mode,
+                        "prompt": prompt,
+                        "notes": event["notes"],
+                        "context": context,
+                        "recognition": engine.transcriber.last_quality,
+                    }
+                    app.state.store.record(
+                        attempt_id,
+                        inputs,
+                        saved_assessment,
+                        str(task) if mode == "practice" else None,
+                    )
+                    emit({"type": "attempt", "id": attempt_id, "assessment": saved_assessment})
+                emit(event)
+
+            if mode == "practice":
+                started = time.perf_counter()
+                notes = engine.transcriber.transcribe(
+                    audio,
+                    threshold,
+                    cancel=cancel,
+                    on_progress=lambda progress: emit(
+                        {"type": "transcribing", "progress": progress}
+                    ),
+                )
+                if cancel.is_set():
+                    return
+                observed(
+                    {
+                        "type": "heard",
+                        "notes": [n.model_dump() for n in notes],
+                        "key": practice_task["key"],
+                        "transcription_ms": round((time.perf_counter() - started) * 1000),
+                    }
+                )
+                emit({"type": "assessment", "id": attempt_id, "assessment": saved_assessment})
+                emit(
+                    {
+                        "type": "done",
+                        "notes": 0,
+                        "stage": "complete" if notes else "practice",
+                        "empty": not notes,
+                    }
+                )
+            elif mode == "learning":
+                engine.learn(
+                    audio, str(session), str(lesson), stage, surprise, threshold, observed, cancel
+                )
+            else:
+                engine.respond(
+                    audio,
+                    str(session),
+                    seconds,
+                    temperature,
+                    threshold,
+                    observed,
+                    cancel,
+                    difficulty,
+                )
+
+        future = executor.submit(perform)
 
         def finished(job):
             error = job.exception()

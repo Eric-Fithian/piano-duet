@@ -114,10 +114,11 @@ def analyze_phrase(generator, notes, threshold, cancel, on_note):
 
 def note_groups(notes):
     groups = []
-    for note in sorted(notes, key=lambda n: (n.start, n.pitch)):
+    for index, note in sorted(enumerate(notes), key=lambda item: (item[1].start, item[1].pitch)):
         if not groups or note.start > groups[-1]["start"] + CHORD_WINDOW:
-            groups.append({"start": note.start, "pitches": Counter()})
+            groups.append({"start": note.start, "pitches": Counter(), "indices": []})
         groups[-1]["pitches"][note.pitch] += 1
+        groups[-1]["indices"].append(index)
     return groups
 
 
@@ -152,11 +153,13 @@ def compare_performance(target, attempt, cancel=None):
         previous = current
     matches = wrong = missing = extra = 0
     pairs = []
+    alignment = []
     i, j = n, m
     while i or j:
         action = trace[i, j]
         if action == "pair":
             a, b = expected[i - 1], played[j - 1]
+            alignment.append({"expected": a["indices"], "played": b["indices"]})
             shared = (a["pitches"] & b["pitches"]).total()
             misses = a["pitches"].total() - shared
             additions = b["pitches"].total() - shared
@@ -169,12 +172,15 @@ def compare_performance(target, attempt, cancel=None):
             i -= 1
             j -= 1
         elif action == "missing":
+            alignment.append({"expected": expected[i - 1]["indices"], "played": []})
             missing += expected[i - 1]["pitches"].total()
             i -= 1
         else:
+            alignment.append({"expected": [], "played": played[j - 1]["indices"]})
             extra += played[j - 1]["pitches"].total()
             j -= 1
     pairs.reverse()
+    alignment.reverse()
     pitch_accuracy = 2 * matches / (len(target) + len(attempt))
     intervals = [(b[0] - a[0], b[1] - a[1]) for a, b in pairwise(pairs)]
     tempo_scale = (
@@ -197,6 +203,7 @@ def compare_performance(target, attempt, cancel=None):
         "played_notes": len(attempt),
         "tempo_percent": round(100 / tempo_scale),
         "timing_error_ms": round(1000 * sum(errors) / len(errors)) if errors else None,
+        "alignment": alignment,
     }
 
 

@@ -1,5 +1,17 @@
 import {createScore, estimateTempo, spellPitch} from './notation.mjs';
 
+export function paginateSystems(phrases, width, height) {
+  return phrases.flatMap(phrase => {
+    if (!phrase.layout) return [];
+    const {rows, rowHeight, scoreWidth} = phrase.layout;
+    const scale = Math.min(1, Math.max(1, width - 16) / scoreWidth);
+    const count = Math.max(1, Math.floor(Math.max(1, height - 46) / (rowHeight * scale)));
+    return Array.from({length: Math.ceil(rows / count)}, (_, i) => ({
+      phrase, start: i * count, end: Math.min(rows, (i + 1) * count),
+    }));
+  });
+}
+
 export class SheetMusic {
   constructor(container) {
     this.container = container;
@@ -8,6 +20,9 @@ export class SheetMusic {
     this.pending = new Set();
     this.timer = null;
     this.lastTick = null;
+    this.pages = [];
+    this.selection = null;
+    this.onPage = () => {};
     this.onError = error => { throw error; };
     this.observer = new ResizeObserver(() => {
       if (!container.clientWidth) return;
@@ -56,11 +71,11 @@ export class SheetMusic {
     score.setAttribute('role', 'img');
     score.tabIndex = 0;
     article.append(heading, score);
-    const nearBottom = this.container.scrollHeight - this.container.scrollTop - this.container.clientHeight < 90;
     this.container.append(article);
     const phrase = {kind, title: name.textContent, notes: notes.map(note => ({...note})), bpm, key, article, label, score,
-      marks: [], reveal: nearBottom};
+      marks: []};
     this.phrases.push(phrase);
+    this.selection = {phrase, row: 0};
     this.schedule(phrase);
     return phrase;
   }
@@ -74,8 +89,13 @@ export class SheetMusic {
       this.pending.clear();
       for (const current of pending) {
         if (!current.notes.length || !this.container.clientWidth) continue;
+        current.article.hidden = false;
         try { this.render(current); } catch (error) { this.onError(error); }
       }
+      this.pages = paginateSystems(this.phrases, this.container.clientWidth, this.container.clientHeight);
+      const index = this.pages.findIndex(page => page.phrase === this.selection?.phrase
+        && this.selection.row >= page.start && this.selection.row < page.end);
+      this.showPage(Math.max(0, index));
       this.lastTick = null;
     }, 100);
   }
@@ -85,23 +105,47 @@ export class SheetMusic {
     for (const phrase of this.phrases) this.schedule(phrase);
   }
 
+  showPage(index) {
+    if (!this.pages.length) { this.onPage({index: 0, total: 0}); return; }
+    index = Math.max(0, Math.min(this.pages.length - 1, index));
+    const page = this.pages[index];
+    this.selection = {phrase: page.phrase, row: page.start};
+    for (const phrase of this.phrases) phrase.article.hidden = phrase !== page.phrase;
+    const {rowHeight, scoreWidth, top} = page.phrase.layout;
+    const y = page.start * rowHeight + (page.start === 0 ? top : 0);
+    const height = (page.end - page.start) * rowHeight + 10 - (page.start === 0 ? top : 0);
+    const svg = page.phrase.score.querySelector('svg');
+    const scale = Math.min(page.phrase.score.clientWidth / scoreWidth, page.phrase.score.clientHeight / height);
+    svg.setAttribute('viewBox', `0 ${y} ${scoreWidth} ${height}`);
+    svg.style.width = `${scoreWidth * scale}px`;
+    svg.style.height = `${height * scale}px`;
+    this.pageIndex = index;
+    this.onPage({index, total: this.pages.length});
+  }
+
+  turnPage(direction) { this.showPage((this.pageIndex || 0) + direction); }
+
   clear() {
     clearTimeout(this.timer);
     this.timer = null;
     this.pending.clear();
     this.phrases = [];
     this.replyPhrase = null;
+    this.pages = [];
+    this.selection = null;
+    this.lastTick = null;
+    this.onPage({index: 0, total: 0});
     this.container.replaceChildren();
     const empty = document.createElement('div');
     empty.className = 'sheet-empty';
-    empty.innerHTML = '<span aria-hidden="true">𝄞</span><p>Your conversation, written as music.</p><small>Play a phrase to begin. Both parts will appear on a grand staff.</small>';
+    empty.innerHTML = '<span aria-hidden="true">𝄞</span><p>Start with a few notes.</p><small>Your music will appear here.</small>';
     this.container.append(empty);
   }
 
   playback(seconds) {
     const phrase = this.replyPhrase;
     if (!phrase) return;
-    const bpm = this.options.tempo === 'auto' ? phrase.bpm : this.options.bpm;
+    const bpm = phrase.kind === 'target' || this.options.tempo === 'auto' ? phrase.bpm : this.options.bpm;
     const origin = phrase.notes.length ? Math.min(...phrase.notes.map(note => note.start)) : 0;
     const tick = seconds === null ? -1 : Math.floor((seconds - origin) * bpm / 60 * 4);
     if (tick === this.lastTick) return;
@@ -110,13 +154,18 @@ export class SheetMusic {
       const active = tick >= mark.start && tick < mark.end;
       mark.element?.classList.toggle('score-sounding', active);
     }
+    const active = phrase.marks.find(mark => tick >= mark.start && tick < mark.end);
+    if (active) {
+      const index = this.pages.findIndex(page => page.phrase === phrase && active.row >= page.start && active.row < page.end);
+      if (index >= 0 && index !== this.pageIndex) this.showPage(index);
+    }
   }
 
   render(phrase) {
     const {Renderer, Stave, StaveNote, Voice, Formatter, Beam, Fraction,
       Accidental, Dot, StaveConnector, StaveTie} = window.VexFlow;
-    const bpm = this.options.tempo === 'auto' ? phrase.bpm : this.options.bpm;
-    const model = createScore(phrase.notes, {bpm, meter: this.options.meter});
+    const bpm = phrase.kind === 'target' || this.options.tempo === 'auto' ? phrase.bpm : this.options.bpm;
+    const model = createScore(phrase.notes, {bpm, meter: phrase.kind === 'target' ? '4/4' : this.options.meter});
     const signature = phrase.key?.signature || 'C';
     const flats = this.options.flats ?? Boolean(phrase.key?.scale_names.some(name => name.includes('b')));
     const signatureWidth = (phrase.key?.scale_names.filter(name => name.length > 1).length || 0) * 12;
@@ -141,7 +190,7 @@ export class SheetMusic {
       const minimum = formatter.preCalculateMinTotalWidth(voices) + 45;
       return {parts, voices, minimum, formatter};
     });
-    const viewport = Math.max(280, phrase.score.clientWidth);
+    const viewport = Math.max(280, this.container.clientWidth - 16);
     const width = Math.max(viewport, ...bars.map(bar => bar.minimum + 125 + signatureWidth));
     const margin = 22;
     const usable = width - 2 * margin;
@@ -212,7 +261,7 @@ export class SheetMusic {
         for (const clef of ['treble', 'bass']) {
           for (const item of bar.parts[clef].notes) {
             const element = item.note.getSVGElement();
-            phrase.marks.push({element, start: item.part.start, end: item.part.end});
+            phrase.marks.push({element, start: item.part.start, end: item.part.end, row: rowIndex});
             item.part.notes.forEach((note, noteIndex) => {
               const prev = previous.get(note.id);
               if (note.tied && prev) {
@@ -239,12 +288,11 @@ export class SheetMusic {
     const height = Math.max(rows.length * rowHeight + 10, bounds.y + bounds.height + 8) - top;
     renderer.resize(width, height);
     svg.setAttribute('viewBox', `0 ${top} ${width} ${height}`);
+    svg.style.width = '100%';
+    svg.style.height = '100%';
+    phrase.layout = {rows: rows.length, rowHeight, scoreWidth: width, top};
     const keyLabel = phrase.key ? `${phrase.key.name} · ` : '';
-    phrase.label.textContent = `${keyLabel}♩ = ${bpm}${this.options.tempo === 'auto' ? ' estimated' : ''} · ${model.meter} · ${phrase.notes.length} notes`;
+    phrase.label.textContent = `${keyLabel}♩ = ${bpm}${this.options.tempo === 'auto' && phrase.kind !== 'target' ? ' estimated' : ''} · ${model.meter} · ${phrase.notes.length} notes`;
     phrase.score.setAttribute('aria-label', `${phrase.title}: ${keyLabel}${phrase.notes.length} notes on treble and bass staves, ${model.meter}, quarter note equals ${bpm} BPM.`);
-    if (phrase.reveal) {
-      this.container.scrollTop += phrase.article.getBoundingClientRect().top - this.container.getBoundingClientRect().top;
-      phrase.reveal = false;
-    }
   }
 }

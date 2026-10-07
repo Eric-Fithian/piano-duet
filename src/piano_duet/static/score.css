@@ -1,5 +1,5 @@
 [hidden] { display: none !important; }
-.view-switch { display: flex; gap: 4px; padding: 0 26px 14px; }
+.view-switch { display: flex; gap: 4px; padding: 0; }
 .view-switch button { background: transparent; color: #aebbb3; padding: 8px 12px; }
 .view-switch button[aria-pressed=true] { background: #33423c; color: #f0eee4; }
 .notation-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 16px; padding: 12px 26px 0; border-top: 1px solid var(--line); }
@@ -7,14 +7,14 @@
 .notation-controls select, .notation-controls input { width: auto; margin: 0; padding: 6px 8px; font-size: 11px; }
 .notation-controls input { width: 65px; color: #d8e0d7; background: #28332b; border: 1px solid #465147; border-radius: 5px; }
 .notation-help { color: #9daaa2; font-size: 10px; line-height: 1.6; padding: 0 26px; margin: 10px 0 14px; }
-#sheetMusic { height: 440px; overflow: auto; overscroll-behavior: contain; background: #f6f3e9; color: #25312d; border-block: 1px solid #d9ddcf; scrollbar-color: #a0aa9c #f6f3e9; }
+#sheetMusic { flex:1; min-width:0; min-height:0; position:relative; overflow:hidden; background:#f6f3e9; color:#25312d; }
 #sheetMusic:focus-visible { outline: 2px solid var(--peach); outline-offset: -3px; }
 .sheet-empty { min-height: 100%; padding: 40px 26px; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .sheet-empty>span { font: 75px Bravura, Georgia, serif; color: #718476; line-height: 1; }
 .sheet-empty p { font: 22px Georgia, serif; margin: 15px 0 12px; }
 .sheet-empty small { font-size: 11px; line-height: 1.7; color: #5c6e61; }
-.score-phrase { background: #f6f3e9; border-bottom: 1px solid #d5d7ca; padding: 0 8px 8px; }
-.score-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 17px 17px 0; }
+.score-phrase { position:absolute; inset:0; display:flex; flex-direction:column; background:#f6f3e9; padding:0 8px 8px; overflow:hidden; }
+.score-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px 0; flex-shrink:0; min-height:32px; }
 .score-heading h2 { font-size: 11px; font-weight: 650; margin: 0; padding: 5px 9px; border-radius: 4px; background: #ead2b8; color: #654326; }
 .score-phrase.duet h2 { background: #d2e5e6; color: #315b61; }
 .score-heading>span { font-size: 10px; color: #627066; text-align: right; line-height: 1.7; }
@@ -22,31 +22,27 @@
 .key-caption { display: block; font-size: 8px; letter-spacing: 1.3px; color: #afc0af; }
 .key-follow strong { display: block; font: 18px Georgia, serif; margin-top: 8px; color: #e1e6d9; }
 .key-follow p { font-size: 10px; line-height: 1.7; margin: 8px 0 0; color: #b0c0b1; }
-.engraving { overflow-x: auto; overflow-y: hidden; }
-.engraving svg { display: block; }
+.engraving { flex:1; min-height:0; overflow:hidden; display:flex; align-items:center; justify-content:center; }
+.engraving svg { display:block; flex:none; max-width:100%; max-height:100%; overflow:hidden; }
 .engraving:focus-visible { outline: 2px solid #648b85; outline-offset: -2px; }
 .score-sounding path, .score-sounding text { fill: #168696; stroke: #168696; }
-@media (min-width: 1400px) { #sheetMusic { height: 500px; } }
 @media (max-width: 760px) {
-  .view-switch { padding-inline: 18px; }
   .notation-controls { padding-inline: 18px; gap: 10px; }
   .notation-help { padding-inline: 18px; }
-  #sheetMusic { height: 400px; }
   .score-heading { padding-inline: 8px; }
   .score-heading>span { font-size: 9px; }
 }
-.mode-switch { display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:18px; }
-.mode-switch button { color:#bdcac1; background:#202b26; border:1px solid #3e5045; }
-.mode-switch button[aria-pressed=true] { background:#d8c8ab; color:#24322b; }
-.mode-switch>span { font-size:12px; color:#a7b7ac; margin-left:10px; }
-.learning-panel { margin:0 26px 20px; padding:18px; background:#24312c; border:1px solid #496152; border-radius:8px; }
+.mode-switch { display:flex; align-items:center; gap:4px; padding:4px; border:1px solid var(--line); border-radius:10px; background:#1d2722; }
+.mode-switch button { color:#bdcac1; background:transparent; padding:9px 18px; }
+.mode-switch button[aria-pressed=true] { background:#3c5141; color:#f0eddf; }
+.learning-panel { flex-shrink:0; padding:14px 22px; position:relative; }
 .learning-steps { list-style:none; display:flex; flex-wrap:wrap; gap:8px 20px; margin:0; padding:0; font-size:11px; color:#a3b6a8; }
 .learning-steps li[aria-current=step] { color:#f0d2ae; font-weight:700; }
-#learningInstruction { font-size:13px; line-height:1.6; margin:14px 0; }
+#learningInstruction { font-size:12px; line-height:1.6; margin:8px 0; }
 .learning-actions { display:flex; flex-wrap:wrap; gap:18px; align-items:center; }
-.learning-result { margin-top:18px; padding-top:16px; border-top:1px solid #496152; }
-.learning-result strong { font:32px Georgia,serif; color:#d2e5cd; }
-.learning-result p { font-size:12px; line-height:1.7; }
+.learning-result { margin-top:8px; display:flex; align-items:center; gap:14px; }
+.learning-result strong { font:26px Georgia,serif; color:#d2e5cd; }
+.learning-result p { font-size:12px; line-height:1.6; margin:0; }
 .learning-result small,.analysis-help { font-size:10px; line-height:1.6; color:#b3c5b8; }
 .analysis-scroll { overflow:auto; max-height:290px; }
 .analysis-scroll table { border-collapse:collapse; width:100%; font-size:10px; text-align:left; }
@@ -55,4 +51,7 @@
 .changed-note { color:#f3c795; }
 .score-phrase.corrected h2 { background:#d2e5e6; color:#315b61; }
 .score-phrase.attempt h2 { background:#dce5c8; color:#435c2b; }
-@media(max-width:760px) { .learning-panel { margin-inline:18px; padding:14px; } .mode-switch>span { flex-basis:100%; margin:6px 0 0; } }
+@media(max-width:600px) { .learning-panel { padding:10px 14px; } .learning-steps { gap:8px; font-size:10px; } #learningInstruction { font-size:11px; } .learning-actions button { padding:6px 8px; font-size:11px; } .mode-switch button { padding-inline:16px; } }
+
+#surpriseDetails { margin:0; padding:0; border:0; }
+@media(max-height:500px) and (min-width:601px) { .learning-panel { padding:6px 16px; } #learningInstruction { margin:4px 0; } .learning-actions { position:absolute; top:0; right:12px; } .learning-steps { padding-right:320px; } }

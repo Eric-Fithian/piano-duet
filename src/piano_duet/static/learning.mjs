@@ -24,7 +24,13 @@ export class LearningCycle {
   }
 }
 
-export function pitchName(pitch) {
+export function pitchName(pitch, key = null) {
+  if (key?.pitch_classes?.includes(pitch % 12)) {
+    const name = key.scale_names[key.pitch_classes.indexOf(pitch % 12)];
+    const natural = {C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11}[name[0]];
+    const alteration = [...name.slice(1)].reduce((value, symbol) => value + (symbol === '#' ? 1 : -1), 0);
+    return `${name.replaceAll('#', '♯').replaceAll('b', '♭')}${Math.floor((pitch - natural - alteration) / 12) - 1}`;
+  }
   return `${['C', 'C♯', 'D', 'E♭', 'E', 'F', 'F♯', 'G', 'A♭', 'A', 'B♭', 'B'][pitch % 12]}${Math.floor(pitch / 12) - 1}`;
 }
 

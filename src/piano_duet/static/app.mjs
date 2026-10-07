@@ -1,9 +1,15 @@
 import {PhraseDetector, PianoSound, readEvents} from './audio.mjs';
 import {SheetMusic} from './sheet.mjs';
 import {LearningCycle, renderAnalysis} from './learning.mjs';
+import {PracticeCycle, localRequest, renderPractice, renderProfile, renderAttempt} from './practice.mjs';
 
 const $ = id => document.getElementById(id);
 const sheet = new SheetMusic($('sheetMusic'));
+sheet.onPage = ({index, total}) => {
+  $('pageLabel').textContent = total ? `${index + 1} / ${total}` : '—';
+  $('previousPage').disabled = !total || index === 0;
+  $('nextPage').disabled = !total || index === total - 1;
+};
 sheet.onError = error => {
   console.error(error);
   $('scoreError').textContent = `Sheet music could not render: ${error.message}`;
@@ -34,9 +40,171 @@ let reply = [];
 let turn = 0;
 let exchangeOffset = 0;
 let lateNotes = 0;
-let mode = 'duet';
+let mode = 'practice';
 const learning = new LearningCycle();
+const practice = new PracticeCycle();
+const automaticPause = {practice: false, duet: true, learning: true};
+let practiceScorePhrase = null;
+let lastAttempt = null;
 let targetScore = null;
+
+function practiceReady() {
+  if (mode !== 'practice' || !practice.task) return;
+  renderPractice(practice);
+  if (practice.completed) {
+    status('Attempt complete. Your profile is up to date.');
+    $('message').textContent = 'Review your feedback below, then choose Next exercise.';
+  } else if (!practice.canPlay) {
+    status('Listen to the melody first.');
+    $('message').textContent = 'Choose Hear melody, then play it back on your piano.';
+  } else {
+    status(microphone ? 'Listening. Take your time.' : 'Ready when you are.');
+    $('message').textContent = microphone
+      ? 'Play the exercise, then press Finish attempt or space. There is no time limit.'
+      : 'Enable your microphone below, then play the exercise on your piano.';
+  }
+}
+
+function showPracticeTarget() {
+  if (practiceScorePhrase) return;
+  const task = practice.task;
+  $('sheetMusic').querySelector('.practice-hidden')?.remove();
+  practiceScorePhrase = sheet.addPhrase('target', task.target, task.bpm || 60, task.key, task.title);
+  $('emptyRoll').hidden = true;
+}
+
+async function refreshProfile() {
+  const profile = await localRequest('/api/profile');
+  renderProfile(profile, id => inspectAttempt(id).catch(fail));
+  if (profile.recent.length) lastAttempt = profile.recent.find(attempt => attempt.note_count > 0)?.id || null;
+  $('savePieceForm').hidden = !lastAttempt;
+}
+
+async function inspectAttempt(id) {
+  renderAttempt(await localRequest(`/api/attempts/${id}`), (id, excluded) => excludeAttempt(id, excluded).catch(fail));
+  if (!$('profileDialog').open) return;
+  $('attemptDetail').scrollIntoView({block: 'start'});
+  $('attemptDetail').focus({preventScroll: true});
+}
+
+async function excludeAttempt(id, excluded) {
+  await localRequest(`/api/attempts/${id}/exclude`, {excluded});
+  if (practice.attemptId === id) { practice.excluded = excluded; renderPractice(practice); }
+  await Promise.all([refreshProfile(), inspectAttempt(id)]);
+}
+
+async function loadPractice() {
+  const generation = epoch;
+  busy = true;
+  detector.reset();
+  buttons();
+  status('Choosing your next step…');
+  const task = await localRequest('/api/practice/next', {focus: $('practiceFocus').value,
+    ...($('practicePiece').value && $('practiceFocus').value === 'repertoire' ? {piece: $('practicePiece').value} : {})});
+  if (task.family === 'repertoire') await loadPieces();
+  if (generation !== epoch || mode !== 'practice') return;
+  practice.acceptTask(task);
+  for (const details of $('exerciseDialog').querySelectorAll('details')) details.open = false;
+  heard = []; reply = []; transcript = [];
+  sheet.clear();
+  practiceScorePhrase = null;
+  $('scoreError').hidden = true;
+  if (practice.visible) showPracticeTarget();
+  else {
+    $('sheetMusic').replaceChildren();
+    const placeholder = document.createElement('p');
+    placeholder.className = 'practice-hidden';
+    placeholder.textContent = task.family === 'ear' ? 'Let your ears lead. Hear the melody, then find it on the keys.' : 'Find the notes yourself. Reveal the score whenever you need help.';
+    $('sheetMusic').append(placeholder);
+  }
+  showKey(task.key);
+  $('turnCount').textContent = `${task.family.toUpperCase()} · STAGE ${task.challenge}`;
+  $('emptyRoll').hidden = practice.visible;
+  if (task.family === 'reading') {
+    $('sheetPanel').hidden = false; $('rollPanel').hidden = true; $('scorePages').hidden = false;
+    $('sheetView').setAttribute('aria-pressed', true); $('rollView').setAttribute('aria-pressed', false);
+  }
+  $('timing').textContent = 'Your exercise';
+  busy = false;
+  practiceReady();
+  buttons();
+}
+
+async function practiceAid(kind) {
+  if (!practice.task || busy) return;
+  const generation = epoch;
+  busy = true;
+  detector.reset();
+  buttons();
+  if (!practice.completed) practice.task = await localRequest(`/api/practice/${practice.task.id}/aid`, {kind});
+  if (generation !== epoch) return;
+  renderPractice(practice);
+  if (kind === 'hints') {
+    busy = false;
+    practiceReady(); buttons();
+    return;
+  }
+  if (kind === 'reveals') {
+    showPracticeTarget();
+    $('sheetPanel').hidden = false; $('rollPanel').hidden = true; $('scorePages').hidden = false;
+    $('sheetView').setAttribute('aria-pressed', true); $('rollView').setAttribute('aria-pressed', false);
+    busy = false;
+    practiceReady(); buttons();
+    return;
+  }
+  await context.resume();
+  if (generation !== epoch) return;
+  playbackStart = context.currentTime + 0.2;
+  playbackEnd = playbackStart;
+  sheet.replyPhrase = practiceScorePhrase;
+  for (const note of practice.task.target) {
+    piano.play(note, playbackStart + note.start);
+    playbackEnd = Math.max(playbackEnd, playbackStart + note.start + note.duration + 0.2);
+  }
+  resumeAt = playbackEnd + 0.75;
+  status('Listen to the example.', '#95c8d2');
+  $('message').textContent = 'The microphone waits while the piano plays.';
+}
+
+async function loadPieces() {
+  const pieces = await localRequest('/api/pieces');
+  const selected = $('practicePiece').value;
+  $('practicePiece').replaceChildren(new Option('Most recently saved', ''));
+  for (const piece of pieces) $('practicePiece').add(new Option(piece.title, piece.id));
+  $('practicePiece').value = selected;
+}
+
+async function hearBeat() {
+  if (busy || !practice.task?.bpm) return;
+  const generation = epoch;
+  busy = true; resumeAt = Infinity; buttons();
+  await context.resume();
+  if (generation !== epoch) return;
+  const beat = 60 / practice.task.bpm;
+  const start = context.currentTime + 0.1;
+  for (let i = 0; i < 4; i++) {
+    const tone = context.createOscillator();
+    const gain = context.createGain();
+    tone.frequency.value = i === 0 ? 1000 : 700;
+    gain.gain.setValueAtTime(0.09, start + i * beat);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + i * beat + 0.06);
+    tone.connect(gain).connect(piano.gain);
+    tone.start(start + i * beat); tone.stop(start + i * beat + 0.07);
+    piano.sources.add(tone);
+    tone.onended = () => { piano.sources.delete(tone); tone.disconnect(); gain.disconnect(); };
+  }
+  resumeAt = start + 4 * beat + 0.3;
+  status(`${practice.task.bpm} BPM · find a comfortable pulse.`);
+}
+
+async function savePiece(event) {
+  event.preventDefault();
+  if (!lastAttempt) throw new Error('Play something before saving a piece.');
+  const piece = await localRequest('/api/pieces', {attempt: lastAttempt, title: $('pieceTitle').value});
+  $('pieceSaved').textContent = `Saved “${piece.title}”. Choose Repertoire in the Practice focus menu to learn it.`;
+  $('pieceTitle').value = '';
+  await loadPieces();
+}
 
 function learningStep(step, instruction) {
   for (const name of ['idea', 'listen', 'repeat', 'score']) {
@@ -74,16 +242,29 @@ function clearLearning() {
 function selectMode(value) {
   if (value === mode) return;
   mode = value;
+  $('practiceMode').setAttribute('aria-pressed', value === 'practice');
   $('duetMode').setAttribute('aria-pressed', value === 'duet');
   $('learningMode').setAttribute('aria-pressed', value === 'learning');
   $('learningPanel').hidden = value !== 'learning';
   $('learningSettings').hidden = value !== 'learning';
   $('duetSettings').hidden = value !== 'duet';
-  $('partnerLabel').textContent = value === 'learning' ? 'Practice target' : 'Duet';
-  $('modeDescription').textContent = value === 'learning'
-    ? 'Play an idea, hear a suggested correction, then play it back for a score.'
+  $('practicePanel').hidden = value !== 'practice';
+  $('practiceSettings').hidden = value !== 'practice';
+  $('keyCaption').textContent = value === 'practice' ? 'KEY OF THIS EXERCISE' : 'KEY OF YOUR LATEST PHRASE';
+  $('notationHelp').textContent = value === 'practice'
+    ? 'Exercise notation follows the task. Tempo and meter controls apply to your transcribed performance.'
+    : 'Approximate written rhythms. Tempo and meter change the score; playback keeps your timing.';
+  $('demo').hidden = value === 'practice';
+  $('answer').innerHTML = value === 'practice' ? 'Finish attempt <kbd>space</kbd>' : 'Answer now <kbd>space</kbd>';
+  $('autoReply').checked = automaticPause[value];
+  $('pause').disabled = !$('autoReply').checked;
+  $('partnerLabel').textContent = value === 'practice' ? 'Exercise' : value === 'learning' ? 'Practice target' : 'Duet';
+  $('modeDescription').textContent = value === 'practice' ? 'Personal practice, shaped by what you play.' : value === 'learning'
+    ? 'Play an idea, hear a variation, then play it back for a score.'
     : 'Trade musical ideas with your AI piano partner.';
+  $('modeDescription').hidden = value !== 'duet';
   reset();
+  if (value === 'practice') loadPractice().catch(fail);
 }
 
 function status(text, color = '#9ab89d') {
@@ -92,15 +273,30 @@ function status(text, color = '#9ab89d') {
 }
 
 function buttons() {
-  $('start').disabled = !ready || Boolean(microphone) || busy;
-  $('start').innerHTML = microphone ? '<span aria-hidden="true">●</span> Microphone on' : '<span aria-hidden="true">●</span> Enable microphone';
+  $('start').disabled = !ready || (!microphone && busy);
+  $('start').setAttribute('aria-pressed', Boolean(microphone));
+  $('start').classList.toggle('primary', !microphone);
+  $('micLabel').textContent = microphone ? 'Turn mic off' : 'Enable microphone';
   $('answer').disabled = !microphone || busy || calibrating > 0 || !detector.active;
+  $('answer').hidden = !microphone || busy || (mode === 'practice' && (!practice.canPlay || practice.completed));
+  $('nextPractice').hidden = mode !== 'practice' || !practice.completed || busy;
   $('stop').disabled = !microphone && !busy;
+  $('stop').hidden = !busy;
   $('demo').disabled = !ready || busy || Boolean(microphone) || (mode === 'learning' && learning.stage === 'repeat');
+  $('demo').hidden = mode === 'practice' || Boolean(microphone) || (mode === 'learning' && learning.stage === 'repeat');
   $('reset').disabled = busy || transcript.length === 0;
+  $('reset').hidden = mode === 'practice' || transcript.length === 0;
   $('export').disabled = busy || transcript.length === 0;
+  $('export').hidden = transcript.length === 0;
   $('microphone').disabled = Boolean(microphone) || busy;
   for (const id of ['duetMode', 'learningMode', 'newRound']) $(id).disabled = busy || detector.active;
+  for (const id of ['practiceMode', 'practiceFocus', 'practicePiece', 'nextPractice', 'skipPractice']) $(id).disabled = !ready || busy || detector.active;
+  for (const id of ['hearPractice', 'revealPractice', 'practiceBeat']) $(id).disabled = !ready || busy || detector.active || !practice.task;
+  $('practiceHelp').inert = busy || detector.active;
+  $('openAnalysis').hidden = mode !== 'learning' || $('surpriseDetails').hidden;
+  $('hearPractice').classList.toggle('primary', !practice.canPlay && !practice.completed);
+  $('hearPractice').classList.toggle('secondary', practice.canPlay || practice.completed);
+  $('rollView').disabled = mode === 'practice' && practice.task?.family === 'reading' && !practice.completed;
   $('replayTarget').disabled = busy || detector.active || !learning.target.length;
 }
 
@@ -126,6 +322,7 @@ async function stop() {
   $('message').textContent = 'The microphone is off. Enable it whenever you want to play again.';
   buttons();
   learningReady();
+  practiceReady();
   if (closing && closing.state !== 'closed') await closing.close();
 }
 
@@ -145,7 +342,14 @@ async function initialize() {
   if (!response.ok) throw new Error('The local piano server is not available. Restart Piano Duet.');
   await Promise.all([piano.load(), sheet.ready()]);
   ready = true;
+  $('autoReply').checked = false;
+  $('pause').disabled = true;
+  $('demo').hidden = true;
+  $('answer').innerHTML = 'Finish attempt <kbd>space</kbd>';
+  await Promise.all([refreshProfile(), loadPieces()]);
+  await loadPractice();
   status('Ready when you are');
+  practiceReady();
   buttons();
 }
 
@@ -153,8 +357,11 @@ async function startMicrophone() {
   $('error').hidden = true;
   busy = true;
   buttons();
-  await context.resume();
+  status('Waiting for microphone access…');
+  $('message').textContent = 'Choose Allow when Chrome asks to use your microphone.';
   const generation = ++epoch;
+  await context.resume();
+  if (generation !== epoch) return;
   const deviceId = $('microphone').value;
   const stream = await navigator.mediaDevices.getUserMedia({audio: {
     echoCancellation: false, noiseSuppression: false, autoGainControl: false,
@@ -198,10 +405,12 @@ function processAudio(chunk) {
       status('Your turn. Play a little something.');
       $('message').textContent = 'Play for as long as you like. Press space when you want a reply.';
       learningReady();
+      practiceReady();
     }
     return;
   }
   if (busy) return;
+  if (mode === 'practice' && !practice.canPlay) return;
   detector.pause = Number($('pause').value);
   detector.gate = Number($('gate').value);
   detector.autoReply = $('autoReply').checked;
@@ -213,9 +422,10 @@ function processAudio(chunk) {
   }
   if (phrase) requestReply(phrase).catch(fail);
   buttons();
+  if (!$('answer').disabled && document.activeElement === $('start')) $('answer').focus({preventScroll: true});
 }
 
-async function requestReply(audio) {
+async function requestReply(audio, {source = 'microphone'} = {}) {
   const generation = epoch;
   const requestStage = learning.stage;
   if (mode === 'learning' && requestStage === 'idea') {
@@ -233,10 +443,14 @@ async function requestReply(audio) {
   controller = new AbortController();
   $('error').hidden = true;
   status('Finding the notes in your phrase…', '#e8b58f');
-  $('message').textContent = 'Take a breath. Duet is listening back and preparing a reply.';
+  $('message').textContent = mode === 'practice'
+    ? 'Listening back to your performance and preparing your feedback.'
+    : 'Listening back to your phrase and preparing a reply.';
   buttons();
   const params = new URLSearchParams({session, seconds: $('length').value,
-    temperature: $('temperature').value, threshold: $('threshold').value, difficulty: $('difficulty').value, mode});
+    temperature: $('temperature').value, threshold: $('threshold').value, difficulty: $('difficulty').value, mode, source,
+    attempt: crypto.randomUUID()});
+  if (mode === 'practice') params.set('task', practice.task.id);
   if (mode === 'learning') {
     params.set('stage', requestStage);
     params.set('lesson', learning.id);
@@ -262,6 +476,12 @@ async function requestReply(audio) {
       if (event.type === 'analyzing') {
         status(`Checking note surprise… ${Math.round(event.progress * 100)}%`, '#e8b58f');
       }
+      if (event.type === 'attempt' && source === 'microphone') lastAttempt = event.id;
+      if (event.type === 'assessment') {
+        practice.acceptAssessment(event);
+        renderPractice(practice);
+        $('timing').textContent = event.assessment.score ? `${event.assessment.score.pitch_accuracy}% pitch accuracy · ${event.assessment.score.rhythm_accuracy ?? '—'}% relative rhythm` : 'No assessed notes yet.';
+      }
       if (event.type === 'lesson') {
         learning.acceptLesson(event);
         renderAnalysis($('surpriseRows'), event.analysis);
@@ -286,14 +506,15 @@ async function requestReply(audio) {
       if (event.type === 'heard') {
         heard = event.notes;
         reply = [];
-        sheet.heard(heard, event.key, mode === 'learning'
+        if (mode === 'practice' && heard.length) showPracticeTarget();
+        sheet.heard(heard, event.key, mode === 'practice' ? {kind: 'attempt', label: 'Your performance'} : mode === 'learning'
           ? {kind: requestStage === 'repeat' ? 'attempt' : 'you', label: `${requestStage === 'repeat' ? 'Your playback' : 'Your idea'} · ${turn + 1}`}
           : {});
         if (event.key) showKey(event.key);
         exchangeOffset = transcript.length ? Math.max(...transcript.map(n => n.start + n.duration)) + 0.5 : 0;
         replyOffset = heard.length ? Math.max(...heard.map(n => n.start + n.duration)) + 0.5 : 0;
         transcript.push(...heard.map(n => ({...n, start: n.start + exchangeOffset})));
-        $('emptyRoll').hidden = heard.length > 0;
+        $('emptyRoll').hidden = heard.length > 0 || (mode === 'practice' && practice.visible);
         status(heard.length ? `Heard ${heard.length} notes. A reply is on its way…` : 'No piano notes detected.', '#e8b58f');
         $('timing').textContent = `${heard.length} notes heard · ${event.transcription_ms} ms transcription`;
       }
@@ -336,6 +557,7 @@ async function requestReply(audio) {
     throw error;
   }
   if (!completed) throw new Error('The local connection ended before the reply finished. Please restart the app.');
+  await refreshProfile();
 }
 
 async function replayTarget() {
@@ -374,7 +596,7 @@ async function demo() {
   for (const note of example.notes) piano.play(note, start + note.start);
   await new Promise(resolve => setTimeout(resolve, 4700));
   if (generation !== epoch) return;
-  await requestReply(example.audio);
+  await requestReply(example.audio, {source: 'demo'});
 }
 
 function answer() {
@@ -412,7 +634,11 @@ function reset() {
   $('turnCount').textContent = 'A FRESH CONVERSATION';
   $('timing').textContent = 'Listening happens here. Nothing leaves your Mac.';
   status(microphone ? 'Your turn. Play a little something.' : 'Ready when you are');
+  $('message').textContent = microphone
+    ? 'Play for as long as you like, then pause or press Answer now.'
+    : 'Enable your microphone to play, or try a demo.';
   clearLearning();
+  if (mode !== 'practice') { practice.reset(); practiceScorePhrase = null; }
   buttons();
 }
 
@@ -423,7 +649,8 @@ function showKey(key) {
   const names = key.scale_names.map(name => name.replaceAll('#', '♯').replaceAll('b', '♭')).join(' ');
   $('keyDetail').textContent = mode === 'learning'
     ? `Your idea’s estimated key. Learning suggestions use the model’s probabilities, without forcing a scale.`
-    : `From your latest phrase. Replies use ${names}.${key.mode === 'minor' ? ' Natural minor.' : ''}`;
+    : mode === 'practice' ? `This exercise uses ${names}.${key.mode === 'minor' ? ' Natural minor.' : ''}`
+      : `From your latest phrase. Replies use ${names}.${key.mode === 'minor' ? ' Natural minor.' : ''}`;
 }
 function drawRoll() {
   const width = canvas.clientWidth;
@@ -435,7 +662,9 @@ function drawRoll() {
   }
   pen.setTransform(dpr, 0, 0, dpr, 0, 0);
   pen.clearRect(0, 0, width, height);
-  const all = [...heard, ...reply.map(n => ({...n, start: n.start + replyOffset}))];
+  const partner = mode === 'practice' ? (practice.visible ? practice.task.target : []) : reply;
+  const partnerOffset = mode === 'practice' ? (heard.length ? Math.max(...heard.map(n => n.start + n.duration)) + 0.5 : 0) : replyOffset;
+  const all = [...heard, ...partner.map(n => ({...n, start: n.start + partnerOffset}))];
   const lower = all.length ? Math.min(48, ...all.map(n => n.pitch)) - 3 : 42;
   const upper = all.length ? Math.max(76, ...all.map(n => n.pitch)) + 3 : 84;
   const seconds = Math.max(10, ...all.map(n => n.start + n.duration + 0.6));
@@ -467,12 +696,12 @@ function drawRoll() {
     pen.globalAlpha = 1;
   }
   notes(heard, 0, '#e8b58f');
-  notes(reply, replyOffset, '#95c8d2');
+  notes(partner, partnerOffset, '#95c8d2');
   if (busy && playbackStart !== null) {
     const progress = context.currentTime - playbackStart;
     pen.strokeStyle = '#b5dce0'; pen.globalAlpha = 0.5;
-    pen.beginPath(); pen.moveTo(x(replyOffset + Math.max(0, progress)), 0);
-    pen.lineTo(x(replyOffset + Math.max(0, progress)), height - 18); pen.stroke(); pen.globalAlpha = 1;
+    pen.beginPath(); pen.moveTo(x(partnerOffset + Math.max(0, progress)), 0);
+    pen.lineTo(x(partnerOffset + Math.max(0, progress)), height - 18); pen.stroke(); pen.globalAlpha = 1;
   }
 }
 
@@ -483,7 +712,7 @@ function draw() {
   const level = microphone ? Math.max(0, Math.min(100, (db + 65) / 60 * 100)) : 0;
   $('level').style.width = `${level}%`;
   $('level').parentElement.setAttribute('aria-valuenow', Math.round(level));
-  $('levelText').textContent = microphone ? `${Math.round(db)} dB` : 'OFF';
+  $('levelText').textContent = microphone ? `${Math.round(db)} dB` : 'MIC OFF';
   if (busy && context.currentTime >= resumeAt) {
     busy = false;
     resumeAt = Infinity;
@@ -494,12 +723,13 @@ function draw() {
       ? 'Listening again. Build on the reply, or start a different idea.'
       : 'That was a local audio-to-piano duet. Enable your microphone to play your own phrase.';
     learningReady();
+    practiceReady();
     buttons();
   }
   requestAnimationFrame(draw);
 }
 
-$('start').addEventListener('click', () => startMicrophone().catch(fail));
+$('start').addEventListener('click', () => (microphone ? stop() : startMicrophone()).catch(fail));
 $('stop').addEventListener('click', () => stop().catch(fail));
 $('answer').addEventListener('click', answer);
 $('demo').addEventListener('click', () => demo().catch(fail));
@@ -507,15 +737,52 @@ $('reset').addEventListener('click', reset);
 $('export').addEventListener('click', () => exportMidi().catch(fail));
 $('duetMode').addEventListener('click', () => selectMode('duet'));
 $('learningMode').addEventListener('click', () => selectMode('learning'));
+$('practiceMode').addEventListener('click', () => selectMode('practice'));
+$('nextPractice').addEventListener('click', () => loadPractice().catch(fail));
+$('skipPractice').addEventListener('click', () => { $('exerciseDialog').close(); loadPractice().catch(fail); });
+$('reviewPractice').addEventListener('click', () => {
+  $('assessmentDialog').close();
+  $('profileDialog').showModal();
+  inspectAttempt(practice.attemptId).catch(fail);
+});
+for (const [button, dialog] of [['openSettings', 'settingsDialog'], ['openProfile', 'profileDialog'],
+  ['openExercise', 'exerciseDialog'], ['openAssessment', 'assessmentDialog'], ['openAnalysis', 'analysisDialog']]) {
+  $(button).addEventListener('click', () => { $(dialog).showModal(); $(dialog).scrollTop = 0; });
+  $(dialog).addEventListener('click', event => {
+    if (event.target !== $(dialog)) return;
+    const bounds = $(dialog).getBoundingClientRect();
+    if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) $(dialog).close();
+  });
+}
+for (const button of document.querySelectorAll('[data-close]')) button.addEventListener('click', () => $(button.dataset.close).close());
+$('practiceFocus').addEventListener('change', () => {
+  $('pieceChoice').hidden = $('practiceFocus').value !== 'repertoire';
+  loadPractice().catch(fail);
+});
+$('practicePiece').addEventListener('change', () => loadPractice().catch(fail));
+$('previousPage').addEventListener('click', () => sheet.turnPage(-1));
+$('nextPage').addEventListener('click', () => sheet.turnPage(1));
+$('sheetMusic').addEventListener('keydown', event => {
+  if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+  event.preventDefault();
+  sheet.turnPage(event.key === 'ArrowLeft' ? -1 : 1);
+});
+$('hearPractice').addEventListener('click', () => practiceAid('hearings').catch(fail));
+$('practiceBeat').addEventListener('click', () => hearBeat().catch(fail));
+$('practiceHelp').addEventListener('toggle', () => { if ($('practiceHelp').open && practice.task && !practice.completed) practiceAid('hints').catch(fail); });
+$('revealPractice').addEventListener('click', () => practiceAid('reveals').catch(fail));
+$('excludePractice').addEventListener('click', () => excludeAttempt(practice.attemptId, !practice.excluded).catch(fail));
+$('savePieceForm').addEventListener('submit', event => savePiece(event).catch(fail));
 $('replayTarget').addEventListener('click', () => replayTarget().catch(fail));
 $('newRound').addEventListener('click', () => { clearLearning(); detector.reset(); buttons(); });
-$('autoReply').addEventListener('change', () => { $('pause').disabled = !$('autoReply').checked; });
+$('autoReply').addEventListener('change', () => { $('pause').disabled = !$('autoReply').checked; automaticPause[mode] = $('autoReply').checked; });
 for (const view of ['sheet', 'roll']) {
   $(`${view}View`).addEventListener('click', () => {
     $('sheetPanel').hidden = view !== 'sheet';
     $('rollPanel').hidden = view !== 'roll';
     $('sheetView').setAttribute('aria-pressed', view === 'sheet');
     $('rollView').setAttribute('aria-pressed', view === 'roll');
+    $('scorePages').hidden = view !== 'sheet';
   });
 }
 for (const id of ['scoreTempo', 'scoreBpm', 'scoreMeter', 'scoreAccidentals']) {
@@ -528,6 +795,7 @@ for (const id of ['scoreTempo', 'scoreBpm', 'scoreMeter', 'scoreAccidentals']) {
   });
 }
 document.addEventListener('keydown', event => {
+  if (document.querySelector('dialog[open]')) return;
   if (event.code !== 'Space' || ['INPUT', 'SELECT', 'BUTTON', 'SUMMARY'].includes(event.target.tagName)) return;
   event.preventDefault();
   answer();

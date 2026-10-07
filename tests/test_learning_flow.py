@@ -26,7 +26,10 @@ def client(tmp_path, monkeypatch):
     engine.lesson = None
     engine.generator = None
     engine.notes = [Note(pitch=61, start=0, duration=0.4, velocity=80)]
-    engine.transcriber = SimpleNamespace(transcribe=lambda *args, **kwargs: engine.notes)
+    engine.transcriber = SimpleNamespace(
+        transcribe=lambda *args, **kwargs: engine.notes,
+        last_quality={"usable": True, "reason": "Test input"},
+    )
 
     def analyze(generator, notes, threshold, cancel, on_note):
         detail = {"index": 0, "played": 61, "corrected": 60, "surprise": 0.99, "changed": True}
@@ -34,7 +37,9 @@ def client(tmp_path, monkeypatch):
         return [notes[0].model_copy(update={"pitch": 60})], [detail]
 
     monkeypatch.setattr("piano_duet.server.analyze_phrase", analyze)
-    with TestClient(create_app(engine_factory=lambda: engine)) as result:
+    with TestClient(
+        create_app(engine_factory=lambda: engine, profile_path=tmp_path / "learner.sqlite3")
+    ) as result:
         yield result
 
 
@@ -51,12 +56,19 @@ def request(client, session, lesson, stage="idea"):
 def test_full_learning_cycle_scores_once_then_accepts_another_idea(client):
     session, lesson = uuid4(), uuid4()
     events = request(client, session, lesson)
-    assert [e["type"] for e in events] == ["heard", "analyzing", "lesson", "note", "done"]
+    assert [e["type"] for e in events] == [
+        "attempt",
+        "heard",
+        "analyzing",
+        "lesson",
+        "note",
+        "done",
+    ]
     assert events[-2]["note"]["pitch"] == 60
     client.app.state.engine.notes = [Note(pitch=60, start=1, duration=0.4, velocity=80)]
     events = request(client, session, lesson, "repeat")
-    assert [e["type"] for e in events] == ["heard", "score", "done"]
-    assert events[1]["score"] == 100
+    assert [e["type"] for e in events] == ["attempt", "heard", "score", "done"]
+    assert events[2]["score"] == 100
     assert events[-1]["stage"] == "complete"
     assert client.app.state.engine.lesson is None
     assert request(client, session, lesson, "repeat")[0]["type"] == "error"

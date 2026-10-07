@@ -1,5 +1,6 @@
 import json
 from threading import Event
+from types import SimpleNamespace
 from uuid import uuid4
 
 import numpy as np
@@ -21,6 +22,8 @@ class RecordingEngine:
     def __init__(self):
         self.called = Event()
         self.audio = None
+        self.history = []
+        self.transcriber = SimpleNamespace(last_quality={"usable": True, "reason": "Test input"})
 
     def respond(self, audio, session, seconds, temperature, threshold, emit, cancel, difficulty):
         self.called.set()
@@ -37,7 +40,9 @@ class RecordingEngine:
 def client(tmp_path, monkeypatch):
     monkeypatch.setattr("piano_duet.server.SAMPLES", tmp_path)
     monkeypatch.setattr("piano_duet.server.NOTATION", tmp_path)
-    with TestClient(create_app(engine_factory=RecordingEngine)) as result:
+    with TestClient(
+        create_app(engine_factory=RecordingEngine, profile_path=tmp_path / "learner.sqlite3")
+    ) as result:
         yield result
 
 
@@ -45,6 +50,7 @@ def test_stream_and_release_busy(client):
     response = client.post(f"/api/respond?session={uuid4()}", content=PCM, headers=HEADERS)
     assert response.status_code == 200
     assert [json.loads(line)["type"] for line in response.text.splitlines()] == [
+        "attempt",
         "heard",
         "note",
         "done",

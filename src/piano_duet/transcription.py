@@ -78,6 +78,13 @@ class PianoTranscriber:
         cancel: Event | None = None,
         on_progress: Callable[[float], None] | None = None,
     ) -> list[Note]:
+        self.last_quality = {
+            "usable": False,
+            "onset_support": None,
+            "supported_fraction": 0,
+            "note_support": [],
+            "reason": "No recognized notes",
+        }
         if audio.ndim != 1 or not np.isfinite(audio).all():
             raise ValueError("Expected finite mono 16 kHz PCM")
         if len(audio) < SAMPLE_RATE // 10:
@@ -118,6 +125,7 @@ class PianoTranscriber:
         )
         detected, pedals = processor.output_dict_to_midi_events(prediction)
         notes = []
+        support = []
         audio_seconds = len(audio) / SAMPLE_RATE
         for event in detected:
             start = max(0, event["onset_time"] - 0.25)
@@ -136,6 +144,28 @@ class PianoTranscriber:
                         velocity=max(1, event["velocity"]),
                     )
                 )
+                frame = round(event["onset_time"] * 100)
+                strength = float(
+                    prediction["reg_onset_output"][
+                        max(0, frame - 3) : min(frames, frame + 4), event["midi_note"] - 21
+                    ].max()
+                )
+                support.append(strength)
+        if support:
+            ordered = sorted(
+                zip(notes, support, strict=True), key=lambda pair: (pair[0].start, pair[0].pitch)
+            )
+            notes = [pair[0] for pair in ordered]
+            support = [pair[1] for pair in ordered]
+            average = float(np.mean(support))
+            fraction = sum(value >= 0.6 for value in support) / len(support)
+            self.last_quality = {
+                "usable": average >= 0.75 and fraction >= 0.8,
+                "onset_support": round(average, 3),
+                "supported_fraction": round(fraction, 3),
+                "note_support": [round(value, 3) for value in support],
+                "reason": "Onset model support; not a calibrated probability of correct transcription",
+            }
         return sorted(notes, key=lambda note: (note.start, note.pitch))
 
 
