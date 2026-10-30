@@ -29,7 +29,7 @@ function longRhythms(beats: number): number[][] {
     .flatMap((duration) => longRhythms(beats - duration).map((tail) => [duration, ...tail]));
 }
 
-function startsOf(groups: number[]): number[] {
+export function beatStarts(groups: number[]): number[] {
   return groups.reduce<number[]>((starts, group) => [...starts, starts[starts.length - 1] + group], [0]);
 }
 
@@ -48,7 +48,7 @@ export function barRhythms(style: string, meter: string, restAt: number | null =
     if (restAt !== null || ending) throw new Error("Long-note bars have neither rests nor fixed endings");
     return longRhythms(beats);
   }
-  const starts = startsOf(groups);
+  const starts = beatStarts(groups);
   const slot = (index: number): number[][] => {
     if (index >= groups.length - ending) return [[groups[index]]];
     if (restAt !== null && Math.abs(starts[index] - restAt) < EPSILON) return [[-groups[index]]];
@@ -77,7 +77,7 @@ export function barRhythms(style: string, meter: string, restAt: number | null =
 export function restPositions(style: string, meter: string, ending: number): number[] {
   if (style === "held" || style === "long") return [];
   const groups = beatGroups(meter);
-  return startsOf(groups).slice(0, -1).filter((_, index) => index > 0 && index < groups.length - 1 - ending);
+  return beatStarts(groups).slice(0, -1).filter((_, index) => index > 0 && index < groups.length - 1 - ending);
 }
 
 export function nextValues(rhythms: number[][], prefix: number[]): number[] {
