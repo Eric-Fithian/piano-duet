@@ -17,7 +17,7 @@ export default defineConfig({
     "/docs": "http://127.0.0.1:4321",
     "/install.sh": { target: "http://127.0.0.1:4321", rewrite: () => "/docs/install.sh" },
   } },
-  preview: { host: "127.0.0.1", headers },
+  preview: { host: "127.0.0.1", headers, proxy: {} },
   worker: { format: "es" },
   plugins: [{
     name: "offline-app-shell",
