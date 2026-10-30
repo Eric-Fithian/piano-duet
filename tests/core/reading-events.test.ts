@@ -37,6 +37,6 @@ print(json.dumps({"events": events, "expected": reading_progress(attempts)}))
   assert.equal(reference.status, 0, reference.stderr);
   const data: { events: ReadingLogEvent[]; expected: unknown } = JSON.parse(reference.stdout);
   assert.deepEqual(readingProgressFromEvents([...data.events].reverse()), data.expected);
-  assert.throws(() => readingProgressFromEvents([data.events[0], data.events[0]]), /Duplicate/);
-  assert.throws(() => readingProgressFromEvents([{ ...data.events[0], kind: "exclusion", payload: { attemptId: "x" } }]), /Invalid exclusion/);
+  assert.throws(() => readingProgressFromEvents([data.events[0], data.events[0]]), { message: "Duplicate practice event attempt-0" });
+  assert.throws(() => readingProgressFromEvents([{ ...data.events[0], kind: "exclusion", payload: { attemptId: "x" } }]), { message: "Invalid exclusion event" });
 });

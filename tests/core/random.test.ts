@@ -9,7 +9,7 @@ test("random choices respect weights and sample without replacement", () => {
   assert.deepEqual(random.choices([1, 2, 3], [0, 1, 3]), [2]);
   assert.deepEqual(random.choices([1, 2, 3], [0, 1, 3]), [3]);
   assert.deepEqual(random.sample([1, 2, 3], 2), [1, 3]);
-  assert.throws(() => random.random(), /Random draws/);
-  assert.throws(() => random.choices([1], [0]), /positive finite total/);
-  assert.throws(() => random.sample([1], 2), /sample size/);
+  assert.throws(() => random.random(), { message: "Random draws must be in [0, 1)" });
+  assert.throws(() => random.choices([1], [0]), { message: "Weighted choices need a positive finite total" });
+  assert.throws(() => random.sample([1], 2), { message: "Invalid sample size" });
 });

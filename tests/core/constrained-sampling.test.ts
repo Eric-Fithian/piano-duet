@@ -46,5 +46,5 @@ print(json.dumps({"pitchTokens": pitch_tokens, "durationTokens": duration_tokens
   }
   const actual = [...constrainedDistribution(data.logits, new Map(data.weights)).values()];
   actual.forEach((probability, index) => assert.ok(Math.abs(probability - data.probabilities[index]) < 1e-6));
-  assert.throws(() => durationMask(vocabulary, new Map([[0.2, 1], [0.201, 1]])), /same Aria token/);
+  assert.throws(() => durationMask(vocabulary, new Map([[0.2, 1], [0.201, 1]])), { message: "Two offered durations map to the same Aria token" });
 });

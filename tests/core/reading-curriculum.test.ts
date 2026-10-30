@@ -29,6 +29,6 @@ print(json.dumps({"histories": histories, "expected": [curriculum_progress(histo
   const data: { histories: CurriculumAttempt[][]; expected: unknown[]; replay: unknown } = JSON.parse(reference.stdout);
   assert.deepEqual(data.histories.map((attempts) => curriculumProgress(attempts)), data.expected);
   assert.deepEqual(curriculumProgress(data.histories.at(-1)!, 1), data.replay);
-  assert.throws(() => curriculumProgress([], 24), /locked/);
-  assert.throws(() => curriculumProgress([], 25), /1 to 24/);
+  assert.throws(() => curriculumProgress([], 24), { message: "Stage 24 is locked until the earlier stages are complete" });
+  assert.throws(() => curriculumProgress([], 25), { message: "Reading stages run from 1 to 24" });
 });

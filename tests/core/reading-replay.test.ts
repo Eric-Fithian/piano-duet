@@ -16,9 +16,9 @@ test("composition replay checks order, options, context and complete consumption
   assert.deepEqual(phrase.note(0, [[48, 2], [50, 3]], [[0.5, 1]]), [50, 0.5]);
   assert.equal(phrase.chordChance([55, 59]), 0.3);
   replay.finish();
-  assert.throws(() => new ReadingReplay(events).choice(["treble"]), /mismatch/);
-  assert.throws(() => new ReadingReplay(events).phrase(null), /mismatch/);
-  assert.throws(() => new ReadingReplay(events).finish(), /unused/);
+  assert.throws(() => new ReadingReplay(events).choice(["treble"]), (error: Error) => error.message.includes("mismatch"));
+  assert.throws(() => new ReadingReplay(events).phrase(null), (error: Error) => error.message.includes("mismatch"));
+  assert.throws(() => new ReadingReplay(events).finish(), { message: "Reading replay left 4 events unused" });
 });
 
 test("the replay accepts the Python recorder's complete stream for all stages", async () => {
