@@ -22,7 +22,7 @@ before(async () => {
     server.on("exit", (code) => reject(new Error(`Vite exited before startup: ${code}`)));
     server.stderr.on("data", (chunk) => process.stderr.write(chunk));
   });
-});
+}, { timeout: 45000 });
 after(() => server.kill("SIGTERM"));
 
 for (const [name, engine] of [["Chromium", chromium], ["WebKit", webkit]]) {
