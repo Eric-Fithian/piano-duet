@@ -6,7 +6,6 @@ set -eu
 
 REPOSITORY="https://github.com/Eric-Fithian/piano-duet.git"
 TARGET="${PIANO_DUET_HOME:-$HOME/.piano-duet}"
-BIN="$HOME/.local/bin"
 
 fail() {
   printf 'Piano Duet: %s\n' "$1" >&2
@@ -19,11 +18,12 @@ fail() {
 xcode-select -p >/dev/null 2>&1 || fail "Git is missing. Run 'xcode-select --install', then run this installer again."
 
 SHELL_PATH="$PATH"
-export PATH="$BIN:$PATH"
+export PATH="$HOME/.local/bin:$PATH"
 if ! command -v uv >/dev/null 2>&1; then
   printf 'Installing uv, the Python package manager...\n'
   curl -LsSf https://astral.sh/uv/install.sh | sh
 fi
+BIN="$(uv tool dir --bin)"
 
 if [ -d "$TARGET/.git" ]; then
   printf 'Updating Piano Duet in %s\n' "$TARGET"
@@ -58,5 +58,8 @@ chmod +x "$BIN/piano-duet"
 printf '\nPiano Duet is installed. Start it with:\n\n  piano-duet\n\n'
 case ":$SHELL_PATH:" in
   *":$BIN:"*) ;;
-  *) printf 'Open a new Terminal window first so %s is on your PATH.\n' "$BIN" ;;
+  *)
+    PATH="$SHELL_PATH" "$(command -v uv)" tool update-shell
+    printf 'Open a new Terminal window first, so the piano-duet command is found.\n'
+    ;;
 esac
