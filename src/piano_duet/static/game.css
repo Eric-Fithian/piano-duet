@@ -146,6 +146,8 @@ button { border-radius: 6px; }
 .youtube-form { display: grid; gap: 14px; }
 .youtube-form input { width: 100%; padding: 11px 12px; color: var(--text); background: var(--bg); border: 1px solid var(--line-strong); border-radius: 6px; }
 .youtube-progress { display: grid; gap: 8px; font: 12px var(--display); letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); }
+.youtube-form .youtube-rights { display: flex; gap: 10px; align-items: flex-start; color: var(--muted); font-size: 13px; line-height: 1.5; cursor: pointer; }
+.youtube-form .youtube-rights input { width: auto; margin: 3px 0 0; padding: 0; accent-color: var(--gold); flex-shrink: 0; }
 .youtube-error { margin: 0; color: #ff9d90; font-size: 13px; line-height: 1.5; }
 .youtube-form .setting-help { margin: 0; }
 

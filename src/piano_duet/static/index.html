@@ -178,6 +178,7 @@
     <div class="dialog-heading"><h2 id="youtubeTitle">From YouTube</h2><button class="quiet-button" data-close="youtubeDialog">Done</button></div>
     <form id="youtubeForm" class="controls youtube-form">
       <input id="youtubeUrl" type="url" placeholder="https://youtu.be/…" aria-label="YouTube link" required autofocus>
+      <label class="youtube-rights"><input id="youtubeRights" type="checkbox" required> I own this recording, or have permission from its rights holder to transcribe it, and will use the score only for my own practice.</label>
       <button id="youtubeGo" class="primary" type="submit">Transcribe</button>
       <div id="youtubeProgress" class="youtube-progress" hidden><span id="youtubeStage"></span><span class="xp-track"><i id="youtubeFill"></i></span></div>
       <p id="youtubeError" class="youtube-error" role="alert" hidden></p>

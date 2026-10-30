@@ -238,7 +238,7 @@ async function importYoutube(event) {
   $('youtubeGo').disabled = true;
   youtubeProgress('Downloading', 0);
   const response = await fetch('/api/library/youtube', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Duet-Client': '1'},
-    body: JSON.stringify({url: $('youtubeUrl').value})});
+    body: JSON.stringify({url: $('youtubeUrl').value, has_rights: $('youtubeRights').checked})});
   if (!response.ok) { youtubeError((await response.json()).detail); return; }
   for await (const update of readEvents(response.body)) {
     if (update.type === 'downloading') youtubeProgress('Downloading', 0.3 * update.progress);

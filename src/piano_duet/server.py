@@ -196,6 +196,8 @@ class ReadingNote(BaseModel):
 
 class YoutubeRequest(BaseModel):
     url: str = Field(min_length=1, max_length=500)
+    # The player must confirm they may transcribe the recording; nothing is downloaded otherwise.
+    has_rights: Literal[True]
 
 
 class SongNote(BaseModel):
