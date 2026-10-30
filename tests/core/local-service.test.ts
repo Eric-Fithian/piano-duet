@@ -15,18 +15,21 @@ import piano_duet.server as server
 class Engine:
     def __init__(self):
         self.transcriber = SimpleNamespace(listen=lambda audio, threshold: [{"pitch": 60, "start": 0.5, "velocity": 80, "confidence": float(audio[0])}])
+        self.generator = SimpleNamespace(phrase=None)
 with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.StringIO()):
     server.SAMPLES = server.NOTATION = Path(directory)
     with TestClient(server.create_app(engine_factory=Engine, profile_path=Path(directory) / "learner.sqlite3")) as client:
         status = client.get("/api/status").json()
         profile = client.get("/api/profile").json()
         pieces = client.get("/api/pieces").json()
+        task = client.post("/api/practice/next", json={"focus": "guided"}, headers={"X-Duet-Client": "1"}).json()
+        aided = client.post(f"/api/practice/{task['id']}/aid", json={"kind": "hearings"}, headers={"X-Duet-Client": "1"}).json()
         audio = np.zeros(32000, dtype="<f4")
         audio[0], audio[1] = 1, 2
         heard = client.post("/api/reading/listen?threshold=0.8", content=audio.tobytes(), headers={"X-Duet-Client": "1"}).json()
         invalid = client.post("/api/reading/listen", content=b"x", headers={"X-Duet-Client": "1"})
 profile["generated_at"] = 1700000000
-print(json.dumps({"status": status, "profile": profile, "pieces": pieces, "heard": heard["notes"], "invalid": {"status": invalid.status_code, "body": invalid.json()}}))
+print(json.dumps({"status": status, "profile": profile, "pieces": pieces, "task": task, "aided": aided, "heard": heard["notes"], "invalid": {"status": invalid.status_code, "body": invalid.json()}}))
 `], { encoding: "utf8", maxBuffer: 10_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const expected = JSON.parse(reference.stdout);
@@ -41,6 +44,12 @@ print(json.dumps({"status": status, "profile": profile, "pieces": pieces, "heard
   assert.deepEqual({ ...status, model: expected.status.model }, expected.status);
   assert.deepEqual(await (await service.fetch("/api/profile")).json(), expected.profile);
   assert.deepEqual(await (await service.fetch("/api/pieces")).json(), expected.pieces);
+  const task = await (await service.fetch("/api/practice/next", { method: "POST", body: JSON.stringify({ focus: "guided" }) })).json();
+  expected.task.id = task.id;
+  assert.deepEqual(task, expected.task);
+  const aided = await (await service.fetch(`/api/practice/${task.id}/aid`, { method: "POST", body: JSON.stringify({ kind: "hearings" }) })).json();
+  expected.aided.id = task.id;
+  assert.deepEqual(aided, expected.aided);
   const audio = new Float32Array(32000); audio[0] = 1; audio[1] = 2;
   const heard = await (await service.fetch("/api/reading/listen?threshold=0.8", { method: "POST", body: audio.buffer })).json();
   assert.deepEqual(heard.notes, expected.heard);

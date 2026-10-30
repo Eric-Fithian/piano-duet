@@ -1,9 +1,9 @@
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
-import type { DownloadProgress, ModelId } from "./inference";
+import type { AssetId, DownloadProgress } from "./inference";
 
 export interface ModelFile {
-  model: ModelId;
+  model: AssetId;
   name: string;
   revision: string;
   url: string;

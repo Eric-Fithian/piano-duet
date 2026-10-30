@@ -1,4 +1,5 @@
 import { learnerProfile } from "./learner-profile.ts";
+import { initialPracticeTask } from "./initial-practice.ts";
 import { attemptsFromEvents } from "./reading-events.ts";
 import type { ReadingLogEvent } from "./reading-events.ts";
 
@@ -6,17 +7,21 @@ export interface LocalEventStore { list(): Promise<ReadingLogEvent[]> }
 export interface LocalTranscriber {
   run(input: { audio: Float32Array; sampleRate: 16000; threshold: number }, signal?: AbortSignal): Promise<{ notes: unknown[] }>;
 }
+export interface LocalAssets { fetch(path: string, options?: RequestInit): Promise<Response> }
 
 export class LocalService {
   private readingBusy = false;
   private readonly store: LocalEventStore;
   private readonly transcriber?: LocalTranscriber;
   private readonly now: () => number;
+  private readonly assets?: LocalAssets;
+  private readonly tasks = new Map<string, ReturnType<typeof initialPracticeTask>>();
 
-  constructor(store: LocalEventStore, transcriber?: LocalTranscriber, now: () => number = () => Date.now() / 1000) {
+  constructor(store: LocalEventStore, transcriber?: LocalTranscriber, now: () => number = () => Date.now() / 1000, assets?: LocalAssets) {
     this.store = store;
     this.transcriber = transcriber;
     this.now = now;
+    this.assets = assets;
   }
 
   async fetch(path: string, options: RequestInit = {}): Promise<Response> {
@@ -24,6 +29,10 @@ export class LocalService {
     const url = new URL(path, "http://piano.local");
     if (url.origin !== "http://piano.local") throw new Error("Local service requests must use a local path");
     const method = (options.method ?? "GET").toUpperCase();
+    if (url.pathname.startsWith("/samples/")) {
+      if (!this.assets) return Response.json({ detail: "Piano samples are not available yet" }, { status: 501 });
+      return this.assets.fetch(url.pathname, options);
+    }
     if (method === "GET" && url.pathname === "/api/status") {
       return Response.json({ application: "piano-duet", development: false, ready: true, busy: this.readingBusy,
         model: "Aria · ONNX 4-bit", sample_rate: 16000 });
@@ -35,6 +44,29 @@ export class LocalService {
       const events = await this.store.list();
       const pieces = events.filter((event) => event.kind === "song" && isPiece(event.payload)).map((event) => (event.payload as { piece: unknown }).piece);
       return Response.json(pieces);
+    }
+    if (method === "POST" && url.pathname === "/api/practice/next") {
+      if (typeof options.body !== "string") return Response.json({ detail: "A practice request needs JSON" }, { status: 400 });
+      const request = JSON.parse(options.body) as { focus?: string; step_by_step?: boolean; piece?: string | null; stage?: number | null; after?: string | null };
+      const focus = request.focus ?? "guided";
+      if (request.step_by_step && focus !== "reading") return Response.json({ detail: "Step-by-step practice requires the reading focus" }, { status: 400 });
+      const attempts = attemptsFromEvents(await this.store.list());
+      if ((focus === "guided" || focus === "technique") && !attempts.length && !request.piece && !request.stage && !request.after) {
+        const task = initialPracticeTask(crypto.randomUUID(), focus);
+        this.tasks.set(task.id, task);
+        return Response.json(task);
+      }
+      return Response.json({ detail: "This practice selection is not available yet" }, { status: 501 });
+    }
+    const parts = url.pathname.split("/").filter(Boolean);
+    if (method === "POST" && parts.length === 4 && parts[0] === "api" && parts[1] === "practice" && parts[3] === "aid") {
+      const task = this.tasks.get(parts[2]);
+      if (!task) return Response.json({ detail: "Choose an unfinished exercise first" }, { status: 409 });
+      if (typeof options.body !== "string") return Response.json({ detail: "An aid request needs JSON" }, { status: 400 });
+      const request = JSON.parse(options.body) as { kind?: "hearings" | "reveals" | "hints" };
+      if (request.kind !== "hearings" && request.kind !== "reveals" && request.kind !== "hints") return Response.json({ detail: "Invalid aid" }, { status: 422 });
+      task.context[request.kind]++;
+      return Response.json(task);
     }
     if (method === "POST" && url.pathname === "/api/reading/listen") return this.listen(url, options);
     return Response.json({ detail: `Local service does not yet implement ${method} ${url.pathname}` }, { status: 501 });

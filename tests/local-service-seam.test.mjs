@@ -10,11 +10,13 @@ test('API requests use the injected service while other requests keep browser fe
   try {
     assert.deepEqual(await localRequest('/api/profile'), {source: 'local'});
     assert.deepEqual(await localRequest('/api/practice/next', {focus: 'reading'}), {source: 'local'});
-    assert.deepEqual(await (await localFetch('/samples/C4.mp3')).json(), {source: 'network'});
+    assert.deepEqual(await (await localFetch('/samples/C4.mp3')).json(), {source: 'local'});
+    assert.deepEqual(await (await localFetch('/docs/')).json(), {source: 'network'});
     assert.equal(requests[0].kind, 'local');
     assert.equal(requests[1].options.method, 'POST');
     assert.deepEqual(JSON.parse(requests[1].options.body), {focus: 'reading'});
-    assert.equal(requests[2].kind, 'network');
+    assert.equal(requests[2].kind, 'local');
+    assert.equal(requests[3].kind, 'network');
     setLocalService(null);
     assert.deepEqual(await localRequest('/api/profile'), {source: 'network'});
   } finally {

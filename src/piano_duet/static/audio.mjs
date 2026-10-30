@@ -1,3 +1,5 @@
+import {localFetch} from './practice.mjs';
+
 export class PhraseDetector {
   constructor({pause = 0.9, gate = -48, noise = 0, autoReply = true} = {}) {
     this.pause = pause;
@@ -65,11 +67,11 @@ export class PianoSound {
     this.gain.connect(compressor).connect(context.destination);
   }
   async load() {
-    const response = await fetch('/samples/manifest.json');
+    const response = await localFetch('/samples/manifest.json');
     if (!response.ok) throw new Error('Piano samples are missing. Run the setup command again.');
     const manifest = await response.json();
     this.samples = await Promise.all(manifest.map(async entry => {
-      const response = await fetch(`/samples/${entry.file}`);
+      const response = await localFetch(`/samples/${entry.file}`);
       if (!response.ok) throw new Error(`Could not load piano sample ${entry.file}`);
       return {pitch: entry.pitch, buffer: await this.context.decodeAudioData(await response.arrayBuffer())};
     }));

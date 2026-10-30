@@ -8,7 +8,7 @@ export function setLocalService(service) {
 }
 
 export function localFetch(path, options) {
-  return localService && path.startsWith('/api/') ? localService.fetch(path, options) : fetch(path, options);
+  return localService && (path.startsWith('/api/') || path.startsWith('/samples/')) ? localService.fetch(path, options) : fetch(path, options);
 }
 
 export async function localRequest(path, body, method = 'POST') {

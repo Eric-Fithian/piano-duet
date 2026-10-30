@@ -1,4 +1,5 @@
 export type ModelId = "aria" | "live-transcription" | "recording-transcription" | "midi-to-score";
+export type AssetId = ModelId | "piano-samples";
 
 export interface PianoNote {
   pitch: number;
@@ -29,7 +30,7 @@ export interface ModelOutputs {
 }
 
 export interface DownloadProgress {
-  model: ModelId;
+  model: AssetId;
   file: string;
   received: number;
   total: number | null;
