@@ -5,7 +5,7 @@ import type { EventKind, JsonValue, PracticeEvent } from "./events";
 
 type Request =
   | { id: number; action: "open" | "list" | "close" }
-  | { id: number; action: "append"; kind: EventKind; payload: JsonValue }
+  | { id: number; action: "append"; kind: EventKind; payload: JsonValue; eventId?: string }
   | { id: number; action: "merge"; events: PracticeEvent[] };
 
 let database: Database | undefined;
@@ -59,10 +59,10 @@ function insert(event: PracticeEvent): boolean {
   return true;
 }
 
-function append(kind: EventKind, payload: JsonValue): PracticeEvent {
+function append(kind: EventKind, payload: JsonValue, eventId?: string): PracticeEvent {
   return db().transaction("IMMEDIATE", () => {
     const clock = Number(db().selectValue("SELECT COALESCE(MAX(clock), 0) FROM events")) + 1;
-    const event = { id: crypto.randomUUID(), deviceId, clock, createdAt: new Date().toISOString(), kind, payload };
+    const event = { id: eventId ?? crypto.randomUUID(), deviceId, clock, createdAt: new Date().toISOString(), kind, payload };
     insert(event);
     return event;
   });
@@ -84,7 +84,7 @@ self.onmessage = async ({ data }: MessageEvent<Request>) => {
   try {
     let value: unknown;
     if (data.action === "open") value = await open();
-    else if (data.action === "append") value = append(data.kind, data.payload);
+    else if (data.action === "append") value = append(data.kind, data.payload, data.eventId);
     else if (data.action === "merge") value = merge(data.events);
     else if (data.action === "list") value = list();
     else if (data.action === "close") {

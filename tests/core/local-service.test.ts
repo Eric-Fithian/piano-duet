@@ -3,6 +3,9 @@ import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { LocalService } from "../../src/core/local-service.ts";
 import type { LocalTranscriber } from "../../src/core/local-service.ts";
+import type { LocalEventStore } from "../../src/core/local-service.ts";
+import type { ReadingLogEvent } from "../../src/core/reading-events.ts";
+import { ReadingReplay } from "./reading-replay.ts";
 
 test("local status, profile and live transcription match FastAPI response shapes", async () => {
   const reference = spawnSync("uv", ["run", "--frozen", "python", "-c", `
@@ -72,4 +75,73 @@ test("live recognition prevents concurrent windows and rejects non-finite audio"
   audio[4] = NaN;
   assert.equal((await service.fetch("/api/reading/listen", { method: "POST", body: audio.buffer })).status, 400);
   assert.equal((await service.fetch("/api/not-ready")).status, 501);
+});
+
+test("Reading introduction and completion match the Python endpoints", async () => {
+  const reference = spawnSync("uv", ["run", "--frozen", "python", "-c", `
+import contextlib, io, json, sys, tempfile
+from pathlib import Path
+from types import SimpleNamespace
+from fastapi.testclient import TestClient
+sys.path.insert(0, "tests")
+from reading_recording import RecordingPhrase, RecordingRandom
+import piano_duet.server as server
+events = []
+original = server.next_task
+def recorded(*args):
+    args = list(args)
+    args[2] = RecordingRandom(0, events)
+    return original(*args)
+server.next_task = recorded
+class Engine:
+    def __init__(self):
+        self.transcriber = SimpleNamespace()
+        self.generator = SimpleNamespace(phrase=RecordingPhrase)
+with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.StringIO()):
+    server.SAMPLES = server.NOTATION = Path(directory)
+    with TestClient(server.create_app(engine_factory=Engine, profile_path=Path(directory) / "learner.sqlite3")) as client:
+        headers = {"X-Duet-Client": "1"}
+        response = client.post("/api/practice/next", json={"focus": "reading", "step_by_step": True}, headers=headers)
+        assert response.status_code == 200, response.text
+        task = response.json()
+        preview = client.post("/api/practice/next", json={"focus": "reading", "step_by_step": True, "after": task["id"]}, headers=headers)
+        assert preview.status_code == 200, preview.text
+        attempt = "5cfb60dc-a9f7-4e10-9b04-033934f96d9b"
+        groups = [[{"pitch": note["pitch"], "start": 1.0 + index, "velocity": 80, "confidence": 0.95}] for index, note in enumerate(task["target"])]
+        result = client.post("/api/reading/complete", json={"task": task["id"], "attempt": attempt, "groups": groups, "interruptions": [], "threshold": 0.8}, headers=headers)
+        assert result.status_code == 200, result.text
+        profile = client.get("/api/profile").json()
+        repeat = client.post("/api/reading/complete", json={"task": task["id"], "attempt": attempt, "groups": groups, "interruptions": [], "threshold": 0.8}, headers=headers)
+print(json.dumps({"task": task, "preview": preview.json(), "events": events, "groups": groups, "result": result.json(), "repeat": repeat.status_code, "introductions": profile["reading"]["introductions"]}))
+`], { encoding: "utf8", maxBuffer: 10_000_000 });
+  assert.equal(reference.status, 0, reference.stderr);
+  const expected = JSON.parse(reference.stdout);
+  const events: ReadingLogEvent[] = [];
+  const store: LocalEventStore = { async list() { return events; }, async append(kind, payload, eventId) {
+    assert.ok(eventId);
+    const event = { id: eventId, deviceId: "test", clock: events.length + 1, createdAt: "2024-01-01T00:00:00Z", kind, payload };
+    events.push(event);
+    return event;
+  } };
+  const replay = new ReadingReplay(expected.events);
+  const service = new LocalService(store, undefined, () => 1700000000, undefined, replay);
+  const request = (path: string, body: unknown) => service.fetch(path, { method: "POST", body: JSON.stringify(body) });
+  const response = await request("/api/practice/next", { focus: "reading", step_by_step: true });
+  assert.equal(response.status, 200);
+  const task = await response.json();
+  expected.task.id = task.id;
+  assert.deepEqual(task, expected.task);
+  const preview = await (await request("/api/practice/next", { focus: "reading", step_by_step: true, after: task.id })).json();
+  expected.preview.id = preview.id;
+  assert.deepEqual(preview, expected.preview);
+  replay.finish();
+  const body = { task: task.id, attempt: expected.result.id, groups: expected.groups, interruptions: [], threshold: 0.8 };
+  const incomplete = await request("/api/reading/complete", { ...body, groups: [[{ ...body.groups[0][0], pitch: 70 }]] });
+  assert.equal(incomplete.status, 400);
+  const saved = await request("/api/reading/complete", body);
+  assert.equal(saved.status, 200);
+  assert.deepEqual(await saved.json(), expected.result);
+  assert.equal((await request("/api/reading/complete", body)).status, expected.repeat);
+  const profile = await (await service.fetch("/api/profile")).json();
+  assert.equal(profile.reading.introductions, expected.introductions);
 });

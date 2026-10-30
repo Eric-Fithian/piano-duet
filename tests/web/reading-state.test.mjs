@@ -29,6 +29,7 @@ for (const [name, engine] of [["Chromium", chromium], ["WebKit", webkit]]) {
         await window.closeReadingLog();
         return { saved, excluded, restored };
       });
+      assert.equal(result.saved.history[0].id, 'reading-test-attempt');
       assert.equal(result.saved.rounds, 1);
       assert.equal(result.saved.notes, 4);
       assert.equal(result.saved.xp.xp, 80);

@@ -22,6 +22,6 @@ Object.assign(window, {
     const context = { source: "microphone", interaction: "step_by_step", hearings: 0, reveals: 0, hints: 0, reading_timing: { interruptions: [] } };
     const { assessment, notes } = assessReading(score, groups, context);
     const payload = { prompt: { ...score, family: "reading", id: crypto.randomUUID() }, context, assessment, notes, mode: "practice" };
-    return log.append("attempt", JSON.parse(JSON.stringify(payload)) as JsonValue);
+    return log.append("attempt", JSON.parse(JSON.stringify(payload)) as JsonValue, "reading-test-attempt");
   },
 });

@@ -5,6 +5,9 @@ import "../../../src/piano_duet/static/practice.css";
 import "../../../src/piano_duet/static/game.css";
 import { setLocalService } from "../../../src/piano_duet/static/practice.mjs";
 import { LocalService } from "../../../src/core/local-service.ts";
+import { AriaPhrase } from "../../../src/core/aria-phrase.ts";
+import type { PhraseContext } from "../../../src/core/aria-tokenizer.ts";
+import { RandomSource } from "../../../src/core/random.ts";
 import { BrowserInference } from "./browser-inference";
 import type { DownloadProgress, InferenceSession } from "./inference";
 import { EventLog, requestPersistentStorage } from "./event-log";
@@ -53,7 +56,15 @@ async function start(): Promise<void> {
       catch (error) { if (signal?.aborted) live = undefined; throw error; }
     },
   };
-  setLocalService(new LocalService(log, transcriber, undefined, new SampleStore(report)));
+  const random = new RandomSource();
+  let aria: Promise<InferenceSession<"aria">> | undefined;
+  const phrase = async (context: unknown) => {
+    aria ??= backend.createSession("aria", report).catch((error) => { aria = undefined; throw error; });
+    const session = await aria;
+    indicator.hidden = true;
+    return new AriaPhrase(session, random, context as PhraseContext | null);
+  };
+  setLocalService(new LocalService(log, transcriber, undefined, new SampleStore(report), random, phrase));
   if (import.meta.env.PROD && "serviceWorker" in navigator) await navigator.serviceWorker.register("/service-worker.js");
   await import("../../../src/piano_duet/static/app.mjs");
 }

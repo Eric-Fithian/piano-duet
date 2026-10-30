@@ -8,7 +8,7 @@ export function initialPracticeTask(id: string, focus: "guided" | "technique") {
   const reason = focus === "guided" ? "A comfortable scale gives us a first look at your playing."
     : "Practice the focus you selected.";
   return {
-    id, family: "technique", challenge: 1, bpm: 50, meter: "4/4", key,
+    id, family: "technique" as const, challenge: 1, bpm: 50, meter: "4/4", key,
     reason: `${reason} Explore C major, which has less practice in this skill.`, purpose: "Explore",
     context: { notation_visible: true, hearings: 0, reveals: 0, hints: 0, familiar: false },
     target: pitches.map((pitch, index) => ({ pitch, start: index * 60 / 50, duration: 60 / 50, velocity: 76 })),

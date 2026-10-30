@@ -34,8 +34,8 @@ export class EventLog {
     }
   }
 
-  append(kind: EventKind, payload: JsonValue): Promise<PracticeEvent> {
-    return this.send("append", { kind, payload });
+  append(kind: EventKind, payload: JsonValue, eventId?: string): Promise<PracticeEvent> {
+    return this.send("append", { kind, payload, eventId });
   }
 
   merge(events: PracticeEvent[]): Promise<number> {
