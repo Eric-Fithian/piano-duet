@@ -1,27 +1,16 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { spawn } from "node:child_process";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { createServer } from "node:net";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { after, before, test } from "node:test";
 import { chromium, webkit } from "playwright";
+import { startTestServer } from "./server.mjs";
 
 let server;
 let port;
 before(async () => {
-  const probe = createServer();
-  await new Promise((resolveReady) => probe.listen(0, "127.0.0.1", resolveReady));
-  port = probe.address().port;
-  await new Promise((resolveClosed) => probe.close(resolveClosed));
-  server = spawn(process.execPath, ["node_modules/vite/bin/vite.js", "--config", "vite.config.ts", "--port", String(port), "--strictPort"],
-    { cwd: resolve("site"), stdio: ["ignore", "pipe", "pipe"] });
-  await new Promise((resolveReady, reject) => {
-    server.stdout.on("data", (chunk) => { if (chunk.toString().includes("Local:")) resolveReady(); });
-    server.on("exit", (code) => reject(new Error(`Vite exited before startup: ${code}`)));
-    server.stderr.on("data", (chunk) => process.stderr.write(chunk));
-  });
+  ({ server, port } = await startTestServer());
 }, { timeout: 45000 });
 after(() => server.kill("SIGTERM"));
 
