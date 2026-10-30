@@ -22,6 +22,14 @@ export interface LineRandom {
   choices(options: number[], weights: number[]): number[];
   random(): number;
 }
+export interface ReadingNote {
+  pitch: number;
+  start: number;
+  duration: number;
+  velocity: number;
+  staff: string;
+  finger?: number;
+}
 export interface ReadingLine {
   staff: string;
   melody: boolean;
@@ -30,7 +38,7 @@ export interface ReadingLine {
   anchor: number | null;
   rhythms: number[][];
   endings: Map<number, number>;
-  cue: { staff: string; low: number; note: null } | null;
+  cue: { staff: string; low: number; note: ReadingNote | null } | null;
   finger: number | null;
   history: number[];
   starts: number[];
