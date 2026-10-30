@@ -4,6 +4,7 @@ from uuid import uuid4
 
 import numpy as np
 import pytest
+from defusedxml import EntitiesForbidden
 from test_practice_flow import HEADERS, client  # noqa: F401
 
 from piano_duet.library import song_attacks, song_sections, song_stats, song_version
@@ -63,6 +64,18 @@ def test_musicxml_import_keeps_staves_chords_ties_and_pickup_alignment():
     assert [(note["pitch"], note["staff"], round(note["start"] / beat, 3), round(note["duration"] / beat, 3)) for note in song["notes"]] == [
         (72, "treble", 3.0, 1.0), (46, "bass", 4.0, 4.0), (65, "treble", 4.0, 4.0), (69, "treble", 4.0, 2.0)]
     assert [len(attack) for attack in song_attacks(song["notes"])] == [1, 3]
+
+
+def test_musicxml_with_a_doctype_imports_but_entity_declarations_are_refused():
+    doctype = ('<?xml version="1.0"?>\n<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN" '
+               '"http://www.musicxml.org/dtds/partwise.dtd">')
+    with_doctype = MUSICXML.replace('<?xml version="1.0"?>', doctype, 1)
+    assert parse_score("idea.musicxml", with_doctype.encode()) == parse_score("idea.musicxml", MUSICXML.encode())
+    # Nested entities expand exponentially, so a small file could exhaust memory.
+    bomb = ('<?xml version="1.0"?><!DOCTYPE score-partwise [<!ENTITY a "aaaaaaaaaa"><!ENTITY b "&a;&a;&a;&a;&a;">]>'
+            "<score-partwise>&b;</score-partwise>")
+    with pytest.raises(EntitiesForbidden):
+        parse_score("bomb.musicxml", bomb.encode())
 
 
 def test_two_single_staff_parts_are_the_right_then_left_hand():
