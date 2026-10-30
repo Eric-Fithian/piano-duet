@@ -3,8 +3,11 @@ import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { readingProgressFromEvents } from "../../src/core/reading-events.ts";
 import type { ReadingLogEvent } from "../../src/core/reading-events.ts";
+import type { ComposerProgress } from "../../src/core/reading-composer.ts";
 
 test("reading event replay merges exclusions and rebuilds the Python progress", () => {
+  const initial: ComposerProgress = readingProgressFromEvents([]);
+  assert.equal(initial.curriculum.target, "first_notes");
   const reference = spawnSync("uv", ["run", "--frozen", "python", "-c", `
 import json, sys
 sys.path.insert(0, "tests")
@@ -23,7 +26,7 @@ for seed in range(8):
     assessment, notes = assess_reading(task, groups, context)
     payload = {"prompt": task, "context": context, "assessment": assessment}
     id_ = f"attempt-{seed}"
-    attempts.append(dict(payload, id=id_, created_at=created, excluded=seed == 1))
+    attempts.append(dict(payload, id=id_, created_at=1767225600.0, excluded=seed == 1))
     events.append({"id": id_, "deviceId": "a", "clock": seed + 1, "createdAt": created, "kind": "attempt", "payload": payload})
 events += [
     {"id": "exclude", "deviceId": "a", "clock": 10, "createdAt": created, "kind": "exclusion", "payload": {"attemptId": "attempt-1", "excluded": True}},

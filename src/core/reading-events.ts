@@ -40,7 +40,7 @@ export function readingProgressFromEvents(events: ReadingLogEvent[]) {
         if (typeof prompt.id !== "string" || !prompt.id || !Array.isArray(prompt.target)
             || !Array.isArray(assessment.observations)) throw new Error("Invalid reading attempt event");
         object(prompt.reading, "Reading prompt");
-        attempts.push({ ...payload, id: event.id, created_at: event.createdAt, excluded: false } as unknown as ProgressAttempt);
+        attempts.push({ ...payload, id: event.id, created_at: Date.parse(event.createdAt) / 1000, excluded: false } as unknown as ProgressAttempt);
       }
     }
   }
