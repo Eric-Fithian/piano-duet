@@ -1,0 +1,27 @@
+name: Installer
+
+# Checks that a new user can still install from main, on a clean Mac without the models.
+on:
+  push:
+    branches: [main]
+    paths: [site/public/install.sh, pyproject.toml, uv.lock, .python-version]
+  schedule:
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  install:
+    name: Fresh install
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install from main
+        env:
+          PIANO_DUET_HOME: ${{ runner.temp }}/piano-duet
+          PIANO_DUET_SETUP: "0"
+        run: sh site/public/install.sh
+      - name: Run the installed command
+        run: ~/.local/bin/piano-duet --help

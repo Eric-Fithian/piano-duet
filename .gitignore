@@ -3,7 +3,11 @@
 /.local/
 /.pytest_cache/
 /.ruff_cache/
-/.DS_Store
+.DS_Store
 __pycache__/
 *.pyc
 *.egg-info/
+node_modules/
+/site/dist/
+/site/.astro/
+.vercel
