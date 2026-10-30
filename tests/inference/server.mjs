@@ -11,6 +11,11 @@ const paths = {
   "/fixtures/transcription.json": ".cache/browser-inference/transcription.json",
   "/models/aria/model.onnx": ".cache/models/aria/onnx-int4-block64/model.onnx",
   "/models/aria/model.onnx.data": ".cache/models/aria/onnx-int4-block64/model.onnx.data",
+  "/models/local-fixture/model.onnx": ".cache/models/aria/onnx-int4-block64/model.onnx",
+  "/models/local-fixture/model.onnx.data": ".cache/models/aria/onnx-int4-block64/model.onnx.data",
+  "/models/local-fixture/convolution.onnx": ".cache/browser-inference/transcription-convolution-fp32.onnx",
+  "/models/local-fixture/recurrent.onnx": ".cache/browser-inference/transcription-recurrent.onnx",
+  "/models/local-fixture/graph.onnx": ".cache/browser-inference/transcription.onnx",
   "/fixtures/aria.json": ".cache/models/aria/onnx-int4-block64/parity.json",
 };
 
@@ -18,6 +23,8 @@ export async function startServer({ referencePort } = {}) {
   const server = createServer(async (request, response) => {
     response.setHeader("Cross-Origin-Opener-Policy", "same-origin");
     response.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
+    response.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    response.setHeader("Access-Control-Allow-Origin", "*");
     if (request.url === "/" && !referencePort) {
       response.setHeader("Content-Type", "text/html");
       response.end('<script type="module" src="/runner.mjs"></script>');

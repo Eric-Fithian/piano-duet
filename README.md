@@ -44,8 +44,18 @@ The installer sets up [uv](https://docs.astral.sh/uv/), downloads the app and it
 
 ## Develop
 
+The browser rebuild is in progress. Its local event log, model cache and inference foundation can be developed with:
+
 ```sh
 git clone https://github.com/Eric-Fithian/piano-duet.git && cd piano-duet
+npm ci
+npm ci --prefix site
+npm run dev   # app at http://127.0.0.1:5173, docs at /docs
+```
+
+The browser practice modes and published model catalog are not ready yet. The existing Python application remains the working reference:
+
+```sh
 make setup   # dependencies and models
 make dev     # hot reload at http://127.0.0.1:8765
 make check   # lint and all tests, as CI runs them

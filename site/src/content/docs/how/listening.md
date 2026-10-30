@@ -11,7 +11,7 @@ Live recognition uses the same local piano model on overlapping two-second audio
 
 ## Counting attacks in a drill
 
-Drills follow you in the browser itself. A spectral-flux attack counter looks for energy appearing at new frequencies every 10 ms, scaled to how loudly you've been playing over the last few seconds. Soft playing or a quiet microphone therefore counts as reliably as loud playing. The counter moves the score with you and decides when a take has ended. See [Drills → Takes](/modes/drills/#takes).
+Drills follow you in the browser itself. A spectral-flux attack counter looks for energy appearing at new frequencies every 10 ms, scaled to how loudly you've been playing over the last few seconds. Soft playing or a quiet microphone therefore counts as reliably as loud playing. The counter moves the score with you and decides when a take has ended. See [Drills → Takes](/docs/modes/drills/#takes).
 
 ## Transcribing a take or a recording
 

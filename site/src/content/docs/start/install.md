@@ -34,7 +34,7 @@ The installer:
 piano-duet
 ```
 
-The app opens at **http://127.0.0.1:8765**. Leave the Terminal window open while you play; **Ctrl+C** stops it. See [your first session](/start/first-session/) for what to do next.
+The app opens at **http://127.0.0.1:8765**. Leave the Terminal window open while you play; **Ctrl+C** stops it. See [your first session](/docs/start/first-session/) for what to do next.
 
 ## Update
 

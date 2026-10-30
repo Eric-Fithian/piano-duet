@@ -13,15 +13,16 @@ GitHub Actions runs [`ci.yml`](https://github.com/Eric-Fithian/piano-duet/blob/m
 | **Python tests** | macOS (Apple Silicon) | `pytest` with the locked dependencies, MLX included |
 | **JavaScript tests** | Ubuntu | `node --test` on the browser modules |
 | **TypeScript core and Python parity** | macOS (Apple Silicon) | Type-checks the shared core and compares its reading calculations with the Python reference |
+| **Browser storage** | Ubuntu | SQLite persistence, merge behavior and model-cache integrity in Chromium and WebKit |
 | **Website** | Ubuntu | `astro check` and a production build of `site/` |
 
-All five must pass before a pull request can merge into `main`. Dependencies are cached by the lockfiles, and a newer push to the same branch cancels the run in progress.
+All six must pass before a pull request can merge into `main`. Dependencies are cached by the lockfiles, and a newer push to the same branch cancels the run in progress.
 
 Vercel builds every pull request that touches `site/` and comments with a preview URL. Merging to `main` deploys the site to production.
 
 ## After merging
 
-On every push to `main`, and weekly, the **Installer** job runs the [one-line installer](/start/install/) on a clean macOS runner, without downloading the models, and starts the installed command. This checks that a fresh install still works for new users.
+On every push to `main`, and weekly, the **Installer** job runs the [one-line installer](/docs/start/install/) on a clean macOS runner, without downloading the models, and starts the installed command. This checks that a fresh install still works for new users.
 
 ## Keeping dependencies fresh
 

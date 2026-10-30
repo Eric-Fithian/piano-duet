@@ -5,6 +5,8 @@ const repository = 'https://github.com/Eric-Fithian/piano-duet';
 
 export default defineConfig({
   site: 'https://piano-duet.vercel.app',
+  base: '/docs',
+  outDir: './dist/docs',
   vite: {server: {headers: {
     'Cross-Origin-Opener-Policy': 'same-origin',
     'Cross-Origin-Embedder-Policy': 'require-corp',

@@ -1,9 +1,11 @@
 ---
 title: Architecture
-description: A browser front end and a loopback Python server, with every model running on the Mac.
+description: The local-first browser foundation and the Python reference implementation.
 ---
 
-Piano Duet is a local web app: a Python server bound to `127.0.0.1` and a browser page that talks only to it. Nothing is deployed anywhere. The website you're reading is documentation only and runs no models.
+The browser rebuild is in progress. Its app lives at `/`, and these docs live under `/docs`. A dedicated worker keeps an append-only event log in SQLite using OPFS; model files are cached on the device by version and digest. Aria and live transcription have browser inference prototypes with WebGPU and WASM execution. Practice modes, sync, the other models and the iOS shell are not yet complete.
+
+The existing Python app remains the reference implementation. It serves a browser page from a server bound to `127.0.0.1` and runs its models on the Mac:
 
 ```text
  Browser (vanilla ES modules)                       Python server (FastAPI, uvicorn)

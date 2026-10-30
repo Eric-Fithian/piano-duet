@@ -1,9 +1,11 @@
 ---
 title: Privacy
-description: No account, no cloud, no recordings. Audio stays in memory on your Mac.
+description: How the current Python reference keeps audio and practice history local.
 ---
 
-Piano Duet has no account and no server of its own on the internet. The only network access is during setup and updates, to download dependencies, model weights and piano samples, plus YouTube when you choose **From YouTube**.
+The current Python reference has no account and no server of its own on the internet. The only network access is during setup and updates, to download dependencies, model weights and piano samples, plus YouTube when you choose **From YouTube**.
+
+The browser rebuild is not complete. Its local event log and model cache stay on the device; account sync is not yet implemented. Its intended sync will carry practice events and settings, never audio or model files.
 
 Audio is processed in memory and sent only to a server bound to `127.0.0.1`. No audio recordings are saved, and no inference calls leave your computer. Recognized notes and contextualized assessments persist in the local learner database. Sample playback, scripts, and styles are also local. MIDI files are saved only when you request an export.
 

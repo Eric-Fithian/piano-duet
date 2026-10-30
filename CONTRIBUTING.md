@@ -10,20 +10,21 @@ Thanks for helping. Bug reports, practice-material ideas, documentation fixes an
 
 ## Set up
 
-You need an Apple Silicon Mac, [uv](https://docs.astral.sh/uv/) and Node.js 24 or later.
+For the browser foundation, you need Node.js 24 or later. The Python reference and full model comparisons also need an Apple Silicon Mac and [uv](https://docs.astral.sh/uv/).
 
 ```sh
 git clone https://github.com/Eric-Fithian/piano-duet.git && cd piano-duet
-make setup   # Python dependencies, the models (about 3 GB, once), the website's packages
-make dev     # the app with hot reload at http://127.0.0.1:8765
+npm ci
+npm ci --prefix site
+npm run dev  # browser app at http://127.0.0.1:5173 and docs under /docs
 ```
 
-Python edits restart the server. HTML, CSS and JavaScript edits refresh the browser without reloading the models.
+The browser app is under construction; its practice modes and published model catalog are not ready. To run the working Python reference, use `make setup` and `make dev` instead. Python edits restart that server, and browser edits refresh it without reloading the models.
 
 ## Make a change
 
 1. Branch from `main`.
-2. Make the change, with tests. Python tests live in `tests/test_*.py`, browser-module tests in `tests/*.test.mjs`, and TypeScript core parity tests in `tests/core/`. These tests do not need the downloaded models.
+2. Make the change, with tests. Python tests live in `tests/test_*.py`, browser-module tests in `tests/*.test.mjs`, TypeScript parity tests in `tests/core/`, and browser storage tests in `tests/web/`. These tests do not need the downloaded models.
 3. Run `make check`, which is what CI runs. Run `make site-build` if you touched `site/`.
 4. Update the documentation in `site/src/content/docs/` if behaviour changed.
 5. Open a pull request. CI must pass before it can merge, and Vercel comments with a preview link for website changes.
@@ -37,7 +38,7 @@ Keep each pull request to one change, and write the description around *why* it 
 - **Python:** each file has a `main()` right after its imports and constants. `ruff` is the linter and its configuration is in `pyproject.toml`. Commands run from the project root, and paths such as `.cache` are relative to it.
 - **JavaScript:** plain ES modules with no build step. Match the surrounding code.
 - **TypeScript core:** `src/core/` contains portable calculations being moved out of the Python reference. Run `npm run check:core` and `npm run test:core` to type-check and compare them with Python.
-- **Local first.** Audio and inference stay on the Mac. Changes that send audio or notes to a remote service won't be accepted.
+- **Local first.** Audio and inference stay on the device. Account sync is being designed for practice events and settings; audio and models must not be sent to it.
 
 ## Project layout
 

@@ -25,11 +25,11 @@ The app fits one screen, with the microphone controls always at the bottom. Exer
 
 | Mode | What it's for |
 | --- | --- |
-| [Reading](/modes/reading/) | Sight-reading fresh scores, one note at a time |
-| [Drills](/modes/drills/) | Scales, arpeggios, chords and Hanon at a steady tempo |
-| [Library](/modes/library/) | Learning full pieces from MIDI, MusicXML or a recording |
-| [Practice](/modes/practice/) | Guided exercises across technique, theory, ear and repertoire |
-| [Duet and Variations](/modes/duet/) | Improvising with Aria and imitating your own ideas |
+| [Reading](/docs/modes/reading/) | Sight-reading fresh scores, one note at a time |
+| [Drills](/docs/modes/drills/) | Scales, arpeggios, chords and Hanon at a steady tempo |
+| [Library](/docs/modes/library/) | Learning full pieces from MIDI, MusicXML or a recording |
+| [Practice](/docs/modes/practice/) | Guided exercises across technique, theory, ear and repertoire |
+| [Duet and Variations](/docs/modes/duet/) | Improvising with Aria and imitating your own ideas |
 
 Use **Try a demo** in Duet or Variations to run the whole audio → transcription → Aria → playback path without a microphone. Demonstrations never change your levels.
 

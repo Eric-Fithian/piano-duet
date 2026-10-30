@@ -1,0 +1,68 @@
+import type { EventKind, JsonValue, PracticeEvent } from "./events";
+
+type Pending = { resolve: (value: unknown) => void; reject: (error: Error) => void };
+
+export class EventLog {
+  private worker = new Worker(new URL("./event-log-worker.ts", import.meta.url), { type: "module" });
+  private pending = new Map<number, Pending>();
+  private sequence = 0;
+  private closed = false;
+
+  constructor() {
+    this.worker.onmessage = ({ data }: MessageEvent<{ id: number; value?: unknown; error?: string }>) => {
+      const request = this.pending.get(data.id);
+      if (!request) throw new Error(`Unexpected event log response ${data.id}`);
+      this.pending.delete(data.id);
+      if (data.error) request.reject(new Error(data.error));
+      else request.resolve(data.value);
+    };
+    this.worker.onerror = (event) => {
+      const error = new Error(`Event log worker failed: ${event.message}`);
+      for (const request of this.pending.values()) request.reject(error);
+      this.pending.clear();
+      this.closed = true;
+    };
+  }
+
+  async open(): Promise<{ deviceId: string }> {
+    try {
+      return await this.send("open");
+    } catch (error) {
+      this.closed = true;
+      this.worker.terminate();
+      throw error;
+    }
+  }
+
+  append(kind: EventKind, payload: JsonValue): Promise<PracticeEvent> {
+    return this.send("append", { kind, payload });
+  }
+
+  merge(events: PracticeEvent[]): Promise<number> {
+    return this.send("merge", { events });
+  }
+
+  list(): Promise<PracticeEvent[]> {
+    return this.send("list");
+  }
+
+  async close(): Promise<void> {
+    await this.send("close");
+    this.closed = true;
+    this.worker.terminate();
+  }
+
+  private send<T>(action: string, fields: object = {}): Promise<T> {
+    if (this.closed) return Promise.reject(new Error("The event log is closed"));
+    const id = ++this.sequence;
+    return new Promise((resolve, reject) => {
+      this.pending.set(id, { resolve: (value) => resolve(value as T), reject });
+      this.worker.postMessage({ id, action, ...fields });
+    });
+  }
+}
+
+export async function requestPersistentStorage(): Promise<boolean> {
+  if (!navigator.storage?.persist) return false;
+  return navigator.storage.persist();
+}
