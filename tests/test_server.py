@@ -147,5 +147,64 @@ def test_model_errors_are_explicit_and_unlock_engine(client):
     assert not client.get("/api/status").json()["busy"]
 
 
+def test_normal_run_does_not_enable_browser_reload(client):
+    assert not client.get("/api/status").json()["development"]
+    assert "/static/reload.mjs?revision=" not in client.get("/").text
+    assert client.get("/__dev/events").status_code == 404
+
+
+@pytest.fixture
+def development_client(tmp_path, monkeypatch):
+    static = tmp_path / "static"
+    static.mkdir()
+    (static / "index.html").write_text("<html><head></head><body>Piano</body></html>")
+    (static / "app.mjs").write_text("export const label = 'Piano';")
+    (static / "styles.css").write_text("body { color: black; }")
+    monkeypatch.setattr("piano_duet.server.STATIC", static)
+    monkeypatch.setattr("piano_duet.server.SAMPLES", tmp_path)
+    monkeypatch.setattr("piano_duet.server.NOTATION", tmp_path)
+    with TestClient(
+        create_app(
+            engine_factory=RecordingEngine,
+            profile_path=tmp_path / "learner.sqlite3",
+            development=True,
+        )
+    ) as result:
+        yield result, static
+
+
+@pytest.mark.parametrize("filename", ["index.html", "styles.css", "app.mjs"])
+def test_development_revision_tracks_frontend_edits(development_client, filename):
+    client, static = development_client
+    page = client.get("/")
+    revision = page.text.split("/static/reload.mjs?revision=")[1].split('"')[0]
+    assert page.headers["cache-control"] == "no-store"
+    assert client.get("/api/status").json()["development"]
+    events = client.get("/__dev/events")
+    assert events.headers["content-type"].startswith("text/event-stream")
+    assert events.headers["cache-control"] == "no-store"
+    assert f"data: {revision}\n" in events.text
+
+    path = static / filename
+    path.write_text(path.read_text() + "\nChanged source")
+    assert f"data: {revision}\n" not in client.get("/__dev/events").text
+    source = client.get(f"/static/{filename}")
+    assert source.headers["cache-control"] == "no-store"
+    assert source.text.endswith("Changed source")
+
+
+def test_development_restart_changes_revision(development_client, tmp_path):
+    client, _ = development_client
+    before = client.get("/__dev/events").text
+    with TestClient(
+        create_app(
+            engine_factory=RecordingEngine,
+            profile_path=tmp_path / "restart.sqlite3",
+            development=True,
+        )
+    ) as restarted:
+        assert restarted.get("/__dev/events").text != before
+
+
 if __name__ == "__main__":
     main()

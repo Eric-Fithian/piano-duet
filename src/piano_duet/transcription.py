@@ -4,6 +4,7 @@ from collections.abc import Callable
 from threading import Event
 
 import numpy as np
+import onnx
 import onnxruntime as ort
 import soundfile as sf
 from piano_transcription_inference.utilities import RegressionPostProcessor
@@ -14,6 +15,9 @@ from piano_duet.assets import TRANSCRIPTION
 from piano_duet.notes import Note
 
 SAMPLE_RATE = 16000
+NOTE_THRESHOLD = 0.80
+LIVE_WINDOW = SAMPLE_RATE * 2
+LIVE_LOOKAHEAD = 0.15
 WINDOW = SAMPLE_RATE * 10
 HOP = SAMPLE_RATE * 5
 OUTPUT_NAMES = (
@@ -49,11 +53,18 @@ class PianoTranscriber:
         options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_DISABLE_ALL
         options.intra_op_num_threads = 4
         options.inter_op_num_threads = 1
+        model = onnx.load(str(TRANSCRIPTION))
+        dimension = model.graph.input[0].type.tensor_type.shape.dim[1]
+        if dimension.dim_value != WINDOW:
+            raise ValueError("Unexpected transcription model window")
+        # The graph already supports variable time; only its exported input metadata is fixed.
+        dimension.ClearField("dim_value")
+        dimension.dim_param = "samples"
         self.session = ort.InferenceSession(
-            str(TRANSCRIPTION), sess_options=options, providers=["CPUExecutionProvider"]
+            model.SerializeToString(), sess_options=options, providers=["CPUExecutionProvider"]
         )
         inputs = self.session.get_inputs()
-        if len(inputs) != 1 or inputs[0].shape != [1, 160000]:
+        if len(inputs) != 1 or inputs[0].shape != [1, "samples"]:
             raise ValueError(f"Unexpected transcription model inputs: {inputs}")
         self.input_name = inputs[0].name
         self.output_names = [output.name for output in self.session.get_outputs()]
@@ -71,10 +82,42 @@ class PianoTranscriber:
     def warmup(self):
         self.session.run(None, {self.input_name: np.zeros((1, WINDOW), dtype=np.float32)})
 
+    def listen(self, audio, onset_threshold=NOTE_THRESHOLD):
+        if audio.shape != (LIVE_WINDOW,) or not np.isfinite(audio).all():
+            raise ValueError("Live reading expects two seconds of finite mono 16 kHz PCM")
+        outputs = self.session.run(
+            ["reg_onset", "frame", "velocity"], {self.input_name: audio[None].astype(np.float32)}
+        )
+        onset, frame, velocity = [output[0] for output in outputs]
+        processor = RegressionPostProcessor(100, 88, onset_threshold, 0.3, 0.1, 0.2)
+        attacks, shifts = processor.get_binarized_output_from_regression(
+            onset, onset_threshold, neighbour=2
+        )
+        notes = []
+        for time_index, pitch_index in np.argwhere(attacks):
+            start = (time_index + shifts[time_index, pitch_index]) / 100
+            if not 0.25 <= start <= len(audio) / SAMPLE_RATE - LIVE_LOOKAHEAD:
+                continue
+            # Require sustained pitch evidence as well as an onset, rejecting unsupported spikes.
+            sustain = frame[time_index : time_index + 6, pitch_index]
+            if np.count_nonzero(sustain >= 0.3) < 3:
+                continue
+            notes.append(
+                {
+                    "pitch": int(pitch_index + 21),
+                    "start": round(float(start), 4),
+                    "velocity": max(
+                        1, min(127, round(float(velocity[time_index, pitch_index]) * 128))
+                    ),
+                    "confidence": round(float(onset[time_index, pitch_index]), 4),
+                }
+            )
+        return notes
+
     def transcribe(
         self,
         audio: np.ndarray,
-        onset_threshold: float = 0.75,
+        onset_threshold: float = NOTE_THRESHOLD,
         cancel: Event | None = None,
         on_progress: Callable[[float], None] | None = None,
     ) -> list[Note]:
@@ -115,42 +158,8 @@ class PianoTranscriber:
             name: np.concatenate([chunk[i] for chunk in chunks])[:frames]
             for i, name in enumerate(OUTPUT_NAMES)
         }
-        processor = RegressionPostProcessor(
-            frames_per_second=100,
-            classes_num=88,
-            onset_threshold=onset_threshold,
-            offset_threshold=0.3,
-            frame_threshold=0.1,
-            pedal_offset_threshold=0.2,
-        )
-        detected, pedals = processor.output_dict_to_midi_events(prediction)
-        notes = []
-        support = []
         audio_seconds = len(audio) / SAMPLE_RATE
-        for event in detected:
-            start = max(0, event["onset_time"] - 0.25)
-            end = event["offset_time"]
-            for pedal in pedals or []:
-                if pedal["onset_time"] < end < pedal["offset_time"]:
-                    end = pedal["offset_time"]
-                    break
-            end = min(audio_seconds, end - 0.25)
-            if end - start >= 0.055 and start < audio_seconds:
-                notes.append(
-                    Note(
-                        pitch=event["midi_note"],
-                        start=start,
-                        duration=end - start,
-                        velocity=max(1, event["velocity"]),
-                    )
-                )
-                frame = round(event["onset_time"] * 100)
-                strength = float(
-                    prediction["reg_onset_output"][
-                        max(0, frame - 3) : min(frames, frame + 4), event["midi_note"] - 21
-                    ].max()
-                )
-                support.append(strength)
+        notes, support = decode(prediction, onset_threshold, frames, audio_seconds)
         if support:
             ordered = sorted(
                 zip(notes, support, strict=True), key=lambda pair: (pair[0].start, pair[0].pitch)
@@ -167,6 +176,45 @@ class PianoTranscriber:
                 "reason": "Onset model support; not a calibrated probability of correct transcription",
             }
         return sorted(notes, key=lambda note: (note.start, note.pitch))
+
+
+def decode(prediction, onset_threshold, frames, audio_seconds):
+    processor = RegressionPostProcessor(
+        frames_per_second=100,
+        classes_num=88,
+        onset_threshold=onset_threshold,
+        offset_threshold=0.3,
+        frame_threshold=0.1,
+        pedal_offset_threshold=0.2,
+    )
+    detected, pedals = processor.output_dict_to_midi_events(prediction)
+    notes = []
+    support = []
+    for event in detected:
+        start = max(0, event["onset_time"] - 0.25)
+        end = event["offset_time"]
+        for pedal in pedals or []:
+            if pedal["onset_time"] < end < pedal["offset_time"]:
+                end = pedal["offset_time"]
+                break
+        end = min(audio_seconds, end - 0.25)
+        if end - start >= 0.055 and start < audio_seconds:
+            notes.append(
+                Note(
+                    pitch=event["midi_note"],
+                    start=start,
+                    duration=end - start,
+                    velocity=max(1, event["velocity"]),
+                )
+            )
+            frame = round(event["onset_time"] * 100)
+            strength = float(
+                prediction["reg_onset_output"][
+                    max(0, frame - 3) : min(frames, frame + 4), event["midi_note"] - 21
+                ].max()
+            )
+            support.append(strength)
+    return notes, support
 
 
 if __name__ == "__main__":

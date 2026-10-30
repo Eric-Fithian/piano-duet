@@ -5,6 +5,8 @@ from collections import defaultdict
 from contextlib import closing
 from pathlib import Path
 
+from piano_duet.reading_curriculum import reading_progress
+
 DATABASE = Path(".local/learner.sqlite3")
 ASSESSMENT_VERSION = 1
 SKILLS = {
@@ -14,6 +16,8 @@ SKILLS = {
     "technique.dynamics": ("Technique", "Even loudness"),
     "technique.scales": ("Technique", "Scale execution"),
     "technique.chords": ("Technique", "Chord execution"),
+    "technique.arpeggios": ("Technique", "Arpeggio execution"),
+    "technique.patterns": ("Technique", "Finger patterns"),
     "reading.pitch": ("Reading", "Reading pitches"),
     "reading.rhythm": ("Reading", "Reading rhythm"),
     "theory.scales": ("Theory", "Building scales"),
@@ -96,6 +100,7 @@ def build_profile(attempts, now=None):
         )
     return {
         "assessment_version": ASSESSMENT_VERSION,
+        "reading": reading_progress(attempts),
         "attempts": len(user_attempts),
         "included_attempts": len(included),
         "notes": sum(len(a["notes"]) for a in included),
@@ -120,6 +125,7 @@ def attempt_summary(attempt):
     return {key: attempt[key] for key in ("id", "created_at", "mode", "excluded")} | {
         "title": attempt["prompt"]["title"],
         "shape": attempt["prompt"].get("shape"),
+        "reading": attempt["prompt"].get("reading"),
         "key": attempt["prompt"].get("key"),
         "note_count": len(attempt["notes"]),
         "assessment": attempt["assessment"],
@@ -151,6 +157,10 @@ class LearnerStore:
             db.execute("CREATE UNIQUE INDEX IF NOT EXISTS unseen_reading ON tasks(fingerprint)")
             db.execute("""CREATE TABLE IF NOT EXISTS pieces (
                 id TEXT PRIMARY KEY, piece TEXT NOT NULL)""")
+            db.execute("""CREATE TABLE IF NOT EXISTS songs (
+                id TEXT PRIMARY KEY, created_at REAL NOT NULL, song TEXT NOT NULL)""")
+            db.execute("""CREATE TABLE IF NOT EXISTS song_plays (
+                id TEXT PRIMARY KEY, song_id TEXT NOT NULL, created_at REAL NOT NULL, play TEXT NOT NULL)""")
 
     def attempts(self):
         with closing(sqlite3.connect(self.path)) as db:
@@ -238,6 +248,43 @@ class LearnerStore:
     def add_piece(self, piece):
         with closing(sqlite3.connect(self.path)) as db, db:
             db.execute("INSERT INTO pieces VALUES (?, ?)", (piece["id"], json.dumps(piece)))
+
+    def add_song(self, song):
+        song = {**song, "created_at": time.time()}
+        with closing(sqlite3.connect(self.path)) as db, db:
+            db.execute("INSERT INTO songs VALUES (?, ?, ?)", (song["id"], song["created_at"], json.dumps(song)))
+        return song
+
+    def songs(self):
+        with closing(sqlite3.connect(self.path)) as db:
+            return [json.loads(row[0]) for row in db.execute("SELECT song FROM songs ORDER BY created_at")]
+
+    def song(self, id_):
+        with closing(sqlite3.connect(self.path)) as db:
+            row = db.execute("SELECT song FROM songs WHERE id=?", (id_,)).fetchone()
+        return json.loads(row[0]) if row else None
+
+    def update_song(self, song):
+        with closing(sqlite3.connect(self.path)) as db, db:
+            if db.execute("UPDATE songs SET song=? WHERE id=?", (json.dumps(song), song["id"])).rowcount != 1:
+                raise ValueError("Unknown song")
+
+    def delete_song(self, id_):
+        with closing(sqlite3.connect(self.path)) as db, db:
+            if db.execute("DELETE FROM songs WHERE id=?", (id_,)).rowcount != 1:
+                raise ValueError("Unknown song")
+            db.execute("DELETE FROM song_plays WHERE song_id=?", (id_,))
+
+    def add_play(self, id_, song_id, play):
+        with closing(sqlite3.connect(self.path)) as db, db:
+            if db.execute("SELECT 1 FROM song_plays WHERE id=?", (id_,)).fetchone():
+                raise ValueError("This play has already been saved")
+            db.execute("INSERT INTO song_plays VALUES (?, ?, ?, ?)", (id_, song_id, time.time(), json.dumps(play)))
+
+    def plays(self, song_id):
+        with closing(sqlite3.connect(self.path)) as db:
+            rows = db.execute("SELECT created_at, play FROM song_plays WHERE song_id=? ORDER BY created_at, rowid", (song_id,)).fetchall()
+        return [{"created_at": at, **json.loads(play)} for at, play in rows]
 
 
 if __name__ == "__main__":

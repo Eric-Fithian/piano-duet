@@ -74,3 +74,56 @@ test('key signature spellings preserve sounding pitch at octave boundaries', () 
   assert.equal(spellPitch(66, false, key).key, 'gb/4');
   assert.equal(spellPitch(60, true, key).key, 'c/4');
 });
+
+test('exact reading preserves rests, explicit staves, and trailing empty bars', () => {
+  const score = createScore([{...note(60, .5, .25), staff: 'bass'}, note(62, 1, 1)], {bpm: 60, exact: true, bars: 2});
+  assert.equal(score.bars.length, 2);
+  assert.equal(score.bars[0].bass[0].notes.length, 0);
+  assert.equal(score.quantized[0].staff, 'bass');
+  assert.equal(score.quantized[0].start, 6);
+  assert.equal(score.quantized[0].end, 9);
+  assert.ok(score.bars[1].bass.every(part => !part.notes.length));
+});
+
+test('triplets retain three equal attacks and all time signatures fill exactly', () => {
+  for (const meter of ['2/4', '3/4', '4/4', '5/4', '6/8', '7/8', '9/8', '12/8']) {
+    const score = createScore([note(60, 0, 1/3), note(62, 1/3, 1/3), note(64, 2/3, 1/3)], {bpm: 60, meter, exact: true, bars: 2});
+    assert.deepEqual(score.bars[0].treble.slice(0, 3).map(part => [part.value, part.tuplet, part.ticks]), [['8', 3, 4], ['8', 3, 4], ['8', 3, 4]]);
+    for (const bar of score.bars) for (const staff of ['treble', 'bass']) {
+      assert.equal(bar[staff].reduce((sum, part) => sum + part.ticks, 0), score.barTicks);
+    }
+  }
+});
+
+test('minor raised leading notes retain their letter, including double sharps', () => {
+  const key = {mode: 'minor', tonic: 8, pitch_classes: [8, 10, 11, 1, 3, 4, 6], scale_names: ['G#', 'A#', 'B', 'C#', 'D#', 'E', 'F#']};
+  assert.equal(spellPitch(67, false, key).key, 'f##/4');
+  const cSharpMinor = {mode: 'minor', tonic: 1, pitch_classes: [1, 3, 4, 6, 8, 9, 11], scale_names: ['C#', 'D#', 'E', 'F#', 'G#', 'A', 'B']};
+  assert.equal(spellPitch(60, false, cSharpMinor).key, 'b#/3');
+});
+
+test('a held note in one hand survives the same pitch attacked by the other hand', () => {
+  const notes = [{pitch: 62, start: 0, duration: 4, velocity: 70, staff: 'bass'}, {pitch: 62, start: 1, duration: 1, velocity: 80, staff: 'treble'}];
+  const [held, attack] = quantizeNotes(notes, 60, {exact: true, ticksPerBeat: 12});
+  assert.deepEqual([held.staff, held.start, held.end], ['bass', 0, 48]);
+  assert.deepEqual([attack.staff, attack.start, attack.end], ['treble', 12, 24]);
+});
+
+test('a held bass in a second voice is one written note under the moving voice, not a chain of ties', () => {
+  const moving = [0, 1, 2].map(beat => ({pitch: 59, start: beat, duration: 1, velocity: 70, staff: 'bass'}));
+  const held = {pitch: 40, start: 0, duration: 3, velocity: 70, staff: 'bass', voice: 1};
+  const [bar] = createScore([...moving, held], {bpm: 60, meter: '3/4', exact: true, bars: 1}).bars;
+  assert.deepEqual(bar.bass.map(part => [part.value, part.notes.map(n => n.pitch)]), [['q', [59]], ['q', [59]], ['q', [59]]]);
+  assert.deepEqual(bar.second.bass.map(part => [part.value, part.dotted, part.notes.map(n => n.pitch)]), [['h', true, [40]]]);
+  assert.equal(bar.second.treble, null);
+});
+
+test('a grace note takes no written time and joins the note it ornaments', () => {
+  const notes = [note(72, 0, 0.5), {...note(78, 0.5, 0.125), grace: true}, note(79, 0.5, 1.5)];
+  const score = createScore(notes, {bpm: 120, meter: '4/4', exact: true});
+  const parts = score.bars[0].treble.filter(part => part.notes.length);
+  assert.deepEqual(parts.map(part => part.notes.map(n => n.pitch)), [[72], [79]]);
+  assert.deepEqual(parts[1].graces, [{pitch: 78, id: 1}]);
+  assert.ok(score.quantized.every(n => n.pitch !== 78));
+  assert.equal(score.bars[0].treble.reduce((sum, part) => sum + part.ticks, 0), score.barTicks);
+});

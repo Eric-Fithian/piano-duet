@@ -84,6 +84,19 @@ def key_scores(histogram):
     return 0.6 * correlation + 0.8 * coverage
 
 
+def signature_mode(fifths, notes):
+    """Major or its relative minor for a key signature written without a mode. A piece usually ends on its tonic,
+    so the lowest note of the final chord decides when it is one of the two tonics; otherwise the pitch profile does."""
+    major = MusicalKey(fifths * 7 % 12, "major")
+    minor = MusicalKey((fifths * 7 + 9) % 12, "minor")
+    last = max(note["start"] for note in notes)
+    bass = min(note["pitch"] for note in notes if note["start"] >= last - 1e-6) % 12
+    if bass in (major.tonic, minor.tonic):
+        return "major" if bass == major.tonic else "minor"
+    scores = key_scores(pitch_histogram([Note(pitch=n["pitch"], start=n["start"], duration=n["duration"], velocity=n["velocity"]) for n in notes]))
+    return "major" if scores[KEYS.index(major)] >= scores[KEYS.index(minor)] else "minor"
+
+
 class KeyTracker:
     def __init__(self):
         self.current = None

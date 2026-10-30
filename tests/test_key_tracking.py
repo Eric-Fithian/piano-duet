@@ -1,6 +1,6 @@
 import pytest
 
-from piano_duet.key_tracking import KEYS, KeyTracker, MusicalKey
+from piano_duet.key_tracking import KEYS, KeyTracker, MusicalKey, signature_mode
 from piano_duet.notes import Note
 
 
@@ -89,6 +89,13 @@ def test_empty_observation_is_an_error():
     with pytest.raises(ValueError) as error:
         KeyTracker().observe([])
     assert "at least one played note" in str(error.value)
+
+
+@pytest.mark.parametrize("fifths,ending,mode", [(0, 57, "minor"), (0, 48, "major"), (5, 56, "minor"), (5, 47, "major")])
+def test_signature_without_mode_follows_the_final_bass_note(fifths, ending, mode):
+    notes = [{"pitch": pitch, "start": i * 0.5, "duration": 0.4, "velocity": 80} for i, pitch in enumerate([60, 62, 64, 65, 67])]
+    notes += [{"pitch": ending, "start": 3.0, "duration": 1.0, "velocity": 80}, {"pitch": ending + 12, "start": 3.0, "duration": 1.0, "velocity": 80}]
+    assert signature_mode(fifths, notes) == mode
 
 
 if __name__ == "__main__":

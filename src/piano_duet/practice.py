@@ -8,6 +8,9 @@ from uuid import uuid4
 
 from piano_duet.assessment import pitch_name
 from piano_duet.key_tracking import MusicalKey
+from piano_duet.reading_curriculum import reading_candidate
+from piano_duet.reading_music import compose_reading
+from piano_duet.reading_stages import curriculum_progress
 
 FOCUSES = ("guided", "technique", "reading", "theory", "ear", "repertoire")
 ANCHORS = {
@@ -38,9 +41,10 @@ KEY_ORDER += [
 
 
 def main():
+    from piano_duet.generation import PianoGenerator
     from piano_duet.profile import LearnerStore
 
-    print(json.dumps(next_task(LearnerStore()), indent=2))
+    print(json.dumps(next_task(LearnerStore(), reading_phrase=PianoGenerator().phrase), indent=2))
 
 
 def fingerprint(notes):
@@ -52,6 +56,17 @@ def fingerprint(notes):
         for n in notes
     ]
     return hashlib.sha256(json.dumps(content).encode()).hexdigest()
+
+
+def reading_context(task):
+    numerator, denominator = map(int, task["meter"].split("/"))
+    end = task["reading"]["bars"] * numerator * 4 / denominator * 60 / task["bpm"]
+    return {"notes": task["target"], "end": end}
+
+
+def reading_fingerprint(task):
+    prefix = "introduction:" if task["reading"]["introduce"] is not None else ""
+    return prefix + fingerprint(task["target"])
 
 
 def sequence(pitches, bpm, beats=None):
@@ -143,11 +158,33 @@ def select_key(skill):
     return key, f"Explore {key['name']}, which has less practice in this skill."
 
 
-def next_task(store, focus="guided", rng=None, piece_id=None):
+def next_task(
+    store,
+    focus="guided",
+    rng=None,
+    piece_id=None,
+    step_by_step=False,
+    after_id=None,
+    reading_phrase=None,
+    reading_stage=None,
+):
     if focus not in FOCUSES:
         raise ValueError("Unknown practice focus")
+    if reading_stage is not None and focus != "reading":
+        raise ValueError("Only reading practice can replay a stage")
     rng = rng or random.SystemRandom()
     profile = store.profile()
+    if reading_stage is not None:
+        profile["reading"]["curriculum"] = curriculum_progress(store.attempts(), reading_stage)
+    preceding = store.task(after_id) if after_id else None
+    if after_id and (
+        not step_by_step
+        or focus != "reading"
+        or not preceding
+        or preceding["family"] != "reading"
+        or preceding["context"].get("interaction") != "step_by_step"
+    ):
+        raise ValueError("A reading preview requires a preceding step-by-step reading score")
     skills = {skill["id"]: skill for skill in profile["skills"]}
     family, purpose, reason = (
         choose_focus(profile)
@@ -328,43 +365,59 @@ def next_task(store, focus="guided", rng=None, piece_id=None):
             task["lesson"] += (
                 " The major seventh is 11 half steps above the root; the minor seventh is 10."
             )
-    elif family in ("reading", "ear"):
+    elif family == "reading":
+        existing = store.reading_fingerprints()
+        previous = next((item for item in profile["practice_recent"] if item.get("reading")), None)
+        if preceding:
+            previous = preceding
+            if preceding["reading"].get("stage_id") == profile["reading"]["curriculum"]["target"]:
+                profile["reading"]["curriculum"]["recent_rhythms"].append(
+                    [
+                        [
+                            round(note["start"] * preceding["bpm"] / 60, 4),
+                            round(note["duration"] * preceding["bpm"] / 60, 4),
+                        ]
+                        for note in preceding["target"]
+                    ]
+                )
+            introduced = preceding["reading"]["introduce"]
+            if introduced is not None:
+                # Plan past the visible introduction without awarding evidence for unplayed notes.
+                profile["reading"]["hands"][preceding["reading"]["clef"]]["introduced"].append(
+                    introduced
+                )
+        if reading_phrase is None:
+            raise ValueError("Reading practice needs Aria to write its scores")
+        # Aria continues the score shown just before this one, so consecutive scores read as one piece.
+        context = reading_context(preceding) if preceding else None
+        for variation in range(200):
+            if profile["reading"]["curriculum"]["target_number"] >= 3:
+                candidate = compose_reading(profile["reading"], rng, reading_phrase, context)
+            else:
+                candidate = reading_candidate(
+                    profile["reading"],
+                    rng,
+                    reading_phrase,
+                    previous,
+                    variation,
+                    purpose == "Repair",
+                    step_by_step,
+                    context,
+                )
+            if reading_fingerprint(candidate) not in existing:
+                break
+        else:
+            raise RuntimeError("Could not generate an unseen reading exercise")
+        task.update(candidate)
+        task["key"] = candidate.get("key", MusicalKey(0, "major").to_dict())
+    elif family == "ear":
         conditions = {c["id"]: c for c in skill["conditions"]}
-        bass = family == "reading" and conditions.get("clef:treble", {}).get(
-            "attempts", 0
-        ) > conditions.get("clef:bass", {}).get("attempts", 0)
-        weak_notes = sorted(
-            (
-                row
-                for row in skill["conditions"]
-                if row["id"].startswith("pitch:") and row["accuracy"] < 80
-            ),
-            key=lambda row: (row["accuracy"], row["last_practiced"]),
-        )
-        if family == "reading" and weak_notes:
-            bass = int(weak_notes[0]["id"].split(":")[1]) < 60
-        base = 48 if bass else 60
-        pool = [base + key["tonic"] + step for step in intervals[: min(7, 4 + challenge)]]
-        if bass and max(pool) >= 60:
-            pool = [pitch - 12 for pitch in pool]
-        priority = sorted(
-            pool,
-            key=lambda pitch: (
-                0 if conditions.get(f"pitch:{pitch}", {}).get("accuracy", 100) < 80 else 1,
-                conditions.get(f"pitch:{pitch}", {}).get("accuracy", 0),
-                conditions.get(f"pitch:{pitch}", {}).get("attempts", 0),
-            ),
-        )[:2]
+        pool = [60 + key["tonic"] + step for step in intervals[: min(7, 4 + challenge)]]
         weights = [
             1 + (100 - conditions.get(f"pitch:{pitch}", {}).get("accuracy", 0)) / 20
             for pitch in pool
         ]
-        length = (
-            (8, 8, 12, 16, 16)[challenge - 1]
-            if family == "reading"
-            else (4, 5, 6, 8, 10)[challenge - 1]
-        )
-        existing = store.reading_fingerprints() if family == "reading" else set()
+        length = (4, 5, 6, 8, 10)[challenge - 1]
         for _ in range(200):
             pitches = []
             limit = max(2, length // 3)
@@ -376,32 +429,22 @@ def next_task(store, focus="guided", rng=None, piece_id=None):
                 ]
                 available_weights = [weights[pool.index(pitch)] for pitch in available]
                 pitches.append(rng.choices(available, weights=available_weights, k=1)[0])
-            if family == "reading":
-                for position, pitch in zip(rng.sample(range(length), 2), priority, strict=True):
-                    pitches[position] = pitch
             if (
-                len(set(pitches)) < min(4 if family == "reading" else 3, length)
+                len(set(pitches)) < min(3, length)
                 or max(Counter(pitches).values()) > limit
                 or any(pitches[i - 2 : i + 1] == [pitches[i]] * 3 for i in range(2, len(pitches)))
             ):
                 continue
             beats = [rng.choice([0.5, 0.5, 1]) for _ in pitches] if challenge >= 3 else [1] * length
             notes = sequence(pitches, bpm, beats)
-            if fingerprint(notes) not in existing:
-                break
+            break
         else:
-            raise RuntimeError("Could not generate an unseen reading exercise")
+            raise RuntimeError("Could not generate an ear-training melody")
         task["target"] = notes
-        task["title"] = "A fresh reading" if family == "reading" else "From your ear to the keys"
+        task["title"] = "From your ear to the keys"
         task["instruction"] = (
-            f"Read this new {'bass' if bass else 'treble'} part at a comfortable, steady pace. Aim for {bpm} BPM. You will get different music next time."
-            if family == "reading"
-            else "Hear the short melody, then play it back from memory. It starts near middle C. Take a slower, steady pace if needed."
+            "Hear the short melody, then play it back from memory. It starts near middle C. Take a slower, steady pace if needed."
         )
-        if family == "reading":
-            task["reason"] += (
-                f" More attention to {', '.join(pitch_name(p, key) for p in priority)} and the {'bass' if bass else 'treble'} clef."
-            )
         task["lesson"] = (
             "Middle C is immediately to the left of the pair of black keys nearest the center of the piano. Read the upper staff with the right hand and the lower staff with the left hand. A higher note on the page means a higher key."
         )
@@ -452,7 +495,13 @@ def next_task(store, focus="guided", rng=None, piece_id=None):
     task["even"] = even
     task["dynamics"] = "even" if even else None
     task["context"]["familiar"] = familiar
-    store.add_task(task, fingerprint(task["target"]) if family == "reading" else None)
+    if step_by_step:
+        if family != "reading":
+            raise ValueError("Step-by-step practice requires a reading task")
+        task["context"]["interaction"] = "step_by_step"
+        task["context"]["introduction"] = task["reading"]["introduce"] is not None
+        task["instruction"] += " There is no time limit; the score waits for the right note."
+    store.add_task(task, reading_fingerprint(task) if family == "reading" else None)
     return task
 
 
