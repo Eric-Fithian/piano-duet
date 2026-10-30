@@ -10,7 +10,7 @@ Thanks for helping. Bug reports, practice-material ideas, documentation fixes an
 
 ## Set up
 
-You need an Apple Silicon Mac, [uv](https://docs.astral.sh/uv/) and Node.js 22 or later.
+You need an Apple Silicon Mac, [uv](https://docs.astral.sh/uv/) and Node.js 24 or later.
 
 ```sh
 git clone https://github.com/Eric-Fithian/piano-duet.git && cd piano-duet
@@ -23,7 +23,7 @@ Python edits restart the server. HTML, CSS and JavaScript edits refresh the brow
 ## Make a change
 
 1. Branch from `main`.
-2. Make the change, with tests. Python tests live in `tests/test_*.py` and browser-module tests in `tests/*.test.mjs`. Neither needs the downloaded models.
+2. Make the change, with tests. Python tests live in `tests/test_*.py`, browser-module tests in `tests/*.test.mjs`, and TypeScript core parity tests in `tests/core/`. These tests do not need the downloaded models.
 3. Run `make check`, which is what CI runs. Run `make site-build` if you touched `site/`.
 4. Update the documentation in `site/src/content/docs/` if behaviour changed.
 5. Open a pull request. CI must pass before it can merge, and Vercel comments with a preview link for website changes.
@@ -36,6 +36,7 @@ Keep each pull request to one change, and write the description around *why* it 
 - **Comments explain why**, not how. Every regular expression gets a comment saying what it matches.
 - **Python:** each file has a `main()` right after its imports and constants. `ruff` is the linter and its configuration is in `pyproject.toml`. Commands run from the project root, and paths such as `.cache` are relative to it.
 - **JavaScript:** plain ES modules with no build step. Match the surrounding code.
+- **TypeScript core:** `src/core/` contains portable calculations being moved out of the Python reference. Run `npm run check:core` and `npm run test:core` to type-check and compare them with Python.
 - **Local first.** Audio and inference stay on the Mac. Changes that send audio or notes to a remote service won't be accepted.
 
 ## Project layout

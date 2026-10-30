@@ -1,0 +1,16 @@
+{
+  "name": "piano-duet",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test:core": "node --test tests/core/*.test.ts",
+    "check:core": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2"
+  }
+}

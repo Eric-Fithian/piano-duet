@@ -49,6 +49,24 @@ jobs:
           node-version: 24
       - run: node --test tests/*.test.mjs
 
+  core:
+    name: TypeScript core and Python parity
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          version: "0.10.12"
+          enable-cache: true
+      - run: npm ci
+      - run: uv sync --frozen
+      - run: npm run check:core
+      - run: npm run test:core
+
   site:
     name: Website
     runs-on: ubuntu-latest
