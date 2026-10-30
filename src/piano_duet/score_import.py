@@ -3,8 +3,9 @@ from collections import Counter
 from fractions import Fraction
 from io import BytesIO
 from statistics import mean
-from xml.etree import ElementTree
 from zipfile import ZipFile
+
+from defusedxml import ElementTree
 
 from piano_duet.key_tracking import KeyTracker, MusicalKey, signature_mode
 from piano_duet.notes import Note
