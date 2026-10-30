@@ -2,6 +2,8 @@ import * as ort from "onnxruntime-web/webgpu";
 import wasmUrl from "onnxruntime-web/ort-wasm-simd-threaded.asyncify.wasm?url";
 import wasmModuleUrl from "onnxruntime-web/ort-wasm-simd-threaded.asyncify.mjs?url";
 import { decodeLiveOnsets } from "./live-onsets";
+import { transcribeRecording } from "./recording-runtime";
+import { RecordingPool } from "./recording-pool";
 import { ModelStore } from "./model-store";
 import type { ModelAsset, ModelRole } from "./browser-inference";
 import type { ModelId, ModelInputs } from "./inference";
@@ -21,17 +23,18 @@ let model: ModelId | undefined;
 let provider: "webgpu" | "wasm";
 let session: ort.InferenceSession | undefined;
 let recurrent: ort.InferenceSession | undefined;
+let recordingPool: RecordingPool | undefined;
 let cache: Record<string, ort.Tensor> = {};
 const controllers = new Map<number, AbortController>();
 const store = new ModelStore();
 let busy = false;
 
 async function open(id: number, name: ModelId, files: ModelAsset[], preference: "auto" | "wasm", signal: AbortSignal): Promise<{ provider: "webgpu" | "wasm" }> {
-  if (session) throw new Error("The inference session is already open");
-  if (name !== "aria" && name !== "live-transcription") throw new Error(`${name} inference is not available yet`);
+  if (session || recordingPool) throw new Error("The inference session is already open");
+  if (name !== "aria" && name !== "live-transcription" && name !== "recording-transcription") throw new Error(`${name} inference is not available yet`);
   if (files.some((file) => file.model !== name)) throw new Error("Model catalog contains a mismatched file");
   const gpu = (navigator as Navigator & { gpu?: { requestAdapter(): Promise<unknown> } }).gpu;
-  provider = preference === "auto" && gpu && await gpu.requestAdapter() ? "webgpu" : "wasm";
+  provider = name !== "recording-transcription" && preference === "auto" && gpu && await gpu.requestAdapter() ? "webgpu" : "wasm";
   const asset = async (role: ModelRole): Promise<Response> => {
     const matches = files.filter((file) => file.role === role);
     if (matches.length !== 1) throw new Error(`${name} needs exactly one ${role} file`);
@@ -50,6 +53,16 @@ async function open(id: number, name: ModelId, files: ModelAsset[], preference: 
     }
     session = await ort.InferenceSession.create(graph, options);
     resetCache();
+  } else if (name === "recording-transcription") {
+    const features = await (await asset("features")).arrayBuffer();
+    const attributes = await (await asset("attributes")).arrayBuffer();
+    const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 0;
+    const count = self.crossOriginIsolated && navigator.hardwareConcurrency >= 12 && memory >= 8 ? (memory >= 16 ? 4 : 3) : 1;
+    if (count > 1) recordingPool = await RecordingPool.open(features, attributes, count, Math.floor(navigator.hardwareConcurrency / count));
+    else {
+      session = await ort.InferenceSession.create(features, { executionProviders: ["wasm"] });
+      recurrent = await ort.InferenceSession.create(attributes, { executionProviders: ["wasm"] });
+    }
   } else {
     options.graphOptimizationLevel = "disabled";
     if (provider === "webgpu") {
@@ -76,7 +89,15 @@ function resetCache(): void {
 }
 
 async function run(input: ModelInputs[ModelId], signal: AbortSignal): Promise<unknown> {
-  if (!session || !model) throw new Error("The inference session is not open");
+  if (!model) throw new Error("The inference session is not open");
+  if (model === "recording-transcription") {
+    const recording = input as ModelInputs["recording-transcription"];
+    if (recording.sampleRate !== 44100) throw new Error("Recording transcription needs 44.1 kHz audio");
+    if (recordingPool) return { notes: await recordingPool.run(recording.audio, signal) };
+    if (!session || !recurrent) throw new Error("Recording transcription is not open");
+    return { notes: await transcribeRecording(session, recurrent, recording.audio, signal) };
+  }
+  if (!session) throw new Error("The inference session is not open");
   if (model === "aria") {
     const { tokens, reset, commit = true } = input as ModelInputs["aria"];
     if (!tokens.length || tokens.some((token) => !Number.isSafeInteger(token) || token < 0)) throw new Error("Aria needs valid token IDs");
@@ -126,6 +147,8 @@ async function close(): Promise<void> {
   cache = {};
   await session?.release();
   await recurrent?.release();
+  recordingPool?.close();
+  recordingPool = undefined;
   session = recurrent = undefined;
   model = undefined;
 }

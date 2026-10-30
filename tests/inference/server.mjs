@@ -16,6 +16,9 @@ const paths = {
   "/models/local-fixture/convolution.onnx": ".cache/browser-inference/transcription-convolution-fp32.onnx",
   "/models/local-fixture/recurrent.onnx": ".cache/browser-inference/transcription-recurrent.onnx",
   "/models/local-fixture/graph.onnx": ".cache/browser-inference/transcription.onnx",
+  "/models/local-fixture/recording-features.onnx": ".cache/models/recording-transcription/onnx-fp32/features.onnx",
+  "/models/local-fixture/recording-attributes.onnx": ".cache/models/recording-transcription/onnx-fp32/attributes.onnx",
+  "/fixtures/recording.pcm": ".cache/browser-inference/recording.pcm",
   "/fixtures/aria.json": ".cache/models/aria/onnx-int4-block64/parity.json",
 };
 
