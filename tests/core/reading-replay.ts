@@ -36,8 +36,8 @@ export class ReadingReplay {
     return this.take("random", { method: "random", args: [], kwargs: {} }).value as number;
   }
 
-  choice<T extends Value>(options: T[]): T {
-    return this.take("random", { method: "choice", args: [options], kwargs: {} }).value as T;
+  choice<T>(options: T[]): T {
+    return this.take("random", { method: "choice", args: [options as Value[]], kwargs: {} }).value as T;
   }
 
   choices<T extends Value>(population: T[], weights: number[] | null = null, k = 1): T[] {
