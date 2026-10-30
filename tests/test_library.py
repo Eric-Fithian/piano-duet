@@ -189,17 +189,25 @@ def test_youtube_import_transcribes_arranges_and_saves_a_song(client, monkeypatc
     monkeypatch.setattr("piano_duet.server.performance_to_score", score)
     recording = Recording([Note(pitch=60 + i % 12, start=i * 0.3, duration=0.3, velocity=80) for i in range(16)])
     monkeypatch.setattr("piano_duet.server.RecordingTranscriber", lambda: recording)
-    response = client.post("/api/library/youtube", json={"url": "https://youtu.be/abc"}, headers=HEADERS)
+    response = client.post("/api/library/youtube", json={"url": "https://youtu.be/abc", "has_rights": True}, headers=HEADERS)
     events = [json.loads(line) for line in response.text.splitlines()]
     assert [event["type"] for event in events] == ["downloading", "transcribing", "arranging", "song"]
     song = events[-1]["song"]
     assert (song["title"], song["artist"], song["meter"]) == ("A recording", "A pianist", "4/4")
     assert client.get(f"/api/library/{song['id']}").json()["url"] == "https://youtu.be/abc"
-    assert client.post("/api/library/youtube", json={"url": "https://example.com/v"}, headers=HEADERS).json()["detail"] == "Paste a link to a single YouTube video"
+    assert client.post("/api/library/youtube", json={"url": "https://example.com/v", "has_rights": True}, headers=HEADERS).json()["detail"] == "Paste a link to a single YouTube video"
     recording.notes = recording.notes[:3]
-    failed = [json.loads(line) for line in client.post("/api/library/youtube", json={"url": "https://www.youtube.com/watch?v=abc"}, headers=HEADERS).text.splitlines()]
+    failed = [json.loads(line) for line in client.post("/api/library/youtube", json={"url": "https://www.youtube.com/watch?v=abc", "has_rights": True}, headers=HEADERS).text.splitlines()]
     assert failed[-1] == {"type": "error", "message": "Too few piano notes were recognized to write a score"}
     assert not client.app.state.busy
+
+
+def test_youtube_import_needs_the_player_to_confirm_their_rights_first(client, monkeypatch):  # noqa: F811
+    fetched = []
+    monkeypatch.setattr("piano_duet.server.fetch_audio", lambda *args, **kwargs: fetched.append(args))
+    for payload in ({"url": "https://youtu.be/abc"}, {"url": "https://youtu.be/abc", "has_rights": False}):
+        assert client.post("/api/library/youtube", json=payload, headers=HEADERS).status_code == 422
+    assert not fetched
 
 
 def test_a_transcription_uses_its_main_meter_and_aligns_bars_after_a_pickup():
