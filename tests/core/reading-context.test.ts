@@ -48,14 +48,14 @@ import json, sys
 sys.path.insert(0, "tests")
 from piano_duet.reading_music import choose_context
 from reading_recording import RecordingRandom
-cases = json.load(sys.stdin)
+cases = json.loads(sys.stdin.readline())
 result = []
 for item in cases:
     events = []
     context = choose_context(item["stage"], item["progress"], RecordingRandom(13, events))
     result.append({"events": events, "context": context})
 print(json.dumps(result))
-`], { input: JSON.stringify(inputs), encoding: "utf8" });
+`], { input: JSON.stringify(inputs) + "\n", encoding: "utf8" });
   assert.equal(reference.status, 0, reference.stderr);
   const expected: { events: ReplayEvent[]; context: [string, MusicalKey, string] }[] = JSON.parse(reference.stdout);
   inputs.forEach(({ stage, progress }, index) => {

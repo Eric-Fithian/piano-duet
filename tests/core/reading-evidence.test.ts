@@ -20,9 +20,9 @@ test("reading evidence and recent readiness match the Python curriculum", () => 
   const reference = spawnSync("uv", ["run", "--frozen", "python", "-c", `
 import json, sys
 from piano_duet.reading_curriculum import reading_rows, summarize
-cases, histories = json.load(sys.stdin)
+cases, histories = json.loads(sys.stdin.readline())
 print(json.dumps({"rows": [list(reading_rows(case["prompt"], case["observations"])) for case in cases], "summaries": [summarize(rows) for rows in histories]}))
-`], { input: JSON.stringify([cases, histories]), encoding: "utf8" });
+`], { input: JSON.stringify([cases, histories]) + "\n", encoding: "utf8" });
   assert.equal(reference.status, 0, reference.stderr);
   const expected = JSON.parse(reference.stdout);
   assert.deepEqual(cases.map(({ prompt, observations }) => readingRows(prompt, observations)), expected.rows);

@@ -17,9 +17,9 @@ test("reading rhythm grammar matches Python for meters, figures and rests", () =
   const reference = spawnSync("uv", ["run", "--frozen", "python", "-c", `
 import json, sys
 from piano_duet.reading_music import bar_rhythms, beat_groups, figures, rest_positions
-cases = json.load(sys.stdin)
+cases = json.loads(sys.stdin.readline())
 print(json.dumps([{"groups": beat_groups(c["meter"]), "figures": figures(c["style"], c["meter"]), "rests": rest_positions(c["style"], c["meter"], c["ending"]), "rhythms": bar_rhythms(c["style"], c["meter"], c["restAt"], c["ending"], c["figure"])} for c in cases]))
-`], { input: JSON.stringify(cases), encoding: "utf8", maxBuffer: 20_000_000 });
+`], { input: JSON.stringify(cases) + "\n", encoding: "utf8", maxBuffer: 20_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const expected = JSON.parse(reference.stdout);
   cases.forEach((item, index) => {

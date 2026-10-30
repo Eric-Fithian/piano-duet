@@ -40,11 +40,11 @@ test("reading rewards match the Python reference across stages, help, rhythm and
   const reference = spawnSync("uv", ["run", "--frozen", "python", "-c", `
 import json, sys
 from piano_duet.reading_rewards import score_xp, stage_clear_xp, level_progress
-data = json.load(sys.stdin)
+data = json.loads(sys.stdin.readline())
 print(json.dumps({"scores": [score_xp(**case) for case in data["cases"]],
                   "levels": [level_progress(xp) for xp in data["levels"]],
                   "stages": [stage_clear_xp(stage) for stage in range(1, 25)]}))
-`], { input: JSON.stringify({ cases, levels }), encoding: "utf8" });
+`], { input: JSON.stringify({ cases, levels }) + "\n", encoding: "utf8" });
   assert.equal(reference.status, 0, reference.stderr);
   const expected = JSON.parse(reference.stdout);
   assert.deepEqual(cases.map(({ prompt, assessment, context }) => scoreXp(prompt, assessment, context)), expected.scores);
