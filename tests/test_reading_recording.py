@@ -1,7 +1,10 @@
 import json
+from random import Random
 
+from fake_phrase import WeightedPhrase
 from reading_recording import record_composition
 
+from piano_duet.reading_music import compose_reading
 from piano_duet.reading_stages import STAGES
 
 
@@ -25,6 +28,9 @@ def test_record_composition_covers_every_stage_and_seeded_context():
             assert all(event["context"] == context for event in events if event["type"] == "phrase")
             assert json.loads(json.dumps(recording))["score"] == recording["score"]
             assert recording == record_composition(stage, seed, context)
+            assert recording["score"] == compose_reading(
+                recording["progress"], Random(seed), WeightedPhrase, context
+            )
 
 
 if __name__ == "__main__":
