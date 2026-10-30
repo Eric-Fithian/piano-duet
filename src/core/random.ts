@@ -1,7 +1,7 @@
 export class RandomSource {
   private readonly draw: () => number;
 
-  constructor(draw: () => number = () => crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32) {
+  constructor(draw: () => number = () => Math.random()) {
     this.draw = draw;
   }
 
