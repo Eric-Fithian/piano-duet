@@ -1,0 +1,45 @@
+# Contributing to Piano Duet
+
+Thanks for helping. Bug reports, practice-material ideas, documentation fixes and code are all welcome.
+
+## Before you start
+
+- **Bugs:** open an [issue](https://github.com/Eric-Fithian/piano-duet/issues/new/choose) with your Mac model, macOS and browser versions, the mode you were in, and what you heard versus what the app showed. **Progress → Export history** can help when a note was misheard.
+- **Larger changes:** open an issue or a draft pull request first, so we can agree on the approach before you invest in it.
+- **Security issues:** report them privately, as described in [SECURITY.md](SECURITY.md).
+
+## Set up
+
+You need an Apple Silicon Mac, [uv](https://docs.astral.sh/uv/) and Node.js 22 or later.
+
+```sh
+git clone https://github.com/Eric-Fithian/piano-duet.git && cd piano-duet
+make setup   # Python dependencies, the models (about 3 GB, once), the website's packages
+make dev     # the app with hot reload at http://127.0.0.1:8765
+```
+
+Python edits restart the server. HTML, CSS and JavaScript edits refresh the browser without reloading the models.
+
+## Make a change
+
+1. Branch from `main`.
+2. Make the change, with tests. Python tests live in `tests/test_*.py` and browser-module tests in `tests/*.test.mjs`. Neither needs the downloaded models.
+3. Run `make check`, which is what CI runs. Run `make site-build` if you touched `site/`.
+4. Update the documentation in `site/src/content/docs/` if behaviour changed.
+5. Open a pull request. CI must pass before it can merge, and Vercel comments with a preview link for website changes.
+
+Keep each pull request to one change, and write the description around *why* it is needed.
+
+## Code style
+
+- **Fail fast.** No silent fallbacks or swallowed exceptions. An unexpected state raises, and model errors are shown to the player rather than hidden.
+- **Comments explain why**, not how. Every regular expression gets a comment saying what it matches.
+- **Python:** each file has a `main()` right after its imports and constants. `ruff` is the linter and its configuration is in `pyproject.toml`. Commands run from the project root, and paths such as `.cache` are relative to it.
+- **JavaScript:** plain ES modules with no build step. Match the surrounding code.
+- **Local first.** Audio and inference stay on the Mac. Changes that send audio or notes to a remote service won't be accepted.
+
+## Project layout
+
+See [Architecture](https://piano-duet.vercel.app/how/architecture/) for how the browser, the server and the models fit together, and [CI and releases](https://piano-duet.vercel.app/contributing/ci/) for what runs on each pull request and how releases are cut.
+
+By contributing, you agree that your contributions are licensed under the [MIT License](LICENSE) and that you'll follow the [Code of Conduct](CODE_OF_CONDUCT.md).

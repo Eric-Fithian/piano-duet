@@ -1,0 +1,15 @@
+name: Idea
+description: A new drill, curriculum change, feature or improvement.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would help your practice?
+      description: The problem or goal, in terms of playing the piano.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What could the app do?

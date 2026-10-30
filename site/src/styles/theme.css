@@ -1,0 +1,85 @@
+/* The app's own palette: a dark stage, gold accent, and the four colours of the mark. */
+:root {
+  --sl-color-accent-low: #3a2a06;
+  --sl-color-accent: #f1aa1c;
+  --sl-color-accent-high: #ffd27a;
+  --sl-color-white: #ffffff;
+  --sl-color-gray-1: #e1e3e6;
+  --sl-color-gray-2: #c2c7ce;
+  --sl-color-gray-3: #a2a6ae;
+  --sl-color-gray-4: #5d6676;
+  --sl-color-gray-5: #273140;
+  --sl-color-gray-6: #121821;
+  --sl-color-black: #0b0f15;
+  --duet-red: #ef5a4c;
+  --duet-yellow: #f5c93d;
+  --duet-green: #45d483;
+  --duet-cyan: #38c6e8;
+  --duet-paper: #f6f3e9;
+}
+
+:root[data-theme='light'] {
+  --sl-color-accent-low: #fbe8c2;
+  --sl-color-accent: #9a6400;
+  --sl-color-accent-high: #4d3100;
+  --sl-color-white: #0b0f15;
+  --sl-color-gray-1: #18202b;
+  --sl-color-gray-2: #273140;
+  --sl-color-gray-3: #4b5565;
+  --sl-color-gray-4: #8a93a3;
+  --sl-color-gray-5: #d7dbe1;
+  --sl-color-gray-6: #eef0f3;
+  --sl-color-gray-7: #f7f8fa;
+  --sl-color-black: #ffffff;
+}
+
+.site-title { letter-spacing: 0.25em; text-transform: uppercase; font-weight: 650; }
+
+.hero .tagline { max-width: 44ch; }
+
+.screenshot {
+  border-radius: 12px;
+  border: 1px solid var(--sl-color-gray-5);
+  box-shadow: 0 24px 60px -20px rgb(0 0 0 / 0.55);
+  width: 100%;
+  height: auto;
+}
+
+.rainbow {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--duet-red) 0 25%, var(--duet-yellow) 25% 50%, var(--duet-green) 50% 75%, var(--duet-cyan) 75%);
+  margin-block: 2.5rem 1.5rem;
+}
+
+.pipeline {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  gap: 0.75rem;
+  counter-reset: step;
+  padding: 0;
+  list-style: none;
+}
+.pipeline li {
+  counter-increment: step;
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+  margin: 0;
+  background: var(--sl-color-gray-6);
+  font-size: var(--sl-text-sm);
+}
+.pipeline li::before {
+  content: counter(step, decimal-leading-zero);
+  display: block;
+  font-weight: 700;
+  color: var(--sl-color-accent);
+  margin-bottom: 0.25rem;
+}
+.pipeline strong { display: block; color: var(--sl-color-white); }
+
+:root:not([data-theme='light']) .sl-link-button.primary {
+  background: var(--sl-color-accent);
+  border-color: var(--sl-color-accent);
+  color: #15120a;
+}

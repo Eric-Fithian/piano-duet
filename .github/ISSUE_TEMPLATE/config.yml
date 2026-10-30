@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://piano-duet.vercel.app
+    about: Installation, every mode, and how the models work.
+  - name: Security report
+    url: https://github.com/Eric-Fithian/piano-duet/security/advisories/new
+    about: Report vulnerabilities privately.

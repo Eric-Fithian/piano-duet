@@ -1,0 +1,41 @@
+name: Bug report
+description: Something didn't work, or the app heard something you didn't play.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what the app showed or played instead.
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode
+      options: [Reading, Drills, Library, Practice, Duet, Variations, Setup or install, Other]
+    validations:
+      required: true
+  - type: input
+    id: mac
+    attributes:
+      label: Mac and macOS
+      placeholder: MacBook Air M2, macOS 15.4
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser
+      placeholder: Chrome 140
+  - type: input
+    id: version
+    attributes:
+      label: Piano Duet version or commit
+      description: "Run `git -C ~/.piano-duet rev-parse --short HEAD`."
+  - type: textarea
+    id: logs
+    attributes:
+      label: Terminal output
+      description: Any error from the Terminal window running piano-duet.
+      render: text
