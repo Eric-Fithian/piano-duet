@@ -21,6 +21,8 @@ export interface ComposerStage extends ContextStage, PlanStage, LineStage, Attac
   bass_low: number;
   register: number;
   rhythm_required: boolean;
+  rhythm_scope: string;
+  required_scores: number;
 }
 export interface ComposerProgress extends ContextProgress {
   hands: Record<string, ReadingHand>;
