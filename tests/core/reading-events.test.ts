@@ -24,7 +24,7 @@ for seed in range(8):
     groups = [[{"pitch": task["target"][i]["pitch"], "start": 1 + attack["start"], "velocity": 80, "confidence": 0.95} for i in attack["indices"]] for attack in reading_attacks(task["target"])]
     context = {"source": "microphone", "interaction": "step_by_step", "hearings": 0, "reveals": 0, "hints": 0, "reading_timing": {"interruptions": []}}
     assessment, notes = assess_reading(task, groups, context)
-    payload = {"prompt": task, "context": context, "assessment": assessment}
+    payload = {"prompt": task, "context": context, "assessment": assessment, "mode": "practice", "notes": notes}
     id_ = f"attempt-{seed}"
     attempts.append(dict(payload, id=id_, created_at=1767225600.0, excluded=seed == 1))
     events.append({"id": id_, "deviceId": "a", "clock": seed + 1, "createdAt": created, "kind": "attempt", "payload": payload})

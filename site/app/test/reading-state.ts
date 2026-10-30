@@ -20,8 +20,8 @@ Object.assign(window, {
         vocabulary: [60, 62, 64], max_step: 2, introduce: null, bars: 1, rhythm_required: false, minimum_bpm: 0, composition: { method: "aria" } } };
     const groups = target.map((note) => [{ pitch: note.pitch, start: note.start + 1, velocity: 80, confidence: 0.95 }]);
     const context = { source: "microphone", interaction: "step_by_step", hearings: 0, reveals: 0, hints: 0, reading_timing: { interruptions: [] } };
-    const { assessment } = assessReading(score, groups, context);
-    const payload = { prompt: { ...score, family: "reading", id: crypto.randomUUID() }, context, assessment };
+    const { assessment, notes } = assessReading(score, groups, context);
+    const payload = { prompt: { ...score, family: "reading", id: crypto.randomUUID() }, context, assessment, notes, mode: "practice" };
     return log.append("attempt", JSON.parse(JSON.stringify(payload)) as JsonValue);
   },
 });

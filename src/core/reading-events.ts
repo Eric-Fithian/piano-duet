@@ -1,5 +1,6 @@
 import { readingProgress } from "./reading-progress.ts";
 import type { ProgressAttempt } from "./reading-progress.ts";
+import type { ProfileAttempt } from "./learner-profile.ts";
 
 export interface ReadingLogEvent {
   id: string;
@@ -15,11 +16,11 @@ function object(value: unknown, label: string): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-export function readingProgressFromEvents(events: ReadingLogEvent[]) {
+export function attemptsFromEvents(events: ReadingLogEvent[]): ProfileAttempt[] {
   const ordered = [...events].sort((a, b) => a.clock - b.clock || compare(a.deviceId, b.deviceId) || compare(a.id, b.id));
   const seen = new Set<string>();
   const excluded = new Map<string, boolean>();
-  const attempts: ProgressAttempt[] = [];
+  const attempts: ProfileAttempt[] = [];
   for (const event of ordered) {
     if (!event.id || !event.deviceId || !Number.isSafeInteger(event.clock) || event.clock < 1 || !Number.isFinite(Date.parse(event.createdAt))) {
       throw new Error("Invalid practice event");
@@ -35,16 +36,23 @@ export function readingProgressFromEvents(events: ReadingLogEvent[]) {
       const prompt = object(payload.prompt, "Attempt prompt");
       const context = object(payload.context, "Attempt context");
       const assessment = object(payload.assessment, "Attempt assessment");
-      if (typeof prompt.family !== "string" || typeof context.source !== "string" || !Array.isArray(assessment.evidence)) throw new Error("Invalid attempt event");
+      if (typeof prompt.family !== "string" || typeof prompt.title !== "string" || !Array.isArray(prompt.target)
+          || typeof context.source !== "string" || !Array.isArray(assessment.evidence)
+          || typeof payload.mode !== "string" || !Array.isArray(payload.notes)) throw new Error("Invalid attempt event");
       if (prompt.family === "reading") {
         if (typeof prompt.id !== "string" || !prompt.id || !Array.isArray(prompt.target)
             || !Array.isArray(assessment.observations)) throw new Error("Invalid reading attempt event");
         object(prompt.reading, "Reading prompt");
-        attempts.push({ ...payload, id: event.id, created_at: Date.parse(event.createdAt) / 1000, excluded: false } as unknown as ProgressAttempt);
       }
+      attempts.push({ ...payload, id: event.id, created_at: Date.parse(event.createdAt) / 1000, excluded: false } as unknown as ProfileAttempt);
     }
   }
   for (const attempt of attempts) attempt.excluded = excluded.get(String(attempt.id)) ?? false;
+  return attempts;
+}
+
+export function readingProgressFromEvents(events: ReadingLogEvent[]) {
+  const attempts = attemptsFromEvents(events).filter((attempt) => attempt.prompt.family === "reading") as unknown as ProgressAttempt[];
   return readingProgress(attempts);
 }
 
