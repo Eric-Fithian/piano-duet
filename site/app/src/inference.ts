@@ -15,7 +15,7 @@ export interface LiveOnset {
 }
 
 export interface ModelInputs {
-  aria: { tokens: number[]; reset: boolean };
+  aria: { tokens: number[]; reset: boolean; commit?: boolean };
   "live-transcription": { audio: Float32Array; sampleRate: 16000; threshold: number };
   "recording-transcription": { audio: Float32Array; sampleRate: 44100 };
   "midi-to-score": { notes: PianoNote[] };

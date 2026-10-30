@@ -78,17 +78,22 @@ function resetCache(): void {
 async function run(input: ModelInputs[ModelId], signal: AbortSignal): Promise<unknown> {
   if (!session || !model) throw new Error("The inference session is not open");
   if (model === "aria") {
-    const { tokens, reset } = input as ModelInputs["aria"];
+    const { tokens, reset, commit = true } = input as ModelInputs["aria"];
     if (!tokens.length || tokens.some((token) => !Number.isSafeInteger(token) || token < 0)) throw new Error("Aria needs valid token IDs");
     if (reset) resetCache();
     const previous = cache;
     const result = await session.run({ tokens: new ort.Tensor("int64", BigInt64Array.from(tokens.map(BigInt)), [1, tokens.length]), ...cache });
-    cache = Object.fromEntries(Object.keys(cache).map((name) => {
+    const next = Object.fromEntries(Object.keys(cache).map((name) => {
       const tensor = result[name.replace("past_", "present_")];
       if (!tensor) throw new Error(`Aria did not return ${name}`);
       return [name, tensor as ort.Tensor];
     }));
-    for (const tensor of Object.values(previous)) tensor.dispose();
+    if (commit) {
+      cache = next;
+      for (const tensor of Object.values(previous)) tensor.dispose();
+    } else {
+      for (const tensor of Object.values(next)) tensor.dispose();
+    }
     const output = result.logits;
     if (!output || output.type !== "float32") throw new Error("Unexpected Aria logits");
     const values = output.data as Float32Array;

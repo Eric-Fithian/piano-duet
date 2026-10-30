@@ -53,8 +53,14 @@ const result = await page.evaluate(async ({ files, fixture, model, preference })
     }
     const allTokens = fixture.steps.flatMap((step) => step.tokens);
     const full = await session.run({ tokens: allTokens, reset: true });
+    const first = fixture.steps[0].tokens;
+    const probe = fixture.steps[1].tokens;
+    await session.run({ tokens: first, reset: true });
+    const probed = await session.run({ tokens: probe, reset: false, commit: false });
+    const continued = await session.run({ tokens: probe, reset: false });
     await session.close();
-    return { outputs, full: Array.from(full.logits), provider, progress };
+    return { outputs, full: Array.from(full.logits), probed: Array.from(probed.logits),
+      continued: Array.from(continued.logits), provider, progress };
   }
   const result = await session.run({ audio: Float32Array.from(fixture.audio), sampleRate: 16000, threshold: 0.8 });
   await session.close();
@@ -65,6 +71,8 @@ if (model === "aria") {
   const last = result.outputs.at(-1);
   const maxError = Math.max(...last.map((value, index) => Math.abs(value - result.full[index])));
   assert.ok(maxError < 0.01, `Cached and full Aria logits differ by ${maxError}`);
+  const probeError = Math.max(...result.probed.map((value, index) => Math.abs(value - result.continued[index])));
+  assert.ok(probeError < 0.01, `Aria probing changed the cache by ${probeError}`);
   for (const [index, actual] of result.outputs.entries()) {
     const expected = fixture.steps[index].mlx_logits;
     const dot = actual.reduce((sum, value, position) => sum + value * expected[position], 0);
@@ -72,7 +80,7 @@ if (model === "aria") {
       * expected.reduce((sum, value) => sum + value * value, 0));
     assert.ok(dot / norm > 0.995);
   }
-  console.log(JSON.stringify({ provider: result.provider, cachedLogitError: maxError, steps: result.outputs.length }));
+  console.log(JSON.stringify({ provider: result.provider, cachedLogitError: maxError, probeLogitError: probeError, steps: result.outputs.length }));
 } else {
   assert.equal(result.notes.length, fixture.notes.length);
   for (let index = 0; index < result.notes.length; index++) {
