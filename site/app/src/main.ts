@@ -1,5 +1,6 @@
 import { EventLog, requestPersistentStorage } from "./event-log";
 import type { DownloadProgress } from "./inference";
+import { readingProgressFromEvents } from "../../../src/core/reading-events.ts";
 import "./style.css";
 
 const root = document.querySelector<HTMLDivElement>("#app");
@@ -19,7 +20,9 @@ root.innerHTML = `
         <button disabled><span>01</span><strong>Reading</strong><small>Find your way around the score</small></button>
         <button disabled><span>02</span><strong>Drills</strong><small>Build your technique</small></button>
         <button disabled><span>03</span><strong>Duet</strong><small>Play a musical conversation</small></button>
-        <button disabled><span>04</span><strong>Library</strong><small>Bring your own music</small></button>
+        <button disabled><span>04</span><strong>Practice</strong><small>Explore at your own pace</small></button>
+        <button disabled><span>05</span><strong>Variations</strong><small>Hear a new take on a phrase</small></button>
+        <button disabled><span>06</span><strong>Library</strong><small>Bring your own music</small></button>
       </div>
       <section class="notice" aria-live="polite">
         <span class="status-dot"></span>
@@ -41,10 +44,10 @@ try {
   if (import.meta.env.PROD && "serviceWorker" in navigator) await navigator.serviceWorker.register("/service-worker.js");
   const persisted = await requestPersistentStorage();
   await log.open();
+  const progress = readingProgressFromEvents(await log.list());
   status.textContent = "Your progress stays on this device";
-  detail.textContent = persisted
-    ? "Practice modes are being prepared."
-    : "Practice modes are being prepared. Your browser has not granted persistent storage.";
+  detail.textContent = `Reading stage ${progress.curriculum.number}: ${progress.curriculum.label} · ${progress.xp.xp} XP. Practice modes are being prepared.`
+    + (persisted ? "" : " Your browser has not granted persistent storage.");
 } catch (error) {
   status.textContent = "Could not open your practice space";
   detail.textContent = error instanceof Error ? error.message : String(error);

@@ -44,6 +44,9 @@ for (const [name, engine] of [["Chromium", chromium], ["WebKit", webkit]]) {
         return progress;
       });
       assert.deepEqual(reloaded, result.saved);
+      await page.goto(`http://127.0.0.1:${port}/`);
+      await page.waitForFunction(() => document.querySelector("#storage-detail")?.textContent.includes("80 XP"));
+      assert.ok((await page.locator("#storage-detail").textContent()).includes("Reading stage 1: First notes"));
     } finally {
       await browser.close();
       await rm(profile, { recursive: true, force: true });
