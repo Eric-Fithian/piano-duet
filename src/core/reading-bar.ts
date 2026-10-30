@@ -4,7 +4,7 @@ import type { ChordRandom, PhraseWriter } from "./reading-chord.ts";
 import { variedOptions } from "./reading-line.ts";
 import type { ReadingHand, ReadingLine, ReadingNote } from "./reading-line.ts";
 import type { MusicalKey } from "./musical-key.ts";
-import { roundEven } from "./numeric.ts";
+import { roundDecimal } from "./numeric.ts";
 import { nextValues } from "./reading-rhythm.ts";
 
 const EPSILON = 1e-9;
@@ -21,7 +21,7 @@ export async function writeBar(stage: AttackStage, hands: Record<string, Reading
   notes: ReadingNote[], rng: ChordRandom): Promise<void> {
   while (true) {
     const waiting = lines.filter((line) => line.cursor < beats - EPSILON)
-      .sort((a, b) => roundEven(a.cursor * 1e6) - roundEven(b.cursor * 1e6) || Number(a.staff !== "bass") - Number(b.staff !== "bass"));
+      .sort((a, b) => roundDecimal(a.cursor, 6) - roundDecimal(b.cursor, 6) || Number(a.staff !== "bass") - Number(b.staff !== "bass"));
     if (!waiting.length) return;
     const line = waiting[0];
     const values = nextValues(line.rhythms, line.prefix);
@@ -75,8 +75,8 @@ export async function writeAttack(stage: AttackStage, hands: Record<string, Read
   if (value === undefined) throw new Error("Phrase selected an unavailable duration");
   const chord = await buildChord(stage.texture, scale, pitch, onset, seconds, shapes, forced, phrase, rng);
   for (const p of chord) {
-    const note: ReadingNote = { pitch: p, start: roundEven(onset * 1e6) / 1e6,
-      duration: roundEven(value * unit * 1e6) / 1e6, velocity: 76, staff: line.staff };
+    const note: ReadingNote = { pitch: p, start: roundDecimal(onset, 6),
+      duration: roundDecimal(value * unit, 6), velocity: 76, staff: line.staff };
     if (index === 0 && line.finger !== null) note.finger = line.finger;
     if (line.cue && line.cue.note === null) line.cue.note = note;
     notes.push(note);

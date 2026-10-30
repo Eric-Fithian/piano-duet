@@ -6,7 +6,7 @@ import type { ContextProgress, ContextStage, RandomChoice } from "./reading-cont
 import { planLine } from "./reading-line.ts";
 import type { LineRandom, LineStage, ReadingHand, ReadingLine, ReadingNote } from "./reading-line.ts";
 import type { MusicalKey } from "./musical-key.ts";
-import { roundEven } from "./numeric.ts";
+import { roundDecimal } from "./numeric.ts";
 import { planScore } from "./reading-plan.ts";
 import type { PlanRandom, PlanStage } from "./reading-plan.ts";
 import { staffStep } from "./reading-score.ts";
@@ -123,8 +123,8 @@ function varied(stage: ComposerStage, score: ReadingScore, lines: ReadingLine[],
     if (melody.length >= 6 && new Set(melody).size < 3) return false;
   }
   if (stage.rhythm !== "long") return true;
-  const pattern = score.target.map((note) => [roundEven(note.start * score.bpm / 60 * 1e4) / 1e4,
-    roundEven(note.duration * score.bpm / 60 * 1e4) / 1e4]);
+  const pattern = score.target.map((note) => [roundDecimal(note.start * score.bpm / 60, 4),
+    roundDecimal(note.duration * score.bpm / 60, 4)]);
   const intervals = lines.reduce((sum, line) => sum + line.pitches.length - 1, 0);
   return !recent.some((item) => JSON.stringify(item) === JSON.stringify(pattern)) && intervals >= 2 && new Set(pattern.map(([, duration]) => duration)).size >= 2;
 }
