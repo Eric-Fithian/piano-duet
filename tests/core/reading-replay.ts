@@ -48,6 +48,10 @@ export class ReadingReplay {
     return this.take("random", { method: "sample", args: [population, k], kwargs: {} }).value as T[];
   }
 
+  randrange(start: number, stop: number): number {
+    return this.take("random", { method: "randrange", args: [start, stop], kwargs: {} }).value as number;
+  }
+
   phrase(context: Value): this {
     this.take("phrase", { context });
     return this;

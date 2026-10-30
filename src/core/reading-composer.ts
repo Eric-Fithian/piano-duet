@@ -31,7 +31,7 @@ export interface ComposerProgress extends ContextProgress {
 export type ComposerRandom = RandomChoice & PlanRandom & LineRandom;
 export type PhraseFactory = (context: unknown) => PhraseWriter | Promise<PhraseWriter>;
 
-export interface ReadingPosition { index: number; low: number; finger: number | null; clef: string; hand: string }
+export interface ReadingPosition { index: number; low: number; finger: number | null; clef?: string; hand?: string }
 export interface ReadingScore {
   target: ReadingNote[];
   title: string;
@@ -46,8 +46,8 @@ export interface ReadingScore {
   reading: {
     stage_id: string; stage_number: number; focus: string; label: string; clef: string; hand: string;
     segments: number[]; positions: ReadingPosition[]; bars_per_row: number; vocabulary: number[];
-    max_step: number; introduce: null; bars: number; rhythm_required: boolean; minimum_bpm: number;
-    composition: { method: string };
+    max_step: number; introduce: number | null; bars: number; rhythm_required?: boolean; minimum_bpm?: number;
+    composition?: { method: string };
   };
 }
 

@@ -62,6 +62,9 @@ class RecordingRandom:
     def sample(self, population, k):
         return self.call("sample", (population, k), {})
 
+    def randrange(self, start, stop):
+        return self.call("randrange", (start, stop), {})
+
 
 class RecordingPhrase:
     def __init__(self, rng, context=None):

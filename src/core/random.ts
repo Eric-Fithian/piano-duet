@@ -16,7 +16,7 @@ export class RandomSource {
     return options[Math.floor(this.random() * options.length)];
   }
 
-  choices(options: number[], weights: number[]): number[] {
+  choices<T>(options: T[], weights: number[]): T[] {
     if (!options.length || options.length !== weights.length || weights.some((weight) => !Number.isFinite(weight) || weight < 0)) {
       throw new Error("Weighted choices need matching, nonnegative finite weights");
     }
@@ -29,6 +29,11 @@ export class RandomSource {
       if (threshold < cumulative) return [options[index]];
     }
     throw new Error("The weighted choice could not be resolved");
+  }
+
+  randrange(start: number, stop: number): number {
+    if (!Number.isSafeInteger(start) || !Number.isSafeInteger(stop) || stop <= start) throw new Error("Invalid random range");
+    return start + Math.floor(this.random() * (stop - start));
   }
 
   sample(options: number[], count: number): number[] {

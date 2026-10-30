@@ -27,7 +27,7 @@ export interface ReadingNote {
   start: number;
   duration: number;
   velocity: number;
-  staff: string;
+  staff?: string;
   finger?: number;
 }
 export interface ReadingLine {
