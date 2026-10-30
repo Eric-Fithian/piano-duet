@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 const headers = {
   "Cross-Origin-Opener-Policy": "same-origin",
@@ -10,21 +11,42 @@ const headers = {
 export default defineConfig({
   root: "app",
   publicDir: false,
-  build: { outDir: "../dist", emptyOutDir: true },
+  build: { outDir: "../dist", emptyOutDir: true, assetsInlineLimit: 0 },
   optimizeDeps: { exclude: ["@sqlite.org/sqlite-wasm"],
     include: ["@noble/hashes/sha2.js", "@noble/hashes/utils.js", "onnxruntime-web/webgpu"] },
-  server: { host: "127.0.0.1", headers, proxy: {
+  server: { host: "127.0.0.1", headers, fs: { allow: [fileURLToPath(new URL("..", import.meta.url))] }, proxy: {
     "/docs": "http://127.0.0.1:4321",
     "/install.sh": { target: "http://127.0.0.1:4321", rewrite: () => "/docs/install.sh" },
   } },
   preview: { host: "127.0.0.1", headers, proxy: {} },
   worker: { format: "es" },
   plugins: [{
+    name: "reference-interface",
+    transformIndexHtml: {
+      order: "pre",
+      handler(html, context) {
+        if (context.path !== "/" && context.path !== "/index.html") return html;
+        html = readFileSync(new URL("../src/piano_duet/static/index.html", import.meta.url), "utf8");
+        const replace = (before: string, after: string) => {
+          if (html.split(before).length !== 2) throw new Error(`Expected exactly one reference interface element: ${before}`);
+          html = html.replace(before, after);
+        };
+        for (const file of ["style.css", "score.css", "practice.css", "game.css"]) {
+          replace(`  <link rel="stylesheet" href="/static/${file}">\n`, "");
+        }
+        replace('  <script src="/notation-assets/vexflow.js" defer></script>\n', "");
+        replace('  <script type="module" src="/static/app.mjs"></script>', '  <script type="module" src="/src/main.ts"></script>');
+        replace('href="/static/credits.html"', 'href="/docs/credits/"');
+        replace('id="openYoutube" class=', 'id="openYoutube" hidden class=');
+        return html;
+      },
+    },
+  }, {
     name: "offline-app-shell",
     generateBundle(_options, bundle) {
       const files = Object.keys(bundle).filter((name) => !name.endsWith(".map")).sort();
       const digest = createHash("sha256");
-      digest.update(readFileSync(new URL("./app/index.html", import.meta.url)));
+      digest.update(readFileSync(new URL("../src/piano_duet/static/index.html", import.meta.url)));
       for (const name of files) {
         const entry = bundle[name];
         digest.update(name).update(entry.type === "asset" ? entry.source : entry.code);

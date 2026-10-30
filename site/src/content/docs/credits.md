@@ -3,13 +3,13 @@ title: Credits
 description: The models, samples and libraries Piano Duet is built on.
 ---
 
-Piano Duet is [MIT-licensed](https://github.com/Eric-Fithian/piano-duet/blob/main/LICENSE). It downloads these models and assets during setup rather than redistributing them, and each keeps its own license.
+Piano Duet is [MIT-licensed](https://github.com/Eric-Fithian/piano-duet/blob/main/LICENSE). Its models, samples and libraries each keep their own licenses. The Python app downloads its assets during setup; the browser build bundles VexFlow and downloads the piano samples when needed.
 
 - [Aria paper and official implementation](https://github.com/EleutherAI/aria), Apache 2.0. [Generation checkpoint](https://huggingface.co/loubb/aria-medium-base/tree/5a1ef36c5007ee10fbe57d61d96725a7244bd2b2), `model-gen.safetensors`. The upstream README's separate `aria-medium-gen` URL is unavailable; the author's base repository contains the generation-tuned weights.
 - [Transkun](https://github.com/Yujia-Yan/Transkun), MIT.
 - High-resolution Piano Transcription by Qiuqiang Kong and collaborators: the [original checkpoint](https://doi.org/10.5281/zenodo.4034264) is licensed [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The [ONNX conversion by stelee](https://huggingface.co/stelee/piano-transcription-onnx) and Piano Duet's pruned, split graph modify that checkpoint. The separate [inference package](https://pypi.org/project/piano-transcription-inference/) declares MIT for its code.
 - Piano samples: [tonejs-instruments by Nicholaus P. Brosowsky](https://github.com/nbrosowsky/tonejs-instruments), [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/). Samples are pitch-shifted and shaped with note envelopes for playback.
-- Sheet music: [VexFlow 5.0.0](https://github.com/vexflow/vexflow), MIT. Its package license is preserved in `.cache/notation/LICENSE`.
+- Sheet music: [VexFlow 5.0.0](https://github.com/vexflow/vexflow), MIT. The Python setup preserves its license in `.cache/notation/LICENSE`.
 - Key-profile reference: [Krumhansl–Kessler profiles in music21's documentation](https://music21.org/music21docs/moduleReference/moduleAnalysisDiscrete.html). The app combines these with scale coverage for the current phrase; music21 is not a runtime dependency.
 - Interaction inspiration: [A.I. Duet](https://github.com/googlecreativelab/aiexperiments-ai-duet), by Yotam Mann with Google's Magenta and Creative Lab teams. This app is independent and does not reuse the old application code.
 - Score writing: [MIDI2ScoreTransformer](https://github.com/TimFelixBeyer/MIDI2ScoreTransformer) (Beyer & Dai, ISMIR 2024). Its repository has no license file. The Python reference downloads its public checkpoint for local use. The browser version will not redistribute the public or retrained checkpoints without the author's permission; the GitHub release asset is not directly usable for browser downloads because it lacks CORS access. A user-supplied local checkpoint and on-device conversion are possible alternatives, but are not implemented yet.

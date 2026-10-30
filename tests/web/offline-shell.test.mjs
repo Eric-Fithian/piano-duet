@@ -18,13 +18,12 @@ for (const [name, engine] of [["Chromium", chromium], ["WebKit", webkit]]) {
     const profile = await mkdtemp(join(tmpdir(), "piano-duet-offline-"));
     const context = await engine.launchPersistentContext(profile, { headless: true });
     try {
+      await context.route("https://raw.githubusercontent.com/**", (route) => route.abort());
       const page = await context.newPage();
       const origin = `http://127.0.0.1:${port}`;
       const response = await page.goto(`${origin}/`);
       assert.equal(response.status(), 200);
-      await page.waitForFunction(() => !document.querySelector("#storage-status").textContent.includes("Preparing"), null, { timeout: 10000 });
-      assert.equal(await page.locator("#storage-status").textContent(), "Your progress stays on this device",
-        await page.locator("#storage-detail").textContent());
+      await page.waitForFunction(() => window.VexFlow && document.querySelector(".mode-switch"), null, { timeout: 10000 });
       await page.evaluate(async () => {
         await navigator.serviceWorker.ready;
         if (!navigator.serviceWorker.controller) await new Promise((resolve) => navigator.serviceWorker.addEventListener("controllerchange", resolve, { once: true }));
@@ -34,9 +33,7 @@ for (const [name, engine] of [["Chromium", chromium], ["WebKit", webkit]]) {
       assert.equal(docs.status(), 200);
       await context.setOffline(true);
       await page.reload();
-      await page.waitForFunction(() => !document.querySelector("#storage-status").textContent.includes("Preparing"), null, { timeout: 10000 });
-      assert.equal(await page.locator("#storage-status").textContent(), "Your progress stays on this device",
-        await page.locator("#storage-detail").textContent());
+      await page.waitForFunction(() => window.VexFlow && document.querySelector(".mode-switch"), null, { timeout: 10000 });
       assert.equal(await page.evaluate(async () => (await (await caches.open("piano-duet-models")).match("/saved-model")).text()), "model");
     } finally {
       await context.close();

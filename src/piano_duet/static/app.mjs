@@ -1085,7 +1085,7 @@ async function startMicrophone() {
     if (inputContext?.state !== 'running') reading.interrupt();
   });
   if (inputContext.sampleRate !== 16000) throw new Error('This browser cannot capture at 16 kHz. Please use Chrome or Safari on your Mac.');
-  await inputContext.audioWorklet.addModule('/static/capture.js');
+  await inputContext.audioWorklet.addModule(new URL('./capture.js', import.meta.url).href);
   if (generation !== epoch) return;
   capture = new AudioWorkletNode(inputContext, 'piano-capture');
   inputContext.createMediaStreamSource(stream).connect(capture).connect(inputContext.destination);

@@ -1,65 +1,67 @@
+import VexFlow from "vexflow";
+import "../../../src/piano_duet/static/style.css";
+import "../../../src/piano_duet/static/score.css";
+import "../../../src/piano_duet/static/practice.css";
+import "../../../src/piano_duet/static/game.css";
+import { setLocalService } from "../../../src/piano_duet/static/practice.mjs";
+import { LocalService } from "../../../src/core/local-service.ts";
+import { BrowserInference } from "./browser-inference";
+import type { DownloadProgress, InferenceSession } from "./inference";
 import { EventLog, requestPersistentStorage } from "./event-log";
-import type { DownloadProgress } from "./inference";
-import { readingProgressFromEvents } from "../../../src/core/reading-events.ts";
+import { PIANO_SAMPLES } from "./piano-samples";
+import { SampleStore } from "./sample-store";
 import "./style.css";
 
-const root = document.querySelector<HTMLDivElement>("#app");
-if (!root) throw new Error("Piano Duet needs an app container");
+Object.assign(window, { VexFlow });
+const indicator = document.createElement("section");
+indicator.className = "asset-download";
+indicator.setAttribute("aria-live", "polite");
+indicator.hidden = true;
+const label = document.createElement("span");
+const bar = document.createElement("progress");
+indicator.append(label, bar);
+document.body.append(indicator);
+const received = new Map<string, number>();
+const sampleBytes = PIANO_SAMPLES.reduce((sum, sample) => sum + sample.bytes, 0);
+function report(progress: DownloadProgress): void {
+  indicator.hidden = false;
+  if (progress.model === "piano-samples") {
+    received.set(progress.file, progress.received);
+    bar.max = sampleBytes;
+    bar.value = [...received.values()].reduce((sum, value) => sum + value, 0);
+    label.textContent = "Preparing piano sounds";
+    if (bar.value === bar.max) indicator.hidden = true;
+  } else {
+    label.textContent = `Preparing ${progress.file}`;
+    if (progress.total === null) bar.removeAttribute("value");
+    else { bar.max = progress.total; bar.value = progress.received; }
+  }
+}
 
-root.innerHTML = `
-  <div class="shell">
-    <header class="topbar">
-      <a class="brand" href="/" aria-label="Piano Duet home"><span class="brand-mark">♪</span><span>Piano Duet</span></a>
-      <a class="guide" href="/docs/">Guide <span aria-hidden="true">↗</span></a>
-    </header>
-    <main>
-      <p class="eyebrow">YOUR PIANO PRACTICE</p>
-      <h1>Make a little<br><em>music every day.</em></h1>
-      <p class="intro">Play at your own pace, with music and feedback that stay on your device.</p>
-      <div class="modes" aria-label="Practice modes">
-        <button disabled><span>01</span><strong>Reading</strong><small>Find your way around the score</small></button>
-        <button disabled><span>02</span><strong>Drills</strong><small>Build your technique</small></button>
-        <button disabled><span>03</span><strong>Duet</strong><small>Play a musical conversation</small></button>
-        <button disabled><span>04</span><strong>Practice</strong><small>Explore at your own pace</small></button>
-        <button disabled><span>05</span><strong>Variations</strong><small>Hear a new take on a phrase</small></button>
-        <button disabled><span>06</span><strong>Library</strong><small>Bring your own music</small></button>
-      </div>
-      <section class="notice" aria-live="polite">
-        <span class="status-dot"></span>
-        <div><strong id="storage-status">Preparing your practice space…</strong><p id="storage-detail">Your progress is stored on this device.</p></div>
-      </section>
-      <section id="download" class="download" hidden aria-live="polite">
-        <label for="download-progress" id="download-label">Preparing your piano models</label>
-        <progress id="download-progress"></progress>
-      </section>
-    </main>
-    <footer><span>Made for the joy of playing.</span><a href="/docs/how/privacy/">Privacy</a></footer>
-  </div>`;
-
-const status = document.querySelector<HTMLElement>("#storage-status");
-const detail = document.querySelector<HTMLElement>("#storage-detail");
-if (!status || !detail) throw new Error("The storage status is missing");
-const log = new EventLog();
-try {
-  if (import.meta.env.PROD && "serviceWorker" in navigator) await navigator.serviceWorker.register("/service-worker.js");
-  const persisted = await requestPersistentStorage();
+async function start(): Promise<void> {
+  const log = new EventLog();
+  await requestPersistentStorage();
   await log.open();
-  const progress = readingProgressFromEvents(await log.list());
-  status.textContent = "Your progress stays on this device";
-  detail.textContent = `Reading stage ${progress.curriculum.number}: ${progress.curriculum.label} · ${progress.xp.xp} XP. Practice modes are being prepared.`
-    + (persisted ? "" : " Your browser has not granted persistent storage.");
-} catch (error) {
-  status.textContent = "Could not open your practice space";
-  detail.textContent = error instanceof Error ? error.message : String(error);
+  const backend = new BrowserInference({});
+  let live: Promise<InferenceSession<"live-transcription">> | undefined;
+  const transcriber = {
+    async run(input: { audio: Float32Array; sampleRate: 16000; threshold: number }, signal?: AbortSignal) {
+      live ??= backend.createSession("live-transcription", report, signal).catch((error) => { live = undefined; throw error; });
+      const session = await live;
+      indicator.hidden = true;
+      try { return await session.run(input, signal); }
+      catch (error) { if (signal?.aborted) live = undefined; throw error; }
+    },
+  };
+  setLocalService(new LocalService(log, transcriber, undefined, new SampleStore(report)));
+  if (import.meta.env.PROD && "serviceWorker" in navigator) await navigator.serviceWorker.register("/service-worker.js");
+  await import("../../../src/piano_duet/static/app.mjs");
 }
 
-export function showDownloadProgress(progress: DownloadProgress): void {
-  const section = document.querySelector<HTMLElement>("#download");
-  const label = document.querySelector<HTMLElement>("#download-label");
-  const bar = document.querySelector<HTMLProgressElement>("#download-progress");
-  if (!section || !label || !bar) throw new Error("The download progress display is missing");
-  section.hidden = false;
-  label.textContent = `Preparing ${progress.file}`;
-  if (progress.total === null) bar.removeAttribute("value");
-  else { bar.max = progress.total; bar.value = progress.received; }
-}
+start().catch((error: unknown) => {
+  const display = document.querySelector<HTMLElement>("#error");
+  if (!display) throw new Error("The interface has no error display");
+  display.textContent = error instanceof Error ? error.message : String(error);
+  display.hidden = false;
+  throw error;
+});

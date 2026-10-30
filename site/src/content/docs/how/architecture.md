@@ -3,7 +3,7 @@ title: Architecture
 description: The local-first browser foundation and the Python reference implementation.
 ---
 
-The browser rebuild is in progress. Its app lives at `/`, and these docs live under `/docs`. A dedicated worker keeps an append-only event log in SQLite using OPFS; model files are cached on the device by version and digest. Aria and live transcription have browser inference prototypes with WebGPU and WASM execution. Practice modes, sync, the other models and the iOS shell are not yet complete.
+The browser rebuild is in progress. Its app lives at `/`, and these docs live under `/docs`. The browser reuses the interface in `src/piano_duet/static/`; its API requests go through an injectable local service. A dedicated worker keeps an append-only event log in SQLite using OPFS; model files and piano samples are cached on the device by version and digest. Aria and live transcription have browser inference prototypes with WebGPU and WASM execution. The initial guided exercise and some local service endpoints are connected; playable modes, sync, the other models and the iOS shell are not yet complete.
 
 The existing Python app remains the reference implementation. It serves a browser page from a server bound to `127.0.0.1` and runs its models on the Mac:
 
@@ -19,7 +19,7 @@ The existing Python app remains the reference implementation. It serves a browse
 
 ## The front end
 
-`src/piano_duet/static/` is plain HTML, CSS and ES modules, with no build step. `app.mjs` wires the modes together; each mode has its own module (`reading.mjs`, `drills.mjs`, `library.mjs`, `practice.mjs`, `learning.mjs`, `song_editor.mjs`).
+`src/piano_duet/static/` is shared HTML, CSS and ES modules. `app.mjs` wires the modes together; each mode has its own module (`reading.mjs`, `drills.mjs`, `library.mjs`, `practice.mjs`, `learning.mjs`, `song_editor.mjs`). The Python reference serves these files directly. The browser build bundles them with VexFlow and injects the local service before the interface starts.
 
 - **Audio:** `audio.mjs` captures microphone audio with an AudioWorklet, counts attacks in the browser for drills, and plays the sampled piano.
 - **Notation:** `notation.mjs` quantizes notes into a score model. `engraving.mjs` lays out systems with VexFlow, and `score_view.mjs` is the one score viewer every mode uses, with zoom, layout, following and overlays.
