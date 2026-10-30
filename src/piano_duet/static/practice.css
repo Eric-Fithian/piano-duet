@@ -2,11 +2,11 @@
 .task-heading { display:flex; align-items:center; justify-content:space-between; gap:14px; }
 .task-heading>div { min-width:0; }
 .task-caption { font-size:10px; color:var(--muted); }
-.practice-panel h2 { font:27px/1.2 Georgia,serif; color:#eee5d4; margin:4px 0 0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.task-summary { font-size:12px; line-height:1.6; color:#c1ccbf; margin:8px 0 0; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.practice-panel h2 { font:27px/1.2 Georgia,serif; color:#dee0e4; margin:4px 0 0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.task-summary { font-size:12px; line-height:1.6; color:#c0c4cb; margin:8px 0 0; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 .practice-actions { display:flex; align-items:center; gap:8px; margin-top:10px; }
 .practice-actions button { padding:7px 12px; font-size:11px; }
-.practice-reason,.practice-help p,#practiceInstruction { color:#c1ceb9; font-size:13px; line-height:1.8; }
+.practice-reason,.practice-help p,#practiceInstruction { color:#bec2c9; font-size:13px; line-height:1.8; }
 .practice-cue { color:#e4d6b6; font-size:12px; line-height:1.8; }
 .practice-help[inert] { opacity:.5; }
 .practice-result { display:flex; align-items:center; gap:16px; margin-top:10px; }
@@ -14,50 +14,193 @@
 .practice-result p { font-size:12px; line-height:1.6; margin:0; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 .practice-result button { margin-left:auto; }
 .practice-panel.completed .task-summary { display:none; }
-#practiceEvidence { color:#b8cdb0; font-size:12px; line-height:1.8; }
+#practiceEvidence { color:#b8bdc5; font-size:12px; line-height:1.8; }
 #practiceFeedbackDetail { font-size:14px; line-height:1.8; }
 #excludePractice { white-space:normal; text-align:left; padding-left:0; margin-top:16px; }
 .score-phrase.target h2 { background:#d2e5e6; color:#315b61; }
-.practice-hidden { height:100%; margin:0; display:grid; place-content:center; padding:24px; text-align:center; font:22px/1.6 Georgia,serif; color:#425449; }
+.practice-hidden { height:100%; margin:0; display:grid; place-content:center; padding:24px; text-align:center; font:22px/1.6 Georgia,serif; color:#2f3b4c; }
 .profile-panel { padding:24px; }
 .profile-heading { display:flex; align-items:center; justify-content:space-between; gap:18px; }
-.profile-heading p,.profile-explanation { font-size:12px; line-height:1.8; color:#becaba; }
-.profile-heading a { text-decoration:none; white-space:nowrap; padding:11px 15px; border-radius:6px; font-size:12px; border:1px solid #5a6f5e; color:#d4ddca; }
+.profile-heading p,.profile-explanation { font-size:12px; line-height:1.8; color:#bcc0c8; }
+.profile-heading a { text-decoration:none; white-space:nowrap; padding:11px 15px; border-radius:6px; font-size:12px; border:1px solid #404f65; color:#cfd2d8; }
 .profile-explanation { max-width:95ch; }
 .skill-cards { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; margin:25px 0; }
-.skill-card { background:#25322b; border:1px solid #425644; border-radius:8px; padding:20px; }
-.skill-card h3 { font:23px Georgia,serif; margin:0 0 18px; color:#e0d7c5; }
-.skill-card p { font-size:11px; line-height:1.8; color:#c0cdb9; }
-.skill-card>strong { font-size:14px; color:#d5dfc7; }
-.skill-detail { margin:0; padding:10px 0; border-top:1px solid #405341; }
+.skill-card { background:#1a222d; border:1px solid #2f3b4e; border-radius:8px; padding:20px; }
+.skill-card h3 { font:23px Georgia,serif; margin:0 0 18px; color:#ced1d7; }
+.skill-card p { font-size:11px; line-height:1.8; color:#bdc1c9; }
+.skill-card>strong { font-size:14px; color:#cfd2d7; }
+.skill-detail { margin:0; padding:10px 0; border-top:1px solid #2d394b; }
 .skill-detail>summary { display:flex; align-items:baseline; justify-content:space-between; gap:12px; font-size:12px; cursor:pointer; }
-.skill-detail>summary>strong { color:#d5ddba; font-weight:500; white-space:nowrap; font-size:11px; }
-.skill-detail>summary>span::before { content:'＋ '; color:#9cba9b; }
+.skill-detail>summary>strong { color:#c6cad1; font-weight:500; white-space:nowrap; font-size:11px; }
+.skill-detail>summary>span::before { content:'＋ '; color:#a2a8b3; }
 .skill-detail[open]>summary>span::before { content:'− '; }
-.skill-conditions { padding-left:14px; font-size:10px; line-height:2; color:#c4d2b8; max-height:210px; overflow:auto; }
-.profile-method,#attemptHistory { border-top:1px solid #405341; padding-top:18px; margin-top:20px; font-size:12px; line-height:1.8; }
-.profile-method p { color:#b5c7b5; max-width:100ch; }
+.skill-conditions { padding-left:14px; font-size:10px; line-height:2; color:#bfc3cb; max-height:210px; overflow:auto; }
+.profile-method,#attemptHistory { border-top:1px solid #2d394b; padding-top:18px; margin-top:20px; font-size:12px; line-height:1.8; }
+.profile-method p { color:#b8bcc4; max-width:100ch; }
 #attemptList { margin-top:16px; }
-.history-attempt { display:grid; grid-template-columns:minmax(120px,1fr) minmax(130px,1fr) 55px; align-items:center; gap:12px; background:transparent; border-bottom:1px solid #3c4d3d; border-radius:0; width:100%; text-align:left; padding:15px 4px; color:#d6dfce; font-size:12px; }
-.history-attempt:hover { background:#2d3d30; }
-.history-attempt small { color:#b3c3b0; font-size:10px; }
+.history-attempt { display:grid; grid-template-columns:minmax(120px,1fr) minmax(130px,1fr) 55px; align-items:center; gap:12px; background:transparent; border-bottom:1px solid #2a3546; border-radius:0; width:100%; text-align:left; padding:15px 4px; color:#d2d5db; font-size:12px; }
+.history-attempt:hover { background:#202937; }
+.history-attempt small { color:#b3b8c0; font-size:10px; }
 .history-attempt strong { text-align:right; font-weight:500; }
-.attempt-detail { margin-top:22px; padding:22px; background:#27352c; border:1px solid #526b51; border-radius:8px; }
+.attempt-detail { margin-top:22px; padding:22px; background:#1b2430; border:1px solid #394961; border-radius:8px; }
 .attempt-detail h3 { font:24px Georgia,serif; margin-top:0; }
 .attempt-detail p { font-size:12px; line-height:1.8; }
-.attempt-context { color:#b9c9b2; }
+.attempt-context { color:#b7bcc4; }
 .attempt-observations { overflow:auto; max-height:250px; margin:18px 0; }
 .attempt-observations table { border-collapse:collapse; width:100%; text-align:left; font-size:12px; }
-.attempt-observations td,.attempt-observations th { padding:9px; border-bottom:1px solid #486048; }
+.attempt-observations td,.attempt-observations th { padding:9px; border-bottom:1px solid #334157; }
 .attempt-detail>button { margin-top:20px; }
-.save-piece { margin-top:25px; border-top:1px solid #405341; padding-top:20px; }
+.save-piece { margin-top:25px; border-top:1px solid #2d394b; padding-top:20px; }
 .save-piece>div { display:flex; gap:10px; margin-top:10px; }
-.save-piece input { min-width:0; flex:1; color:#e2e7d6; background:#283b2b; border:1px solid #5a7256; border-radius:6px; padding:12px; }
-.save-piece input::placeholder { color:#aebeaa; }
-.save-piece>p { color:#bed4b7; font-size:12px; }
+.save-piece input { min-width:0; flex:1; color:#dbdee2; background:#1c2635; border:1px solid #3d4e67; border-radius:6px; padding:12px; }
+.save-piece input::placeholder { color:#acb2bb; }
+.save-piece>p { color:#c0c4cb; font-size:12px; }
 [hidden] { display:none !important; }
 @media(max-width:1000px) { .skill-cards { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @media(max-width:650px) { .skill-cards { grid-template-columns:1fr; } .profile-panel { padding:20px; } .practice-panel { padding:10px 14px; } .practice-panel h2 { font-size:22px; } .task-caption { display:none; } .task-summary { font-size:11px; line-height:1.5; } .practice-actions { gap:2px; margin-top:8px; } .practice-actions button { padding:7px 9px; } .practice-result { gap:8px; } .practice-result>strong { font-size:23px; } .practice-result p { font-size:11px; } .profile-heading { align-items:start; flex-direction:column; } .history-attempt { grid-template-columns:1fr 55px; } .history-attempt small { grid-row:2; } .history-attempt strong { grid-row:1; grid-column:2; } .practice-heading { align-items:start; } }
 
 .attempt-detail { scroll-margin-top:90px; }
+.fluency-hands { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; }
+.fluency-hand { border:1px solid #303c4f; border-radius:10px; padding:14px; }
+.fluency-hand h4 { margin:0 0 12px; font-size:12px; color:#c0c4cb; }
+.fluency-hand strong { font:24px Georgia,serif; color:#deebc8; }
+.fluency-hand span,.fluency-hand p { font-size:12px; line-height:1.6; color:#c0c4cb; }
+.fluency-hand small { font-size:11px; color:#afb5be; }
+.landing-map { margin:16px 0 20px; }
+.landing-map figcaption { font-size:12px; color:#d1d4d9; margin-bottom:8px; }
+.landing-staff { background:#f6f3e9; border-radius:10px; overflow:hidden; }
+.landing-staff svg { display:block; width:100%; height:auto; max-height:190px; }
+.landing-note { cursor:pointer; outline:none; }
+.landing-hit { fill:transparent; stroke:transparent; stroke-width:1.5; }
+.landing-note:focus-visible .landing-hit,.landing-note[aria-pressed=true] .landing-hit { fill:#337d8210; stroke:#387f81; }
+.landing-label,.landing-value { text-anchor:middle; font:12px sans-serif; fill:#33463b; stroke:none; }
+.landing-value { fill:#55645a; }
+.landing-detail { min-height:36px; font-size:12px; line-height:1.6; color:#bcc0c8; margin:8px 0 0; }
+.landing-legend { display:flex; align-items:center; gap:10px; font-size:11px; color:#c0c4cb; }
+.landing-gradient { flex:1; height:7px; border-radius:4px; background:linear-gradient(90deg,#388482,#d3a84e,#b85641); }
+.landing-key { margin:8px 0 18px; }
+#fingerHelp { font-size:12px; }
+#fingerHelp>span { margin-right:4px; }
+.finger-hands { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:18px 0; }
+.finger-hands figure { margin:0; text-align:center; font-size:13px; }
+.finger-hands svg { width:100%; max-height:230px; }
+.finger-hands path { fill:#253144; stroke:#a7adb7; stroke-width:2; stroke-linejoin:round; }
+.finger-hands text { fill:#fff3dc; text-anchor:middle; font:bold 18px sans-serif; }
+.finger-intro { font-size:13px; line-height:1.8; color:#d1d4da; }
+.task-caption.reading-caption { display:block; }
+@media(max-width:600px) and (max-height:700px) {
+  .piano-app[data-mode=reading] .practice-panel:not(.introduction) .task-summary { display:none; }
+}
 @media(max-height:500px) and (min-width:601px) { .practice-panel { padding:6px 16px; position:relative; } .practice-panel h2 { font-size:20px; } .task-caption,.task-summary { display:none; } .task-heading { padding-right:280px; } .practice-actions { position:absolute; right:16px; top:3px; margin:0; } .practice-result { margin-top:4px; } }
+
+.drill-panel { flex-shrink:0; border-bottom:1px solid var(--line); }
+.drill-bar { position:relative; display:flex; align-items:center; gap:6px; padding:6px 10px 7px; }
+.drill-title { flex:1; min-width:0; display:flex; align-items:center; gap:10px; padding:5px 8px; background:none; border:0; border-radius:6px; text-align:left; color:#dee0e4; }
+.drill-title:hover { background:#1e2734; }
+.drill-title strong { flex:0 1 auto; max-width:75%; font:20px/1.2 Georgia,serif; font-weight:400; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.drill-title small { flex:1 1 0; min-width:0; font-size:11px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.drill-title svg { flex:none; width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:2; transition:transform .2s; }
+.drill-title[aria-expanded=true] svg { transform:rotate(180deg); }
+.drill-bar .hud-tempo b { font-size:16px; }
+.drill-bar .hud-tempo button { width:24px; height:24px; }
+.drill-bar .hud-tempo>span small:last-child { font-family:inherit; font-size:11px; }
+.drill-ladder-track { position:absolute; left:0; right:0; bottom:0; height:2px; border-radius:0; }
+.drill-options { padding:2px 16px 10px; }
+.drill-picker { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+.drill-picker label { display:flex; }
+.drill-picker label>span { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+.drill-picker select { margin:0; width:auto; max-width:180px; padding:5px 8px; font-size:12px; }
+.drill-picker button { padding:6px 9px; font-size:11px; }
+.drill-milestone, .drill-summary { margin:6px 0 0; font-size:11px; line-height:1.5; color:var(--muted); }
+.drill-metrics { display:block; color:#deebc8; font-size:12px; }
+.drill-log { display:grid; gap:2px; }
+.drill-log-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:4px 12px; width:100%; text-align:left; background:transparent; border-bottom:1px solid #2a3546; border-radius:0; padding:12px 4px; color:#d2d5db; font-size:12px; }
+.drill-log-row:hover { background:#202937; }
+.drill-log-row small { grid-column:1 / -1; color:#b3b8c0; font-size:10px; }
+.drill-log-row strong { font-weight:500; white-space:nowrap; }
+/* Drills replace the exercise panel with the bar above and the stats card below it. */
+.piano-app[data-mode=drills] #practicePanel { display:none; }
+.drill-last { padding:5px 9px; font-size:11px; white-space:nowrap; }
+.drill-results { flex-shrink:0; padding:10px 16px 12px; border-bottom:1px solid var(--line); background:#161d27; }
+.drill-results-head { display:flex; align-items:baseline; gap:12px; min-width:0; }
+.drill-results-head>strong { font:18px Georgia,serif; color:#e7c9a8; white-space:nowrap; }
+.drill-results-head>strong.clean { color:#deebc8; }
+.drill-results-head>span { flex:1; min-width:0; font-size:12px; color:#c0c4cb; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.drill-results-head button { padding:4px 8px; font-size:11px; }
+/* Results: a meter per measure against its clean target, and a note-by-note timeline of the take. */
+.drill-results-head>em { font-style:normal; font-size:12px; font-weight:500; color:#e7d6b0; white-space:nowrap; }
+.drill-results-body { display:flex; flex-wrap:wrap; gap:10px 22px; margin-top:8px; }
+.drill-meters { flex:0 1 300px; display:grid; gap:5px; align-content:start; min-width:240px; }
+.drill-meter { display:grid; grid-template-columns:64px 1fr 44px; align-items:center; gap:8px; font-size:11px; color:#c0c4cb; }
+.drill-meter-label { color:var(--muted); }
+.drill-meter-value { font-weight:600; font-variant-numeric:tabular-nums; text-align:right; color:#e4e6ea; }
+.drill-meter-track { position:relative; height:8px; border-radius:4px; background:#2a3442; overflow:hidden; }
+.drill-meter-track>i { position:absolute; inset:0 auto 0 0; border-radius:4px; background:var(--meter); }
+.drill-meter-track>u { position:absolute; top:-1px; bottom:-1px; width:2px; margin-left:-1px; background:#e4e6ea; opacity:.75; }
+.drill-meter-signed>s { position:absolute; inset:0 auto; background:#45d48333; }
+.drill-meter-signed>i { border-radius:2px; }
+.drill-meter-signed::after { content:''; position:absolute; left:50%; top:0; bottom:0; width:1px; background:#e4e6ea80; }
+.drill-meter.good { --meter:#45d483; }
+.drill-meter.short { --meter:#f1aa1c; }
+.drill-meter.short .drill-meter-value { color:#f6c768; }
+.drill-lanes { flex:1 1 360px; display:grid; grid-template-columns:54px 1fr auto; margin:0; min-width:0; font-size:10px; color:var(--muted); }
+.drill-lane-labels, .drill-lane-ends { display:grid; grid-template-rows:repeat(3, 28px) 12px; align-items:center; }
+.drill-lane-ends { padding-left:8px; color:#c0c4cb; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.drill-lane-chart { position:relative; display:grid; grid-template-rows:84px 12px; min-width:0; }
+.drill-lane-chart svg { display:block; width:100%; height:84px; overflow:visible; }
+.drill-lane-axis { position:relative; }
+.drill-lane-axis>span { position:absolute; top:1px; transform:translateX(2px); font-size:9px; color:#7d8590; }
+.drill-lanes :is(line, path) { vector-effect:non-scaling-stroke; }
+.drill-lanes .lane-bar { stroke:#ffffff14; stroke-width:1; }
+.drill-lanes .lane-band { fill:#45d4831f; }
+.drill-lanes .lane-tempo { fill:none; stroke:#c9d1db; stroke-width:1.5; stroke-linejoin:round; }
+.drill-lanes .lane-off { stroke:#f1aa1c; stroke-width:2; }
+.drill-lane-ends>.good { color:#7fe0a6; }
+.drill-lane-ends>.short { color:#f6c768; }
+.drill-lane-missed { position:absolute; top:42px; transform:translate(-50%, -50%); color:#ef5a4c; font-size:13px; font-weight:700; line-height:1; pointer-events:none; }
+.drill-lanes .lane-zero, .drill-lanes .lane-typical { stroke:#3d4858; stroke-width:1; }
+.drill-lanes .lane-typical { stroke:#8a94a3; stroke-dasharray:3 3; }
+.drill-lanes .lane-steady, .drill-lanes .lane-even { fill:#566273; }
+.drill-lanes .lane-late { fill:#d9734a; }
+.drill-lanes .lane-early { fill:#4a8ac4; }
+.drill-lanes .lane-loud { fill:#f1aa1c; }
+.drill-lanes .lane-hit { fill:transparent; }
+.drill-lanes .lane-hit:hover { fill:#ffffff12; }
+@media(max-width:700px) { .drill-meters { flex-basis:100%; } }
+.drill-issues { margin:8px 0 0; padding-left:16px; font-size:12px; line-height:1.6; color:#d1d4d9; columns:2 260px; }
+/* Practice keeps one title row and a one-line instruction; the rest is in Details. */
+.piano-app[data-mode=practice] .practice-panel { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:2px 14px; padding:8px 16px; }
+.piano-app[data-mode=practice] .task-heading { grid-column:1; grid-row:1; justify-content:flex-start; }
+.piano-app[data-mode=practice] .task-caption { display:none; }
+.piano-app[data-mode=practice] .practice-panel h2 { font-size:20px; margin:0; }
+.piano-app[data-mode=practice] .practice-actions { grid-column:2; grid-row:1; margin:0; }
+.piano-app[data-mode=practice] .task-summary { grid-column:1 / -1; grid-row:2; margin:0; -webkit-line-clamp:1; }
+.piano-app[data-mode=practice] .practice-result { grid-column:1 / -1; grid-row:2; margin:0; gap:12px; }
+.piano-app[data-mode=practice] .practice-result>strong { font-size:20px; }
+/* The toolbar, the roll legend and a title chip repeating the heading only earn space when they add something. */
+:is(.piano-app[data-mode=drills], .piano-app[data-mode=practice]) .score-toolbar,
+.piano-app[data-mode=drills] .roll-footer, .piano-app[data-mode=practice] .roll-footer,
+.piano-app[data-mode=drills] .score-phrase.target .score-heading, .piano-app[data-mode=practice] .score-phrase.target .score-heading { display:none; }
+@media(max-width:650px) { .drill-title small { display:none; } .drill-picker select { max-width:130px; } }
+.drill-picker label.always { display:flex; }
+.drill-level { display:flex; flex-direction:column; align-items:center; gap:3px; width:38px; padding:4px 0; background:none; border:1px solid var(--line-strong); border-radius:6px; color:var(--gold, #e3b35b); }
+.drill-level b { font:15px/1 var(--display); }
+.drill-level .xp-track { width:24px; height:3px; }
+.drill-session { padding:5px 9px; font-size:11px; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.drill-session.active { color:#0b0f15; background:#deebc8; }
+.drill-streak { margin-left:auto; margin-right:12px; font-size:12px; color:var(--gold, #e3b35b); }
+.drill-levels-dialog .dialog-heading { align-items:center; }
+.drill-levels { display:grid; gap:14px; }
+.drill-level-group { display:grid; gap:6px; }
+.drill-level-group h3 { margin:0; }
+.drill-level-card { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:12px; padding:8px 10px; border:1px solid #2c3747; border-radius:8px; }
+.drill-level-badge { display:grid; place-items:center; width:32px; height:32px; border-radius:8px; font:17px var(--display); color:#0b0f15; background:var(--gold, #e3b35b); }
+.drill-level-card strong { font-size:13px; font-weight:500; color:#e0e2e6; }
+.drill-level-card .xp-track { margin:5px 0 4px; }
+.drill-level-card small { font-size:11px; color:#aeb4bd; }
+.drill-level-card button { padding:5px 10px; font-size:11px; }
+.drill-level-rules summary { cursor:pointer; font-size:12px; color:#c0c4cb; }
+.session-choices { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-top:12px; }
+.session-choices>span { font-size:12px; color:var(--muted); }
+.session-choices button { padding:8px 12px; font-size:12px; }
+@media(max-width:650px) { .drill-session { padding-inline:6px; } }

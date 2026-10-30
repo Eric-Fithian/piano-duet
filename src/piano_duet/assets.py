@@ -29,6 +29,9 @@ def main():
     from piano_duet.generation import quantize_checkpoint
 
     quantize_checkpoint()
+    from piano_duet.score_model import setup as setup_score_model
+
+    setup_score_model()
     print("Ready. Start with: uv run piano-duet")
 
 

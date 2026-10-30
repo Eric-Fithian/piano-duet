@@ -1,3 +1,4 @@
+import math
 import time
 from collections.abc import Callable, Iterator
 from threading import Event
@@ -71,6 +72,9 @@ class PianoGenerator:
         if not pitch_classes or any(type(p) is not int or not 0 <= p < 12 for p in pitch_classes):
             raise ValueError("A pitch constraint requires pitch classes between 0 and 11")
         return [i for i in self.note_ids if self.tokenizer.id_to_tok[i][1] % 12 in pitch_classes]
+
+    def phrase(self, rng, context=None):
+        return ConstrainedPhrase(self, rng, context)
 
     def generate(
         self,
@@ -247,6 +251,123 @@ class PianoGenerator:
             )[0, -1]
             mx.eval(logits)
             position += 1
+
+
+class ConstrainedPhrase:
+    """Aria writes one phrase note by note, choosing only among the pitches and durations offered.
+
+    `context` is the music just before the phrase, {"notes": [...], "end": seconds}: Aria hears it first, and the
+    phrase's onsets count from its end, so the new music continues it.
+    """
+
+    CAPACITY = 2048
+    TEMPERATURE = 0.95
+    # Like the duet sampler, drop options far less likely than Aria's favourite.
+    CUTOFF = 0.035
+
+    def __init__(self, generator, rng, context=None):
+        self.tokenizer = generator.tokenizer
+        self.model = generator.model
+        self.rng = rng
+        self.pitch_tokens = {}
+        for token in generator.note_ids:
+            self.pitch_tokens.setdefault(self.tokenizer.id_to_tok[token][1], []).append(token)
+        self.model.setup_cache(1, max_seq_len=self.CAPACITY, dtype=mx.float16)
+        self.position = 0
+        self.pitch = None
+        if context is None:
+            self.pending = self.tokenizer.encode([("prefix", "instrument", "piano"), self.tokenizer.bos_tok])
+            self.segment = self.onset = 0
+            self.origin = 0
+            return
+        notes = [Note(**{field: note[field] for field in ("pitch", "start", "duration", "velocity")}) for note in context["notes"]]
+        if not notes:
+            raise ValueError("Context for a constrained phrase needs notes")
+        prompt = self.tokenizer.tokenize(to_midi_dict(notes), add_dim_tok=False, add_eos_tok=False)
+        self.pending = self.tokenizer.encode(prompt)
+        # Aria's timeline starts at the context's first onset; the phrase begins where the context ends.
+        first = min(note.start for note in notes)
+        if context["end"] < max(note.start for note in notes):
+            raise ValueError("A phrase's context must end after its last onset")
+        self.origin = context["end"] - first
+        self.segment = prompt.count(self.tokenizer.time_tok) * self.tokenizer.abs_time_step_ms
+        self.onset = self.tokenizer.calc_length_ms(prompt, onset=True)
+
+    def note(self, onset, pitches, durations):
+        """Write a note at `onset` seconds; `pitches` and `durations` (seconds) map options to practice weights."""
+        milliseconds = round((self.origin + onset) * 100) * 10
+        if milliseconds < self.onset:
+            raise ValueError("A constrained phrase must be written in time order")
+        # Aria orders the notes of one onset from low to high.
+        if self.pitch is not None and milliseconds == self.onset and min(pitches) <= self.pitch:
+            raise ValueError("Notes sharing an onset must be written from low to high")
+        self.onset = milliseconds
+        while milliseconds >= self.segment + self.tokenizer.abs_time_step_ms:
+            self.pending.append(self.tokenizer.tok_to_id[self.tokenizer.time_tok])
+            self.segment += self.tokenizer.abs_time_step_ms
+        if any(pitch not in self.pitch_tokens for pitch in pitches):
+            raise ValueError("Constrained pitches must be piano keys")
+        pitch_token = self.choose(
+            {token: weight for pitch, weight in pitches.items() for token in self.pitch_tokens[pitch]}
+        )
+        self.pending += [pitch_token, self.tokenizer.tok_to_id[("onset", milliseconds - self.segment)]]
+        options = {}
+        for seconds, weight in durations.items():
+            token = self.tokenizer.tok_to_id[("dur", min(self.tokenizer.max_dur_ms, round(seconds * 100) * 10))]
+            if token in options:
+                raise ValueError("Two offered durations map to the same Aria token")
+            options[token] = (seconds, weight)
+        duration_token = self.choose({token: weight for token, (_, weight) in options.items()})
+        self.pending.append(duration_token)
+        self.pitch = self.tokenizer.id_to_tok[pitch_token][1]
+        return self.pitch, options[duration_token][0]
+
+    def choose(self, options):
+        if not options or any(not weight > 0 for weight in options.values()):
+            raise ValueError("A constrained choice needs options with positive weights")
+        if len(options) == 1:
+            return next(iter(options))
+        logits = self.advance() if self.pending else self.logits
+        tokens = list(options)
+        scores = logits[mx.array(tokens)].astype(mx.float32) / self.TEMPERATURE + mx.log(
+            mx.array([options[token] for token in tokens], dtype=mx.float32)
+        )
+        scores = mx.where(scores >= mx.max(scores) + math.log(self.CUTOFF), scores, -float("inf"))
+        probabilities = mx.softmax(scores).tolist()
+        return self.rng.choices(tokens, weights=probabilities)[0]
+
+    def advance(self):
+        count = len(self.pending)
+        if self.position + count > self.CAPACITY:
+            raise RuntimeError("The constrained phrase is longer than its Aria context")
+        logits = self.model(
+            mx.array([self.pending]),
+            mx.arange(self.position, self.position + count),
+            offset=self.position,
+            max_kv_pos=self.position + count - 1,
+        )[0, -1]
+        self.position += count
+        self.pending = []
+        self.logits = logits
+        return logits
+
+    def chord_chance(self, pitches):
+        """Aria's probability that its next note is one of `pitches`, sounding with the note just written."""
+        logits = self.advance() if self.pending else self.logits
+        probabilities = mx.softmax(logits.astype(mx.float32) / self.TEMPERATURE)
+        same = self.tokenizer.tok_to_id[("onset", self.onset - self.segment)]
+        total = 0.0
+        for pitch in pitches:
+            tokens = self.pitch_tokens[pitch]
+            weights = probabilities[mx.array(tokens)]
+            mass = mx.sum(weights).item()
+            if mass < 1e-6:
+                continue
+            # Try the pitch at its likeliest velocity, read Aria's onset for it, then let the next write overwrite it.
+            probe = tokens[int(mx.argmax(weights).item())]
+            onset = self.model(mx.array([[probe]]), mx.array([self.position]), offset=self.position, max_kv_pos=self.position)[0, -1]
+            total += mass * mx.softmax(onset.astype(mx.float32) / self.TEMPERATURE)[same].item()
+        return min(1.0, total)
 
 
 def repetitive_short_notes(notes):

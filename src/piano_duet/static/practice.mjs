@@ -2,14 +2,19 @@ import {pitchName} from './learning.mjs';
 
 const $ = id => document.getElementById(id);
 
-export async function localRequest(path, body) {
+export async function localRequest(path, body, method = 'POST') {
   const response = await fetch(path, body === undefined ? {} : {
-    method: 'POST', headers: {'Content-Type': 'application/json', 'X-Duet-Client': '1'},
+    method, headers: {'Content-Type': 'application/json', 'X-Duet-Client': '1'},
     body: JSON.stringify(body),
   });
   if (!response.ok) {
+    // A crash in the server answers in plain text, not the JSON of a refused request.
+    if (!response.headers.get('content-type')?.includes('application/json')) {
+      throw new Error(`The local server failed on ${path} (${response.status}). Check the Terminal running Piano Duet for details.`);
+    }
     const data = await response.json();
-    throw new Error(typeof data.detail === 'string' ? data.detail : 'The local learning request was invalid.');
+    const detail = Array.isArray(data.detail) ? data.detail.map(item => `${item.loc.join('.')}: ${item.msg}`).join('; ') : data.detail;
+    throw new Error(typeof detail === 'string' ? detail : 'The local learning request was invalid.');
   }
   return response.json();
 }
@@ -59,8 +64,11 @@ export function renderPractice(cycle) {
   const task = cycle.task;
   if (!task) return;
   $('practicePanel').classList.toggle('completed', cycle.completed);
+  $('practicePanel').classList.toggle('has-result', Boolean(cycle.result));
+  $('practicePanel').classList.toggle('introduction', Boolean(task.context.introduction));
   $('practicePurpose').textContent = `${task.purpose} · ${task.family}`;
-  $('practiceChallenge').textContent = `Stage ${task.challenge} of 5`;
+  $('practiceChallenge').textContent = task.reading ? `${task.reading.hand.toUpperCase()} HAND · ${task.reading.clef.toUpperCase()} CLEF`
+    : task.drill ? `${task.drill.group} · ${task.cue}`.toUpperCase() : `Stage ${task.challenge} of 5`;
   $('practiceTitle').textContent = task.title;
   $('practiceInstruction').textContent = task.instruction;
   $('practiceSummary').textContent = task.instruction;
@@ -68,7 +76,7 @@ export function renderPractice(cycle) {
   $('practiceCue').hidden = !task.cue;
   $('practiceReason').textContent = task.reason;
   $('practiceLesson').textContent = task.lesson;
-  $('hearPractice').textContent = task.family === 'ear' ? 'Hear melody' : 'Hear example';
+  $('hearPractice').textContent = task.family === 'ear' ? 'Hear melody' : task.reading ? 'Hear this score' : task.drill ? '▶ Hear it played' : 'Hear example';
   $('practiceBeat').hidden = !task.bpm;
   $('revealPractice').hidden = cycle.visible;
   $('practiceResult').hidden = !cycle.result;
@@ -134,6 +142,13 @@ export function renderProfile(profile, onSelect) {
   }
 }
 
+export function beatGroups(meter) {
+  const [numerator, denominator] = meter.split('/').map(Number);
+  if (meter === '7/8') return [1, 1, 1.5];
+  if (denominator === 8 && numerator % 3 === 0) return Array(numerator / 3).fill(1.5);
+  return Array(numerator).fill(4 / denominator);
+}
+
 export function renderAttempt(attempt, onExclude) {
   const panel = $('attemptDetail');
   panel.replaceChildren();
@@ -143,6 +158,13 @@ export function renderAttempt(attempt, onExclude) {
   const context = attempt.context;
   panel.append(element('p', `${context.family} · ${context.notation_visible ? 'score shown from the start' : 'score initially hidden'} · ${context.hearings} listens · ${context.reveals} reveals · ${context.hints} help views · ${context.familiar ? 'familiar material' : 'new material'}`, 'attempt-context'));
   panel.append(element('p', attempt.assessment.feedback));
+  for (const change of attempt.assessment.fluency || []) {
+    const label = `${change.hand === 'left' ? 'Left' : 'Right'} hand · ${pitchName(change.pitch, attempt.prompt.key)}${change.finger ? ` · suggested finger ${change.finger}` : ''}`;
+    const arrival = change.arrival_seconds === null ? `Landing untimed: ${change.arrival_reason}` : `${change.arrival_seconds.toFixed(1)} s to land.`;
+    const extra = change.extra_seconds === null ? `Extra pause unmeasured: ${change.reason}`
+      : `${change.extra_seconds.toFixed(1)} s extra pause (${change.extra_beats.toFixed(1)} beats), at ${Math.round(change.bpm)} BPM.`;
+    panel.append(element('p', `${label}: ${arrival} ${extra}`));
+  }
   const quality = attempt.assessment.quality;
   panel.append(element('p', `Recognition: ${quality.usable ? 'sufficient onset support' : 'uncertain'}. ${quality.reason}.`, 'attempt-context'));
   const labels = evidenceLabels(attempt.assessment);
@@ -163,7 +185,8 @@ export function renderAttempt(attempt, onExclude) {
     for (const observation of attempt.assessment.observations) {
       const row = element('tr');
       for (const text of [String(observation.index + 1), pitchName(observation.expected, attempt.prompt.key),
-        observation.heard.map(pitch => pitchName(pitch, attempt.prompt.key)).join(' + ') || '—', observation.matched ? 'Matched' : 'Check this note']) row.append(element('td', text));
+        observation.heard.map(pitch => pitchName(pitch, attempt.prompt.key)).join(' + ') || '—', context.interaction === 'step_by_step'
+          ? (observation.matched ? 'First try' : 'Corrected') : observation.matched ? 'Matched' : 'Check this note']) row.append(element('td', text));
       body.append(row);
     }
     table.append(body); scroll.append(table); panel.append(scroll);

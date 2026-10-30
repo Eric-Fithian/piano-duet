@@ -10,7 +10,7 @@ from scipy.signal import resample_poly
 from piano_duet.assets import CACHE, SAMPLES, require_assets
 from piano_duet.notes import Note
 from piano_duet.server import DuetEngine
-from piano_duet.transcription import SAMPLE_RATE
+from piano_duet.transcription import NOTE_THRESHOLD, SAMPLE_RATE
 
 
 def main():
@@ -24,7 +24,7 @@ def main():
     for iteration, gain in enumerate((1.0, 0.3, 0.1)):
         events = []
         started = time.perf_counter()
-        engine.respond(audio * gain, "benchmark", 5, 0.95, 0.75, events.append, Event())
+        engine.respond(audio * gain, "benchmark", 5, 0.95, NOTE_THRESHOLD, events.append, Event())
         heard = next(event for event in events if event["type"] == "heard")["notes"]
         matched = set()
         for note in heard:

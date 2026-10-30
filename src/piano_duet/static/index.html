@@ -3,37 +3,94 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#151a1b">
+  <meta name="theme-color" content="#0b0f15">
   <title>Piano Duet — grow at the piano</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="/static/style.css">
   <link rel="stylesheet" href="/static/score.css">
   <link rel="stylesheet" href="/static/practice.css">
+  <link rel="stylesheet" href="/static/game.css">
   <script src="/notation-assets/vexflow.js" defer></script>
   <script type="module" src="/static/app.mjs"></script>
 </head>
 <body class="piano-app">
   <div class="shell">
     <header class="app-header">
-      <a class="brand" href="/" aria-label="Piano Duet home"><span class="mark" aria-hidden="true">ⅱ</span> DUET</a>
-      <nav class="header-actions" aria-label="Your piano workspace">
-        <button id="openProfile" class="quiet-button" aria-haspopup="dialog">Progress</button>
-        <button id="openSettings" class="quiet-button" aria-haspopup="dialog">Settings</button>
-      </nav>
+      <a class="brand" href="/" aria-label="Piano Duet home"><span class="mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>DUET</a>
+      <nav class="mode-switch" role="group" aria-label="Playing mode"><button id="readingMode" aria-pressed="false">Reading</button><button id="drillsMode" aria-pressed="false">Drills</button><button id="libraryMode" aria-pressed="false">Library</button><button id="practiceMode" aria-pressed="true">Practice</button><button id="duetMode" aria-pressed="false">Duet</button><button id="learningMode" aria-pressed="false">Variations</button></nav>
+      <div class="header-actions">
+        <button id="openProfile" class="level-badge" aria-haspopup="dialog" aria-label="Progress"><span class="level-diamond" aria-hidden="true"><b id="levelNumber">1</b></span><span class="level-meta"><span><span class="level-caption">Level</span><span id="levelXp" class="level-xp"></span></span><span class="xp-track"><i id="levelFill"></i></span></span></button>
+        <button id="openSettings" class="icon-button" aria-haspopup="dialog" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg></button>
+      </div>
     </header>
     <main>
       <h1 class="sr-only">Your piano practice</h1>
-      <div class="session-setup">
-        <div class="mode-switch" role="group" aria-label="Playing mode"><button id="practiceMode" aria-pressed="true">Practice</button><button id="duetMode" aria-pressed="false">Duet</button><button id="learningMode" aria-pressed="false">Variations</button></div>
-
-      </div>
       <p id="modeDescription" class="mode-description" hidden>Personal practice, shaped by what you play.</p>
+      <section id="libraryPanel" class="library" aria-label="Library" hidden>
+        <header class="library-head"><h2 class="rule-heading">Library</h2><input id="librarySearch" type="search" placeholder="Search songs" aria-label="Search songs"><button id="openYoutube" class="secondary" aria-haspopup="dialog">From YouTube</button><label class="primary import-button">Import<input id="libraryFile" type="file" accept=".mid,.midi,.musicxml,.xml,.mxl"></label></header>
+        <div class="song-table" role="table" aria-label="Your songs">
+          <div class="song-row song-columns" role="row"><span>#</span><span>Title</span><span>Plays</span><span>Recent</span><span>Best</span><span>Covered</span><span>Last played</span><span>Length</span><span></span></div>
+          <div id="songRows"></div>
+          <p id="songEmpty" class="song-empty"></p>
+        </div>
+        <h3 id="catalogHeading" class="rule-heading">Get more</h3>
+        <div id="catalogRows" class="catalog"></div>
+      </section>
       <section class="performance" aria-label="Piano workspace">
+        <section id="songHud" class="reading-hud song-hud" aria-label="Current song" hidden>
+          <div class="hud-stage"><button id="songBack" class="icon-button" aria-label="Back to library"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button><span class="song-title"><strong id="songTitle"></strong><small id="songArtist"></small></span></div>
+          <div id="songSections" class="song-sections" role="group" aria-label="Sections"></div>
+          <div class="hud-right">
+            <span id="songWrong" class="hud-wrong" role="status" hidden></span>
+            <span id="songAccuracy" class="hud-session"><b>—</b><small>First try</small></span>
+            <span id="songStreak" class="hud-streak"><b>0</b><small>Streak</small></span>
+            <button id="songEdit" class="quiet-button" title="Fix the tempo, meter, key, bar lines or notes">Edit</button>
+            <button id="songPreview" class="icon-button" aria-label="Preview from here"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5l11 7-11 7z"/></svg></button>
+          </div>
+        </section>
+        <section id="songEditBar" class="song-edit-bar" aria-label="Edit song" hidden>
+          <label>Tempo <input id="editTempo" type="number" min="30" max="240" step="1" aria-label="Tempo in quarter notes per minute"></label>
+          <label>Meter <select id="editMeter"></select></label>
+          <label>Key <select id="editKey"></select></label>
+          <span class="edit-bars" role="group" aria-label="Move the bar lines"><span>Bar lines</span><button id="barsEarlier" class="icon-button" title="Move the bar lines one step earlier" aria-label="Move the bar lines one step earlier">◀</button><button id="barsLater" class="icon-button" title="Move the bar lines one step later" aria-label="Move the bar lines one step later">▶</button></span>
+          <small class="edit-hint">Click a note to select it · Delete removes it · ↑↓ a semitone, ⇧ an octave · double-click a staff to add a note</small>
+          <span class="edit-actions"><button id="editUndo" class="quiet-button">Undo</button><button id="editRevert" class="quiet-button">Revert to transcription</button><button id="editCancel" class="quiet-button">Cancel</button><button id="editSave" class="primary">Save</button></span>
+        </section>
+        <section id="drillPanel" class="drill-panel" aria-label="Drill" hidden>
+          <div class="drill-bar">
+            <button id="drillToggle" class="drill-title" aria-expanded="false" aria-controls="drillOptions" title="Change drill"><strong id="drillTitle">Drills</strong><small id="drillCue"></small><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg></button>
+            <button id="drillLevel" class="drill-level" aria-haspopup="dialog" title="Drill levels"><b id="drillLevelNumber">0</b><span class="xp-track"><i id="drillLevelFill"></i></span></button>
+            <span id="drillTempoControl" class="hud-tempo" role="group" aria-label="Drill tempo"><button id="drillSlower" aria-label="Slower" aria-keyshortcuts="ArrowLeft">−</button><span><small>♩</small><b id="drillTempo">—</b><small id="drillSubdivision"></small></span><button id="drillFaster" aria-label="Faster" aria-keyshortcuts="ArrowRight">+</button></span>
+            <button id="drillListen" class="icon-button listen-button" aria-label="Hear it played" title="Hear it played"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="play-icon" d="M8 5l11 7-11 7z"/><path class="stop-icon" d="M7 7h10v10H7z"/></svg></button>
+            <button id="drillBeat" class="icon-button" aria-label="Hear the beat" title="Hear the beat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 21h8l-2.5-17h-3zM12 14l5-8"/></svg></button>
+            <button id="drillLast" class="quiet-button drill-last" aria-controls="drillResults" hidden></button>
+            <button id="drillNext" class="icon-button" aria-label="Next drill" title="Next drill"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l8 6-8 6zM17 6v12"/></svg></button>
+            <button id="drillSession" class="quiet-button drill-session" aria-haspopup="dialog">Session</button>
+            <button id="drillDetails" class="icon-button" aria-haspopup="dialog" aria-label="Instructions and tips" title="Instructions and tips"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.2"/></svg></button>
+            <span class="xp-track drill-ladder-track" aria-hidden="true"><i id="drillLadderFill"></i></span>
+          </div>
+          <div id="drillOptions" class="drill-options" hidden>
+            <div class="drill-picker">
+              <label><span>Drill</span><select id="drillKind"></select></label>
+              <label><span>Type</span><select id="drillVariant"></select></label>
+              <label><span id="drillKeyCaption">Key</span><select id="drillKey"></select></label>
+              <label><span>Hands</span><select id="drillHands"></select></label>
+              <label><span>Range</span><select id="drillOctaves"></select></label>
+              <label><span>Start</span><select id="drillInversion"></select></label>
+              <label><span>Practice</span><select id="drillPractice"></select></label>
+              <label class="always"><span>Each take</span><select id="drillFlow"><option value="build">Build: same drill each take</option><option value="mix">Mix: re-roll Random each take</option></select></label>
+              <button id="drillAuto" class="quiet-button">Choose for me</button>
+            </div>
+            <p id="drillMilestone" class="drill-milestone" aria-live="polite"></p>
+            <p id="drillSummary" class="drill-summary"></p>
+          </div>
+        </section>
+        <section id="drillResults" class="drill-results" aria-label="How your last rep went" aria-live="polite" hidden></section>
         <section id="practicePanel" class="practice-panel" aria-label="Current exercise">
           <div class="task-heading"><div><span id="practiceChallenge" class="task-caption"></span><h2 id="practiceTitle">Finding your next step…</h2></div><button id="openExercise" class="quiet-button" aria-haspopup="dialog">Details</button></div>
           <p id="practiceSummary" class="task-summary"></p>
-          <div id="practiceResult" class="practice-result" role="status" hidden><strong id="practiceScore"></strong><p id="practiceFeedback"></p><button id="openAssessment" class="quiet-button" aria-haspopup="dialog">Review</button></div>
-          <div class="practice-actions"><button id="hearPractice" class="secondary" disabled>Hear example</button><button id="practiceBeat" class="quiet-button" disabled>Hear the beat</button><button id="revealPractice" class="quiet-button" disabled>Reveal score</button></div>
+          <div id="practiceResult" class="practice-result" role="status" hidden><strong id="practiceScore"></strong><p><span id="drillMetrics" class="drill-metrics" hidden></span><span id="practiceFeedback"></span></p><button id="openAssessment" class="quiet-button" aria-haspopup="dialog">Review</button></div>
+          <div id="practiceActions" class="practice-actions"><button id="hearPractice" class="secondary" disabled>Hear example</button><button id="practiceBeat" class="quiet-button" disabled>Hear the beat</button><button id="revealPractice" class="quiet-button" disabled>Reveal score</button></div>
         </section>
           <section id="learningPanel" class="learning-panel" aria-label="Learning round" hidden>
             <ol class="learning-steps"><li id="ideaStep" aria-current="step">1. Your idea</li><li id="listenStep">2. Listen</li><li id="repeatStep">3. Play back</li><li id="scoreStep">4. Your score</li></ol>
@@ -41,28 +98,103 @@
             <div class="learning-actions"><button id="replayTarget" class="secondary" disabled>Hear target again</button><button id="newRound" class="text-button">New round</button><button id="openAnalysis" class="text-button" aria-haspopup="dialog" hidden>Note details</button></div>
             <div id="learningResult" class="learning-result" role="status" hidden><strong id="learningScore"></strong><p id="learningFeedback"></p></div>
           </section>
+        <section id="readingHud" class="reading-hud" aria-label="Current score" hidden>
+          <div class="hud-stage"><span id="hudStageNumber" class="stage-node" aria-hidden="true">1</span><strong id="hudStageLabel"></strong><span id="hudNew" class="hud-tag hud-new" hidden>New note</span><button id="hudReplay" class="hud-tag hud-replay" hidden>Replay ✕</button><span id="hudHand" class="hud-tag"></span></div>
+          <div id="hudNotes" class="hud-notes" role="img"></div>
+          <div class="hud-right">
+            <span id="readingFeedback" class="hud-wrong" role="status" hidden></span>
+            <span id="hudStreak" class="hud-streak" aria-label="Streak"><b>0</b><small>Streak</small></span>
+            <span id="hudXp" class="hud-session"><b>0</b><small>XP</small></span>
+            <span id="hudTempo" class="hud-tempo" role="group" aria-label="Playing tempo" hidden><button id="tempoDown" aria-label="Slower" aria-keyshortcuts="ArrowLeft">−</button><span><small>♩</small><b id="tempoValue"></b></span><button id="tempoUp" aria-label="Faster" aria-keyshortcuts="ArrowRight">+</button></span>
+            <button id="hudBeat" class="icon-button" aria-label="Hear the beat" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 21h8l-2.5-17h-3zM12 14l5-8"/></svg></button>
+            <button id="hudListen" class="icon-button listen-button" aria-label="Hear this score (halves its XP)" title="Hear this score (halves its XP)"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="play-icon" d="M8 5l11 7-11 7z"/><path class="stop-icon" d="M7 7h10v10H7z"/></svg></button>
+            <button id="hudHelp" class="icon-button" aria-haspopup="dialog" aria-label="Help"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.5v.6M12 16.8v.2"/></svg></button>
+          </div>
+        </section>
         <div class="score-toolbar">
-          <div class="view-switch" role="group" aria-label="Music display"><button id="sheetView" aria-pressed="true">Sheet music</button><button id="rollView" aria-pressed="false">Piano roll</button></div>
-          <div id="scorePages" class="score-pages" role="group" aria-label="Score pages"><button id="previousPage" class="quiet-button" aria-label="Previous score page" disabled>‹</button><span id="pageLabel" aria-live="polite">—</span><button id="nextPage" class="quiet-button" aria-label="Next score page" disabled>›</button></div>
+          <button id="fingerHelp" class="quiet-button" aria-haspopup="dialog" hidden><span aria-hidden="true">ⓘ</span> Finger numbers</button>
+          <div id="musicDisplay" class="view-switch" role="group" aria-label="Music display"><button id="sheetView" aria-pressed="true">Sheet music</button><button id="rollView" aria-pressed="false">Piano roll</button></div>
         </div>
-        <div id="sheetPanel"><div id="scoreError" class="error" role="alert" hidden></div><div id="sheetMusic" role="region" tabindex="0" aria-label="Sheet music, use left and right arrows to turn pages"></div></div>
+        <div id="sheetPanel"><div id="scoreError" class="error" role="alert" hidden></div><div id="sheetMusic" role="region" aria-label="Sheet music"></div></div>
         <div id="rollPanel" class="roll-wrap" hidden><canvas id="roll" aria-label="Notes you played in amber and the AI reply in blue"></canvas><div id="emptyRoll"><span class="empty-symbol" aria-hidden="true">♪</span><p>Start with a few notes.</p><span>Your piano will appear here when you finish a phrase.</span></div></div>
         <div class="roll-footer"><div class="legend"><span><i class="swatch you"></i>You</span><span><i class="swatch partner"></i><span id="partnerLabel">Exercise</span></span></div><span id="timing"></span><button id="demo" class="text-button" disabled hidden>Try a demo ↗</button></div>
       </section>
       <section class="transport" aria-label="Microphone and playing controls">
+        <div class="transport-status"><span id="statusDot" class="dot"></span><span id="status" role="status" aria-live="polite">Getting the piano ready…</span></div>
         <div class="transport-primary">
-          <button id="start" class="primary microphone-button" disabled aria-pressed="false"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/></svg><span id="micLabel">Enable microphone</span></button>
+          <button id="start" class="space-key" disabled aria-pressed="false" aria-keyshortcuts="Space"><span class="key-cap">Space</span><span id="micLabel">Start</span><span class="meter" role="meter" aria-label="Microphone input level" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="level"></span></span></button>
           <button id="answer" class="primary" disabled hidden>Finish attempt <kbd>space</kbd></button>
           <button id="nextPractice" class="primary" disabled hidden>Next exercise →</button>
           <button id="stop" class="stop" disabled hidden>Stop</button>
         </div>
-        <div class="transport-status"><div class="status-label"><span id="statusDot" class="dot"></span><span id="status" role="status" aria-live="polite">Getting the piano ready…</span></div><div class="input-meter"><span id="levelText">MIC OFF</span><div class="meter" role="meter" aria-label="Microphone input level" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="level"></div></div></div></div>
+        <div class="transport-side"><span id="levelText" class="sr-only">MIC OFF</span></div>
       </section>
+      <div id="xpToast" class="xp-toast" role="status" hidden></div>
+      <div id="banner" class="banner" aria-live="assertive" hidden></div>
       <p id="message" class="message sr-only">Enable your microphone, then play the exercise on your piano.</p>
       <div id="error" class="error" role="alert" hidden></div>
     </main>
   </div>
 
+  <dialog id="readingProgressDialog" class="career-dialog" aria-label="Reading progress">
+    <header class="career-head">
+      <div class="career-level"><span class="level-diamond large" aria-hidden="true"><b id="careerLevel">1</b></span><div><span class="eyebrow">Reader level</span><div class="career-xp"><span class="xp-track large"><i id="careerFill"></i></span><span id="careerXp"></span></div></div></div>
+      <dl id="careerStats" class="career-stats"></dl>
+      <button class="icon-button close" data-close="readingProgressDialog" autofocus aria-label="Close progress"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </header>
+    <section class="career-section"><h3 class="rule-heading">Stage path <span id="pathCount"></span></h3><ol id="readingPath" class="stage-path"></ol><p id="pathDetail" class="path-detail" aria-live="polite"></p></section>
+    <div class="career-grid">
+      <section class="career-section"><h3 class="rule-heading">Current stage</h3><div id="readingStage" class="stage-card"></div></section>
+      <section class="career-section"><h3 class="rule-heading">Recent scores</h3><div id="readingHistory" class="recent-scores"></div><h3 class="rule-heading">Skills</h3><div id="readingSkills" class="skill-tiles"></div></section>
+    </div>
+    <details class="career-section landings"><summary class="rule-heading">Position landings</summary>
+      <div id="readingLandingMap" class="landing-maps"></div>
+      <div class="landing-legend"><span>0.5 s</span><span class="landing-gradient" aria-hidden="true"></span><span>3 s+</span></div>
+      <div id="readingFluency" class="fluency-hands"></div>
+    </details>
+    <button id="allProgress" class="text-button career-more">All piano skills →</button>
+  </dialog>
+  <dialog id="drillLogDialog" class="settings-dialog drill-levels-dialog" aria-labelledby="drillLogTitle">
+    <div class="dialog-heading"><h2 id="drillLogTitle">Drill levels</h2><span id="drillStreak" class="drill-streak"></span><button class="quiet-button" data-close="drillLogDialog" autofocus>Done</button></div>
+    <div class="controls">
+      <div id="drillLevels" class="drill-levels"></div>
+      <details class="drill-level-rules"><summary>How levels work</summary><p class="setting-help">Each drill has ten levels. A key counts once you play three clean takes in a row there, at whatever tempo you choose: at least 90% of notes, 80% even timing, no pauses, and no drift of more than 8% across the take, in even notes. The streak is credited at the slowest of its three takes. Level 1 needs one key at the starting tempo. Each later level needs more keys (2, 3, 4, 6, 8, 10, 12, 16, then 20) at an evenly rising share of the drill's tempo ladder, and from level 4 hands together where the drill allows it. The suggested tempo then moves one metronome mark past it; two takes without a clean rep lower the suggestion. It is only an invitation: play faster or slower and you are credited at the tempo you played. Milestones are RCM 2022 minimum tempos for the drill family.</p></details>
+      <h3 class="rule-heading">Tempo log</h3>
+      <div id="drillLog" class="drill-log"></div>
+    </div>
+  </dialog>
+  <dialog id="sessionDialog" class="settings-dialog" aria-labelledby="sessionTitle">
+    <div class="dialog-heading"><h2 id="sessionTitle">Practice session</h2><button class="quiet-button" data-close="sessionDialog" autofocus>Close</button></div>
+    <div class="controls">
+      <p id="sessionIntro" class="setting-help">The coach picks your weakest drill and stays on it for a block of the session, so you improve one thing rather than sampling many. Then it moves to the next weakest.</p>
+      <div id="sessionChoices" class="session-choices">
+        <span>For</span><button class="secondary" data-session="minutes:5">5 min</button><button class="primary" data-session="minutes:10">10 min</button><button class="secondary" data-session="minutes:15">15 min</button><button class="secondary" data-session="minutes:20">20 min</button><button class="secondary" data-session="minutes:30">30 min</button>
+        <span>or</span><button class="secondary" data-session="takes:10">10 takes</button><button class="secondary" data-session="takes:20">20 takes</button>
+      </div>
+      <div id="sessionActive" hidden><p id="sessionState"></p><button id="endSession" class="secondary">End session</button></div>
+    </div>
+  </dialog>
+  <dialog id="youtubeDialog" class="settings-dialog" aria-labelledby="youtubeTitle">
+    <div class="dialog-heading"><h2 id="youtubeTitle">From YouTube</h2><button class="quiet-button" data-close="youtubeDialog">Done</button></div>
+    <form id="youtubeForm" class="controls youtube-form">
+      <input id="youtubeUrl" type="url" placeholder="https://youtu.be/…" aria-label="YouTube link" required autofocus>
+      <button id="youtubeGo" class="primary" type="submit">Transcribe</button>
+      <div id="youtubeProgress" class="youtube-progress" hidden><span id="youtubeStage"></span><span class="xp-track"><i id="youtubeFill"></i></span></div>
+      <p id="youtubeError" class="youtube-error" role="alert" hidden></p>
+      <p class="setting-help">Solo piano recordings work best.</p>
+    </form>
+  </dialog>
+  <dialog id="fingerDialog" class="settings-dialog" aria-labelledby="fingerTitle">
+    <div class="dialog-heading"><h2 id="fingerTitle">Help</h2><button class="quiet-button" data-close="fingerDialog" autofocus>Done</button></div>
+    <div class="controls">
+      <div class="finger-hands">
+        <figure><svg viewBox="0 0 240 240" role="img" aria-label="Left hand viewed from above: thumb 1 on the right, index 2, middle 3, ring 4, little finger 5 on the left."><path transform="translate(240 0) scale(-1 1)" d="M90 220 L85 180 Q70 168 65 150 L36 116 Q26 102 40 95 Q47 93 55 104 L77 127 L77 52 Q77 35 91 35 Q105 35 105 52 L105 103 L108 25 Q108 9 122 9 Q136 9 136 25 L136 103 L139 41 Q139 25 152 25 Q165 25 165 41 L165 113 L170 70 Q172 54 185 56 Q197 58 195 74 L188 156 Q186 180 173 194 L171 220 Z"/><text x="186" y="122">1</text><text x="149" y="66">2</text><text x="118" y="40">3</text><text x="88" y="57">4</text><text x="57" y="86">5</text></svg><figcaption>Left hand</figcaption></figure>
+        <figure><svg viewBox="0 0 240 240" role="img" aria-label="Right hand viewed from above: thumb 1 on the left, index 2, middle 3, ring 4, little finger 5 on the right."><path d="M90 220 L85 180 Q70 168 65 150 L36 116 Q26 102 40 95 Q47 93 55 104 L77 127 L77 52 Q77 35 91 35 Q105 35 105 52 L105 103 L108 25 Q108 9 122 9 Q136 9 136 25 L136 103 L139 41 Q139 25 152 25 Q165 25 165 41 L165 113 L170 70 Q172 54 185 56 Q197 58 195 74 L188 156 Q186 180 173 194 L171 220 Z"/><text x="54" y="122">1</text><text x="91" y="66">2</text><text x="122" y="40">3</text><text x="152" y="57">4</text><text x="183" y="86">5</text></svg><figcaption>Right hand</figcaption></figure>
+      </div>
+      <p class="finger-intro">Thumb 1 to little finger 5. A number marks a new hand position.</p>
+      <div id="readingHelpActions" class="help-actions" hidden><p class="setting-help">Hearing the score halves its XP.</p></div>
+    </div>
+  </dialog>
   <dialog id="settingsDialog" class="settings-dialog" aria-labelledby="settingsTitle">
     <div class="dialog-heading"><h2 id="settingsTitle">Settings</h2><button class="quiet-button" data-close="settingsDialog" autofocus aria-label="Close settings">Done</button></div>
     <div class="controls">
@@ -71,8 +203,9 @@
       <h3>Listening</h3>
           <label for="microphone">Microphone</label><select id="microphone"><option value="">System default</option></select>
           <p class="setting-help">Choose an input before enabling your microphone. Stay quiet for the first second while it calibrates.</p>
-          <label class="check-setting" for="autoReply"><input id="autoReply" type="checkbox" checked> Reply after a pause</label><p class="setting-help">No time limit on your turn. Turn this off to play through rests, then use Answer now or space.</p>
-          <div class="slider-label"><label for="pause">Leave a pause</label><output id="pauseValue">0.9 s</output></div><input id="pause" type="range" min="0.4" max="2" value="0.9" step="0.1"><p class="setting-help">How long a pause ends your turn when automatic replies are on.</p>
+          <div class="slider-label"><label for="threshold">Note confidence</label><output id="thresholdValue">0.80</output></div><input id="threshold" type="range" min="0.1" max="0.99" value="0.80" step="0.01" aria-describedby="thresholdHelp"><div class="range-ends"><span>More sensitive</span><span>Fewer stray notes</span></div><p id="thresholdHelp" class="setting-help">Hearing extra notes? Raise this a little. Missing notes you played? Lower it. High values can miss quiet notes. Saved for your next attempts.</p>
+          <div id="autoReplyControls"><label class="check-setting" for="autoReply"><input id="autoReply" type="checkbox" checked> Reply after a pause</label><p class="setting-help">No time limit on your turn. Turn this off to play through rests, then use Answer now or space.</p>
+          <div class="slider-label"><label for="pause">Leave a pause</label><output id="pauseValue">0.9 s</output></div><input id="pause" type="range" min="0.4" max="2" value="0.9" step="0.1"><p class="setting-help">How long a pause ends your turn when automatic replies are on.</p></div>
           <div class="panel-heading second"><h3 id="replyHeading">Playback</h3></div>
           <div id="learningSettings" hidden><div class="slider-label"><label for="surprise">Correct above surprise</label><output id="surpriseValue">98.0%</output></div><input id="surprise" type="range" min="80" max="99.9" value="98" step="0.1" aria-describedby="surpriseHelp"><p id="surpriseHelp" class="setting-help">Higher thresholds preserve more of your idea. Only pitches change; rhythm and note lengths stay yours. Applies to the next idea.</p></div>
           <div id="duetSettings" hidden>
@@ -81,7 +214,7 @@
           <div class="slider-label spaced"><label for="temperature">Adventurousness</label><output id="temperatureValue">Balanced</output></div><input id="temperature" type="range" min="0.5" max="1.3" value="0.95" step="0.05"><div class="range-ends"><span>Familiar</span><span>Unexpected</span></div>
           </div>
           <div class="slider-label spaced"><label for="volume">Piano volume</label><output id="volumeValue">65%</output></div><input id="volume" type="range" min="0" max="100" value="65" step="1">
-          <details><summary>Microphone fine-tuning</summary><div class="slider-label"><label for="gate">Noise gate</label><output id="gateValue">−48 dB</output></div><input id="gate" type="range" min="-65" max="-25" value="-48" step="1"><p class="setting-help">Raise this if room noise keeps a phrase open.</p><div class="slider-label"><label for="threshold">Note confidence</label><output id="thresholdValue">0.75</output></div><input id="threshold" type="range" min="0.1" max="0.9" value="0.75" step="0.05"><p class="setting-help">Raise this to reject extra notes; lower it for soft playing.</p></details>
+          <details><summary>Microphone fine-tuning</summary><div class="slider-label"><label for="gate">Noise gate</label><output id="gateValue">−48 dB</output></div><input id="gate" type="range" min="-65" max="-25" value="-48" step="1"><p class="setting-help">Raise this if room noise keeps a phrase open. To reduce extra recognized pitches, use Note confidence above.</p></details>
       <details class="score-settings"><summary>Sheet music display</summary>
             <div class="notation-controls">
               <label>Tempo <select id="scoreTempo"><option value="auto">Estimate</option><option value="manual">Set BPM</option></select></label>
@@ -115,7 +248,7 @@
         <div id="practiceSettings" class="practice-focus"><label for="practiceFocus">Focus</label><select id="practiceFocus"><option value="guided">Choose for me</option><option value="technique">Technique</option><option value="reading">Sight-reading</option><option value="theory">Theory</option><option value="ear">Playing by ear</option><option value="repertoire">Repertoire</option></select><div id="pieceChoice" hidden><label for="practicePiece">Piece</label><select id="practicePiece"><option value="">Most recently saved</option></select></div></div>
       <p id="practicePurpose" class="eyebrow"></p><p id="practiceInstruction"></p><p id="practiceCue" class="practice-cue"></p>
       <details><summary>Why this exercise?</summary><p id="practiceReason" class="practice-reason"></p><button id="skipPractice" class="text-button" disabled>Choose another exercise →</button></details>
-      <details id="practiceHelp" class="practice-help"><summary>Need a hint?</summary><p id="practiceLesson"></p><p>Middle C is just to the left of the pair of black keys nearest the center of your piano. The white keys going upward are C, D, E, F, G, A, B, then C again. The number after a note is its octave: middle C is C4. Take your time, then press <strong>Finish attempt</strong> or space. Using a hint is saved with your attempt.</p></details>
+      <details id="practiceHelp" class="practice-help"><summary>Need a hint?</summary><p id="practiceLesson"></p><p>Middle C is just to the left of the pair of black keys nearest the center of your piano. The white keys going upward are C, D, E, F, G, A, B, then C again. The number after a note is its octave: middle C is C4. <span id="practiceFinishHelp">Take your time, then press Finish attempt or space.</span> Using a hint is saved with your attempt.</p></details>
     </div>
   </dialog>
   <dialog id="assessmentDialog" class="settings-dialog" aria-labelledby="assessmentTitle">
