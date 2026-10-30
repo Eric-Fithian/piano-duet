@@ -1,7 +1,7 @@
 import {AttackCounter, PhraseDetector, PianoSound, readEvents} from './audio.mjs';
 import {ScoreView} from './score_view.mjs';
 import {LearningCycle, pitchName, renderAnalysis} from './learning.mjs';
-import {PracticeCycle, localRequest, renderPractice, renderProfile, renderAttempt, beatGroups} from './practice.mjs';
+import {PracticeCycle, localFetch, localRequest, renderPractice, renderProfile, renderAttempt, beatGroups} from './practice.mjs';
 import {ReadingStream} from './reading.mjs';
 import {TEMPO_LIMITS, renderCareer, renderLevel, renderReadingHud, showBanner, showXpToast} from './game.mjs';
 import {currentOrdinal, renderLibrary, renderSongHud, sessionAccuracy} from './library.mjs';
@@ -212,7 +212,7 @@ async function importSong(file) {
   const params = new URLSearchParams({filename: file.name});
   if (pendingImport) { params.set('title', pendingImport.title); params.set('artist', pendingImport.artist); }
   pendingImport = null;
-  const response = await fetch(`/api/library/import?${params}`, {
+  const response = await localFetch(`/api/library/import?${params}`, {
     method: 'POST', headers: {'Content-Type': 'application/octet-stream', 'X-Duet-Client': '1'}, body: await file.arrayBuffer(),
   });
   if (!response.ok) throw new Error((await response.json()).detail);
@@ -237,7 +237,7 @@ async function importYoutube(event) {
   $('youtubeError').hidden = true;
   $('youtubeGo').disabled = true;
   youtubeProgress('Downloading', 0);
-  const response = await fetch('/api/library/youtube', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Duet-Client': '1'},
+  const response = await localFetch('/api/library/youtube', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Duet-Client': '1'},
     body: JSON.stringify({url: $('youtubeUrl').value, has_rights: $('youtubeRights').checked})});
   if (!response.ok) { youtubeError((await response.json()).detail); return; }
   for await (const update of readEvents(response.body)) {
@@ -258,7 +258,7 @@ async function importYoutube(event) {
 
 async function deleteSong(item) {
   if (!confirm(`Remove “${item.title}” and its play history?`)) return;
-  const response = await fetch(`/api/library/${item.id}`, {method: 'DELETE', headers: {'X-Duet-Client': '1'}});
+  const response = await localFetch(`/api/library/${item.id}`, {method: 'DELETE', headers: {'X-Duet-Client': '1'}});
   if (!response.ok) throw new Error((await response.json()).detail);
   await loadLibrary();
 }
@@ -1047,7 +1047,7 @@ async function initialize() {
   }
   const savedMode = localStorage.getItem('piano-duet.mode') || 'practice';
   if (!['practice', 'reading', 'drills', 'library', 'duet', 'learning'].includes(savedMode)) throw new Error('The saved playing mode is invalid.');
-  const response = await fetch('/api/status');
+  const response = await localFetch('/api/status');
   if (!response.ok) throw new Error('The local piano server is not available. Restart Piano Duet.');
   await Promise.all([piano.load(), sheet.ready()]);
   ready = true;
@@ -1197,7 +1197,7 @@ async function requestReply(audio, {source = 'microphone'} = {}) {
     params.set('lesson', learning.id);
     params.set('surprise', Number($('surprise').value) / 100);
   }
-  const response = await fetch(`/api/respond?${params}`, {
+  const response = await localFetch(`/api/respond?${params}`, {
     method: 'POST', headers: {'Content-Type': 'application/octet-stream', 'X-Duet-Client': '1'},
     body: audio.buffer, signal: controller.signal,
   }).catch(error => {
@@ -1349,7 +1349,7 @@ function answer() {
 }
 
 async function exportMidi() {
-  const response = await fetch('/api/export', {method: 'POST',
+  const response = await localFetch('/api/export', {method: 'POST',
     headers: {'Content-Type': 'application/json', 'X-Duet-Client': '1'},
     body: JSON.stringify({notes: transcript})});
   if (!response.ok) throw new Error('The MIDI export failed. Your notes are still available in this session.');

@@ -1,9 +1,18 @@
 import {pitchName} from './learning.mjs';
 
 const $ = id => document.getElementById(id);
+let localService = null;
+
+export function setLocalService(service) {
+  localService = service;
+}
+
+export function localFetch(path, options) {
+  return localService && path.startsWith('/api/') ? localService.fetch(path, options) : fetch(path, options);
+}
 
 export async function localRequest(path, body, method = 'POST') {
-  const response = await fetch(path, body === undefined ? {} : {
+  const response = await localFetch(path, body === undefined ? {} : {
     method, headers: {'Content-Type': 'application/json', 'X-Duet-Client': '1'},
     body: JSON.stringify(body),
   });

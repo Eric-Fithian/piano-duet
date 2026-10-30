@@ -1,3 +1,5 @@
+import {localFetch} from './practice.mjs';
+
 export function matchesReading(pitches, expected) {
   const targets = Array.isArray(expected) ? expected : [expected];
   return targets.every(pitch => pitches.includes(pitch))
@@ -255,7 +257,7 @@ export class ReadingStream {
 }
 
 async function listen(audio, threshold, signal) {
-  const response = await fetch(`/api/reading/listen?threshold=${threshold}`, {
+  const response = await localFetch(`/api/reading/listen?threshold=${threshold}`, {
     method: 'POST', headers: {'Content-Type': 'application/octet-stream', 'X-Duet-Client': '1'},
     body: audio.buffer, signal,
   });
