@@ -10,10 +10,13 @@ These are feasibility measurements, not timings for a finished browser app. They
 | Aria prefill | 193 ms | 14 tokens; model already loaded |
 | Aria decode | 34 ms/token median | 36 warmed single-token steps; WebGPU with KV outputs kept in GPU buffers |
 | Aria masked sampling | ONNX mean KL 0.084, p95 0.525; MLX mean 0.511, p95 0.851 | 60 choices from five generated Reading scores and one Duet reply, compared with full-precision PyTorch |
+| TypeScript Reading composition | 0.70 s first-notes score; 2.96 s dyad score | One seeded score per stage with the full Aria model on WebGPU, measured after model loading |
 | Live transcription | 81–88 ms per warmed window | 2 seconds at 16 kHz, convolution on WebGPU and recurrent layers on 12-thread WASM; transfer included |
 | Reading feedback | 472–486 ms browser; 547–655 ms Python | Three trials each, same E4 score and synthetic microphone, measured from detected audio onset to a green score note |
 
 The Aria comparison uses the app's actual allowed-token masks, weights, temperature and min-p cutoff. KL is in nats; probabilities removed by the cutoff are smoothed at `1e-12` so the comparison remains finite. Mean top-k overlap with the full-precision distribution was 0.9645 for ONNX and 0.9646 for MLX. The sampled contexts are generated exercises, not recorded performances; broader fixture coverage is still needed. The gate requires ONNX's mean and 95th-percentile KL to be no worse than MLX, and records regression caps at 1.1 times the MLX values.
+
+The TypeScript composer timings include constrained sampling and chord probes, but exclude downloading and opening the model. They cover two scores from an empty practice history, not a full Reading session. A separate record/replay test checks 48 generated compositions across all 24 stages against the Python composer.
 
 The transcription fixture contains three sampled piano notes. The split graph's maximum onset-tensor difference from the Python reference was about `0.0000023`, and it detected the same three pitches. The full graph took roughly 1.03 seconds per window on WebGPU; pruning and splitting matters. A four-thread Python reference took roughly 125–158 ms per window in these measurements. An exploratory fp16 conversion clamped constants and changed onset values by as much as 0.409, so it is not the current candidate.
 
@@ -33,5 +36,7 @@ uv run --frozen python -m piano_duet.browser_inference_fixture
 node tests/inference/measure-browser.mjs chrome aria webgpu
 node tests/inference/measure-browser.mjs chrome transcription split-fp32
 ```
+
+With `npm run dev --prefix site` running in another terminal, `node tests/inference/verify-reading-composer.mjs first_notes` and `node tests/inference/verify-reading-composer.mjs pairs` exercise the browser composer with the local Aria model.
 
 The full-model checks need local weights and are not yet part of CI. The small-model export and cache tests do run in CI. The paired Reading test also needs the reference app running on port 8879 with a separate learner database under `.cache/browser-inference/`; `tests/inference/reading-latency.mjs` never uses the existing learner database.
