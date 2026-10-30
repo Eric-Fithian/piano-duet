@@ -17,6 +17,8 @@ import { assessReading, matchesReading } from "./reading-assessment.ts";
 import type { HeardNote } from "./reading-assessment.ts";
 import { readingAttacks } from "./reading-score.ts";
 import { scoreXp } from "./reading-rewards.ts";
+import { measureLandings } from "./reading-fluency.ts";
+import type { PositionChange } from "./reading-fluency.ts";
 
 export type LocalJsonValue = null | boolean | number | string | LocalJsonValue[] | { [key: string]: LocalJsonValue };
 export interface LocalEventStore {
@@ -88,6 +90,25 @@ export class LocalService {
       return Response.json({ detail: "This practice selection is not available yet" }, { status: 501 });
     }
     const parts = url.pathname.split("/").filter(Boolean);
+    if (parts[0] === "api" && parts[1] === "attempts" && parts.length >= 3 && parts.length <= 4) {
+      const attempts = attemptsFromEvents(await this.store.list());
+      const attempt = attempts.find((item) => item.id === parts[2]);
+      if (!attempt) return Response.json({ detail: "Unknown performance" }, { status: 404 });
+      if (method === "GET" && parts.length === 3) {
+        if (attempt.prompt.family !== "reading") return Response.json(attempt);
+        const reading = attempt as unknown as ProgressAttempt;
+        const fluency = measureLandings((reading.assessment.fluency ?? []) as PositionChange[], reading.assessment.observations, reading.context);
+        return Response.json({ ...attempt, assessment: { ...attempt.assessment, fluency } });
+      }
+      if (method === "POST" && parts.length === 4 && parts[3] === "exclude") {
+        if (!this.store.append) return Response.json({ detail: "Saving practice is not available yet" }, { status: 501 });
+        if (typeof options.body !== "string") return Response.json({ detail: "An exclusion needs JSON" }, { status: 400 });
+        const request = JSON.parse(options.body) as { excluded?: unknown };
+        if (typeof request.excluded !== "boolean") return Response.json({ detail: "Invalid exclusion" }, { status: 422 });
+        await this.store.append("exclusion", { attemptId: attempt.id, excluded: request.excluded });
+        return Response.json(learnerProfile(attemptsFromEvents(await this.store.list()), this.now()));
+      }
+    }
     if (method === "POST" && parts.length === 4 && parts[0] === "api" && parts[1] === "practice" && parts[3] === "aid") {
       const entry = this.tasks.get(parts[2]);
       if (!entry || entry.completed) return Response.json({ detail: "Choose an unfinished exercise first" }, { status: 409 });

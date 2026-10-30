@@ -111,15 +111,18 @@ with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.S
         result = client.post("/api/reading/complete", json={"task": task["id"], "attempt": attempt, "groups": groups, "interruptions": [], "threshold": 0.8}, headers=headers)
         assert result.status_code == 200, result.text
         profile = client.get("/api/profile").json()
+        detail = client.get(f"/api/attempts/{attempt}").json()
+        excluded = client.post(f"/api/attempts/{attempt}/exclude", json={"excluded": True}, headers=headers).json()
+        excluded_detail = client.get(f"/api/attempts/{attempt}").json()
+        restored = client.post(f"/api/attempts/{attempt}/exclude", json={"excluded": False}, headers=headers).json()
         repeat = client.post("/api/reading/complete", json={"task": task["id"], "attempt": attempt, "groups": groups, "interruptions": [], "threshold": 0.8}, headers=headers)
-print(json.dumps({"task": task, "preview": preview.json(), "events": events, "groups": groups, "result": result.json(), "repeat": repeat.status_code, "introductions": profile["reading"]["introductions"]}))
+print(json.dumps({"task": task, "preview": preview.json(), "events": events, "groups": groups, "result": result.json(), "detail": detail, "excluded": excluded, "excluded_detail": excluded_detail, "restored": restored, "repeat": repeat.status_code, "introductions": profile["reading"]["introductions"]}))
 `], { encoding: "utf8", maxBuffer: 10_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const expected = JSON.parse(reference.stdout);
   const events: ReadingLogEvent[] = [];
   const store: LocalEventStore = { async list() { return events; }, async append(kind, payload, eventId) {
-    assert.ok(eventId);
-    const event = { id: eventId, deviceId: "test", clock: events.length + 1, createdAt: "2024-01-01T00:00:00Z", kind, payload };
+    const event = { id: eventId ?? crypto.randomUUID(), deviceId: "test", clock: events.length + 1, createdAt: "2024-01-01T00:00:00Z", kind, payload };
     events.push(event);
     return event;
   } };
@@ -144,4 +147,19 @@ print(json.dumps({"task": task, "preview": preview.json(), "events": events, "gr
   assert.equal((await request("/api/reading/complete", body)).status, expected.repeat);
   const profile = await (await service.fetch("/api/profile")).json();
   assert.equal(profile.reading.introductions, expected.introductions);
+  const detail = await (await service.fetch(`/api/attempts/${body.attempt}`)).json();
+  expected.detail.created_at = detail.created_at;
+  expected.detail.prompt.id = task.id;
+  assert.deepEqual(detail, expected.detail);
+  const excluded = await (await request(`/api/attempts/${body.attempt}/exclude`, { excluded: true })).json();
+  assert.equal(excluded.included_attempts, expected.excluded.included_attempts);
+  assert.equal(excluded.reading.introductions, expected.excluded.reading.introductions);
+  const excludedDetail = await (await service.fetch(`/api/attempts/${body.attempt}`)).json();
+  expected.excluded_detail.created_at = excludedDetail.created_at;
+  expected.excluded_detail.prompt.id = task.id;
+  assert.deepEqual(excludedDetail, expected.excluded_detail);
+  const restored = await (await request(`/api/attempts/${body.attempt}/exclude`, { excluded: false })).json();
+  assert.equal(restored.included_attempts, expected.restored.included_attempts);
+  assert.equal(restored.reading.introductions, expected.restored.reading.introductions);
+  assert.equal((await service.fetch("/api/attempts/unknown")).status, 404);
 });
