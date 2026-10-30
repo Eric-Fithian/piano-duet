@@ -43,6 +43,9 @@ for (const [name, engine] of [['Chromium', chromium], ['WebKit', webkit]]) {
       assert.equal(await page.locator('#profileDialog').evaluate(dialog => dialog.open), true);
       assert.ok((await page.locator('#profileSummary').textContent()).includes('0 included attempts'));
       await page.locator('#profileDialog').evaluate(dialog => dialog.close());
+      await page.locator('#libraryMode').click();
+      assert.equal(await page.locator('#recordingImportStatus').textContent(), 'Score writing for audio files and recordings is unavailable for now.');
+      assert.equal(await page.locator('.recording-import button:disabled').count(), 2);
       await page.locator('#readingMode').click();
       await page.waitForFunction(() => document.querySelector('#practiceTitle')?.textContent?.includes('Meet'), null, {timeout: 30000});
       await page.locator('#sheetMusic svg').first().waitFor({timeout: 15000});

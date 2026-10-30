@@ -25,6 +25,7 @@ with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.S
         status = client.get("/api/status").json()
         profile = client.get("/api/profile").json()
         pieces = client.get("/api/pieces").json()
+        library = client.get("/api/library").json()
         task = client.post("/api/practice/next", json={"focus": "guided"}, headers={"X-Duet-Client": "1"}).json()
         aided = client.post(f"/api/practice/{task['id']}/aid", json={"kind": "hearings"}, headers={"X-Duet-Client": "1"}).json()
         audio = np.zeros(32000, dtype="<f4")
@@ -32,7 +33,7 @@ with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.S
         heard = client.post("/api/reading/listen?threshold=0.8", content=audio.tobytes(), headers={"X-Duet-Client": "1"}).json()
         invalid = client.post("/api/reading/listen", content=b"x", headers={"X-Duet-Client": "1"})
 profile["generated_at"] = 1700000000
-print(json.dumps({"status": status, "profile": profile, "pieces": pieces, "task": task, "aided": aided, "heard": heard["notes"], "invalid": {"status": invalid.status_code, "body": invalid.json()}}))
+print(json.dumps({"status": status, "profile": profile, "pieces": pieces, "library": library, "task": task, "aided": aided, "heard": heard["notes"], "invalid": {"status": invalid.status_code, "body": invalid.json()}}))
 `], { encoding: "utf8", maxBuffer: 10_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const expected = JSON.parse(reference.stdout);
@@ -47,6 +48,7 @@ print(json.dumps({"status": status, "profile": profile, "pieces": pieces, "task"
   assert.deepEqual({ ...status, model: expected.status.model }, expected.status);
   assert.deepEqual(await (await service.fetch("/api/profile")).json(), expected.profile);
   assert.deepEqual(await (await service.fetch("/api/pieces")).json(), expected.pieces);
+  assert.deepEqual(await (await service.fetch("/api/library")).json(), expected.library);
   const task = await (await service.fetch("/api/practice/next", { method: "POST", body: JSON.stringify({ focus: "guided" }) })).json();
   expected.task.id = task.id;
   assert.deepEqual(task, expected.task);

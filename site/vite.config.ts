@@ -38,6 +38,8 @@ export default defineConfig({
         replace('  <script type="module" src="/static/app.mjs"></script>', '  <script type="module" src="/src/main.ts"></script>');
         replace('href="/static/credits.html"', 'href="/docs/credits/"');
         replace('id="openYoutube" class=', 'id="openYoutube" hidden class=');
+        replace('        <div class="song-table" role="table" aria-label="Your songs">',
+          '        <div class="recording-import" aria-label="Recording import"><button class="secondary" type="button" disabled>Import audio</button><button class="secondary" type="button" disabled>Record audio</button><p id="recordingImportStatus">Score writing for audio files and recordings is unavailable for now.</p></div>\n        <div class="song-table" role="table" aria-label="Your songs">');
         return html;
       },
     },

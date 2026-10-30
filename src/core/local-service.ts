@@ -19,6 +19,7 @@ import { readingAttacks } from "./reading-score.ts";
 import { scoreXp } from "./reading-rewards.ts";
 import { measureLandings } from "./reading-fluency.ts";
 import type { PositionChange } from "./reading-fluency.ts";
+import { LIBRARY_CATALOG } from "./library-catalog.ts";
 
 export type LocalJsonValue = null | boolean | number | string | LocalJsonValue[] | { [key: string]: LocalJsonValue };
 export interface LocalEventStore {
@@ -74,6 +75,13 @@ export class LocalService {
       const events = await this.store.list();
       const pieces = events.filter((event) => event.kind === "song" && isPiece(event.payload)).map((event) => (event.payload as { piece: unknown }).piece);
       return Response.json(pieces);
+    }
+    if (method === "GET" && url.pathname === "/api/library") {
+      const events = await this.store.list();
+      if (events.some((event) => event.kind === "song" && !isPiece(event.payload))) {
+        return Response.json({ detail: "Saved songs are not available yet" }, { status: 501 });
+      }
+      return Response.json({ songs: [], catalog: LIBRARY_CATALOG });
     }
     if (method === "POST" && url.pathname === "/api/practice/next") {
       if (typeof options.body !== "string") return Response.json({ detail: "A practice request needs JSON" }, { status: 400 });
