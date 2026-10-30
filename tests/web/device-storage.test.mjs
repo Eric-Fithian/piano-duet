@@ -26,7 +26,7 @@ before(async () => {
 after(() => server.kill("SIGTERM"));
 
 for (const [name, engine] of [["Chromium", chromium], ["WebKit", webkit]]) {
-  test(`${name} persists and merges an append-only SQLite event log`, async () => {
+  test(`${name} persists and merges an append-only SQLite event log`, { timeout: 45000 }, async () => {
     const profile = await mkdtemp(join(tmpdir(), "piano-duet-profile-"));
     const context = await engine.launchPersistentContext(profile, { headless: true });
     try {
@@ -80,7 +80,7 @@ for (const [name, engine] of [["Chromium", chromium], ["WebKit", webkit]]) {
     }
   });
 
-  test(`${name} verifies, caches and re-downloads versioned models`, async () => {
+  test(`${name} verifies, caches and re-downloads versioned models`, { timeout: 45000 }, async () => {
     const profile = await mkdtemp(join(tmpdir(), "piano-duet-profile-"));
     const context = await engine.launchPersistentContext(profile, { headless: true });
     try {
@@ -126,7 +126,7 @@ for (const [name, engine] of [["Chromium", chromium], ["WebKit", webkit]]) {
     }
   });
 
-  test(`${name} reports unavailable models and decodes supported live onsets`, async () => {
+  test(`${name} reports unavailable models and decodes supported live onsets`, { timeout: 45000 }, async () => {
     const profile = await mkdtemp(join(tmpdir(), "piano-duet-profile-"));
     const context = await engine.launchPersistentContext(profile, { headless: true });
     try {
