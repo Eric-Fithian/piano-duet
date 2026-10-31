@@ -19,7 +19,7 @@ npm ci --prefix site
 npm run dev  # browser app at http://127.0.0.1:5173 and docs under /docs
 ```
 
-The browser app is under construction; its practice modes and published model catalog are not ready. To run the working Python reference, use `make setup` and `make dev` instead. Python edits restart that server, and browser edits refresh it without reloading the models.
+The browser app is under construction. Reading, Drills, Library recording import, Duet and Variations use the local service and published model catalog; guided Practice and account sync are being integrated. Models download on first use. To run the Python reference, use `make setup` and `make dev` instead. Python edits restart that server, and browser edits refresh it without reloading the models.
 
 ## Make a change
 
@@ -27,7 +27,7 @@ For account and sync tests, start Docker, install the Supabase CLI, run `supabas
 
 1. Branch from `main`.
 2. Make the change, with tests. Python tests live in `tests/test_*.py`, browser-module tests in `tests/*.test.mjs`, TypeScript parity tests in `tests/core/`, and browser storage tests in `tests/web/`. These tests do not need the downloaded models.
-3. Run `make check`, which is what CI runs. Run `make site-build` if you touched `site/`.
+3. Run `make check`. CI also runs published-model parity and full-model browser checks; see [CI and releases](https://piano-duet.vercel.app/docs/contributing/ci/). Run `make site-build` if you touched `site/`.
 4. Update the documentation in `site/src/content/docs/` if behaviour changed.
 5. Open a pull request. CI must pass before it can merge, and Vercel comments with a preview link for website changes.
 
@@ -60,6 +60,6 @@ The script adds the public project URL and anon key to both Vercel environments.
 
 ## Project layout
 
-See [Architecture](https://piano-duet.vercel.app/how/architecture/) for how the browser, the server and the models fit together, and [CI and releases](https://piano-duet.vercel.app/contributing/ci/) for what runs on each pull request and how releases are cut.
+See [Architecture](https://piano-duet.vercel.app/docs/how/architecture/) for how the browser, the server and the models fit together, and [CI and releases](https://piano-duet.vercel.app/docs/contributing/ci/) for what runs on each pull request and how releases are cut.
 
 By contributing, you agree that your contributions are licensed under the [MIT License](LICENSE) and that you'll follow the [Code of Conduct](CODE_OF_CONDUCT.md).

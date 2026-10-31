@@ -54,21 +54,44 @@ function contextInput(history: ScoreTokens): Record<string, ort.Tensor> {
 }
 
 export class ScoreRuntime {
-  private constructor(private encoder: ort.InferenceSession, private first: ort.InferenceSession,
-    private context: ort.InferenceSession, private step: ort.InferenceSession) {}
+  private constructor(encoder: ort.InferenceSession, first: ort.InferenceSession,
+    context: ort.InferenceSession, step: ort.InferenceSession) {
+    this.encoder = encoder; this.first = first; this.context = context; this.step = step;
+  }
 
-  static async open(graphs: ScoreGraphs, provider: "webgpu" | "wasm"): Promise<ScoreRuntime> {
+  private encoder: ort.InferenceSession;
+  private first: ort.InferenceSession;
+  private context: ort.InferenceSession;
+  private step: ort.InferenceSession;
+
+  static async open(graphs: ScoreGraphs, provider: "webgpu" | "wasm",
+    createSession: (graph: ArrayBuffer | string, options: ort.InferenceSession.SessionOptions) => Promise<ort.InferenceSession>
+      = (graph, options) => typeof graph === "string" ? ort.InferenceSession.create(graph, options)
+        : ort.InferenceSession.create(graph, options)): Promise<ScoreRuntime> {
     const executionProviders = provider === "webgpu" ? ["webgpu", "wasm"] : ["wasm"];
     const outputs = Object.fromEntries(CACHES.map((name) => [`present_${name}`, "gpu-buffer"])) as Record<string, "gpu-buffer">;
-    const create = (graph: ArrayBuffer | string, options: ort.InferenceSession.SessionOptions) => typeof graph === "string"
-      ? ort.InferenceSession.create(graph, options) : ort.InferenceSession.create(graph, options);
-    const encoder = await create(graphs.encoder, { executionProviders,
-      ...(provider === "webgpu" ? { preferredOutputLocation: { encoded: "gpu-buffer" } } : {}) });
-    const options = { executionProviders, ...(provider === "webgpu" ? { preferredOutputLocation: outputs } : {}) };
-    const first = await create(graphs.first, options);
-    const context = await create(graphs.context, options);
-    const step = await create(graphs.step, options);
-    return new ScoreRuntime(encoder, first, context, step);
+    const opened: ort.InferenceSession[] = [];
+    const create = async (graph: ArrayBuffer | string, options: ort.InferenceSession.SessionOptions) => {
+      const session = await createSession(graph, options); opened.push(session); return session;
+    };
+    try {
+      const encoder = await create(graphs.encoder, { executionProviders,
+        ...(provider === "webgpu" ? { preferredOutputLocation: { encoded: "gpu-buffer" } } : {}) });
+      const options = { executionProviders, ...(provider === "webgpu" ? { preferredOutputLocation: outputs } : {}) };
+      const first = await create(graphs.first, options);
+      const context = await create(graphs.context, options);
+      const step = await create(graphs.step, options);
+      return new ScoreRuntime(encoder, first, context, step);
+    } catch (error) {
+      const released = await Promise.allSettled(opened.map((session) => Promise.resolve().then(() => session.release())));
+      const failures = released.filter((result) => result.status === "rejected").map((result) => result.reason);
+      if (failures.length) throw new AggregateError([error, ...failures], "Score model initialization and cleanup failed");
+      if (provider !== "webgpu") throw error;
+      const failure = new Error(error instanceof Error ? error.message : String(error), { cause: error });
+      failure.name = "WebGPUInitializationError";
+      if (error instanceof Error && error.stack) failure.stack = error.stack;
+      throw failure;
+    }
   }
 
   async generate(initial: ScoreInputTokens, signal?: AbortSignal, complete?: Promise<ScoreInputTokens>,

@@ -1,4 +1,4 @@
-import {AttackCounter, PhraseDetector, PianoSound, readEvents} from './audio.mjs';
+import {AttackCounter, PhraseDetector, PianoSound, captureAllowed, capturePerformanceTime, readEvents} from './audio.mjs';
 import {ScoreView} from './score_view.mjs';
 import {LearningCycle, pitchName, renderAnalysis} from './learning.mjs';
 import {PracticeCycle, localFetch, localRequest, renderPractice, renderProfile, renderAttempt, beatGroups} from './practice.mjs';
@@ -43,6 +43,7 @@ let calibrating = 0;
 let noiseSamples = [];
 let latestLevel = 0;
 let resumeAt = Infinity;
+let resumeAtPerformance = -Infinity;
 let playbackStart = null;
 let playbackEnd = 0;
 let replyOffset = 0;
@@ -107,6 +108,11 @@ const reading = new ReadingStream({
 
 function isPracticeMode(value = mode) {
   return value === 'practice' || value === 'reading' || value === 'drills';
+}
+
+function setResumeAt(time) {
+  resumeAt = time;
+  if (Number.isFinite(time)) resumeAtPerformance = performance.now() + (time - context.currentTime) * 1000;
 }
 
 function practiceReady() {
@@ -414,7 +420,7 @@ async function previewSong() {
     piano.play(note, playbackStart + note.start - origin);
     playbackEnd = Math.max(playbackEnd, playbackStart + note.start - origin + note.duration);
   }
-  resumeAt = playbackEnd + 0.4;
+  setResumeAt(playbackEnd + 0.4);
   previewing = {origin, ordinal: -1, view: null};
   buttons();
 }
@@ -640,7 +646,7 @@ async function practiceAid(kind) {
     piano.play(scaled, playbackStart + scaled.start);
     playbackEnd = Math.max(playbackEnd, playbackStart + scaled.start + scaled.duration + 0.2);
   }
-  resumeAt = playbackEnd + 0.75;
+  setResumeAt(playbackEnd + 0.75);
   listening = true;
   status(mode === 'reading' ? 'Listen to the score.' : 'Listen to the example.', '#95c8d2');
   $('message').textContent = 'The microphone waits while the piano plays.';
@@ -651,7 +657,7 @@ async function practiceAid(kind) {
 function toggleListening() {
   if (!listening) { practiceAid('hearings').catch(fail); return; }
   piano.stop();
-  resumeAt = context.currentTime;
+  setResumeAt(context.currentTime);
 }
 
 function loadDrill(request) {
@@ -817,7 +823,7 @@ async function hearBeat() {
   if (busy || !practice.task?.bpm) return;
   reading.pause();
   const generation = epoch;
-  busy = true; resumeAt = Infinity; buttons();
+  busy = true; setResumeAt(Infinity); buttons();
   await context.resume();
   if (generation !== epoch) return;
   const bpm = mode === 'reading' && reading.progress?.bpm ? reading.progress.tempo : practice.task.bpm;
@@ -838,7 +844,7 @@ async function hearBeat() {
     tone.onended = () => { piano.sources.delete(tone); tone.disconnect(); gain.disconnect(); };
     offset += length;
   }
-  resumeAt = start + offset * beat + 0.3;
+  setResumeAt(start + offset * beat + 0.3);
   status(`${practice.task.meter} · ♩ = ${bpm}`);
 }
 
@@ -1010,7 +1016,8 @@ async function stop() {
   inputContext = null;
   busy = false;
   calibrating = 0;
-  resumeAt = Infinity;
+  setResumeAt(Infinity);
+  resumeAtPerformance = -Infinity;
   playbackStart = null;
   latestLevel = 0;
   detector.reset();
@@ -1096,6 +1103,7 @@ async function startMicrophone() {
     if (inputContext?.state !== 'running') reading.interrupt();
   });
   if (inputContext.sampleRate !== 16000) throw new Error('This browser cannot capture at 16 kHz. Please use Chrome or Safari on your Mac.');
+  if (typeof inputContext.getOutputTimestamp !== 'function') throw new Error('This browser cannot timestamp microphone audio.');
   await inputContext.audioWorklet.addModule(new URL('./capture.js', import.meta.url).href);
   if (generation !== epoch) return;
   capture = new AudioWorkletNode(inputContext, 'piano-capture');
@@ -1103,7 +1111,11 @@ async function startMicrophone() {
   calibrating = mode === 'reading' || mode === 'library' ? 0 : 16000;
   noiseSamples = [];
   detector.reset();
-  capture.port.onmessage = event => processAudio(event.data);
+  const captureContext = inputContext;
+  capture.port.onmessage = event => Promise.resolve().then(() => {
+    const {samples, capturedAt} = event.data;
+    processAudio(samples, capturePerformanceTime(capturedAt, captureContext.getOutputTimestamp(), captureContext.baseLatency));
+  }).catch(fail);
   for (const track of stream.getTracks()) track.onended = () => fail(new Error('The microphone disconnected. Reconnect it and enable the microphone again.'));
   await inputContext.resume();
   const devices = await navigator.mediaDevices.enumerateDevices();
@@ -1121,7 +1133,7 @@ async function startMicrophone() {
   buttons();
 }
 
-function processAudio(chunk) {
+function processAudio(chunk, capturedAt) {
   latestLevel = Math.sqrt(chunk.reduce((sum, x) => sum + x * x, 0) / chunk.length);
   if (calibrating > 0) {
     noiseSamples.push(latestLevel);
@@ -1138,12 +1150,13 @@ function processAudio(chunk) {
   }
   // The app's own playback must never be heard as the player's: whatever reset `busy`, nothing is
   // recorded while the piano or the metronome is still sounding in the room.
-  if (piano.audible) {
+  const speakerUntil = performance.now() + (piano.audibleUntil - context.currentTime) * 1000;
+  if (!captureAllowed(capturedAt, resumeAtPerformance, speakerUntil, busy && !Number.isFinite(resumeAt))) {
     if (detector.active) detector.reset();
     takeStarted = false;
     return;
   }
-  if (busy) return;
+  if (busy) finishPlayback();
   if (mode === 'reading') { reading.feed(chunk); return; }
   if (mode === 'library') { if (song && !songEditor) songStream.feed(chunk); return; }
   if (isPracticeMode() && !practice.canPlay) return;
@@ -1187,7 +1200,7 @@ async function requestReply(audio, {source = 'microphone'} = {}) {
     learningStep('repeat', 'Listening back to your attempt and comparing it with the practice target…');
   }
   busy = true;
-  resumeAt = Infinity;
+  setResumeAt(Infinity);
   playbackStart = null;
   playbackEnd = 0;
   lateNotes = 0;
@@ -1303,7 +1316,7 @@ async function requestReply(audio, {source = 'microphone'} = {}) {
         } else if (event.stage !== 'complete') {
           $('message').textContent = 'No piano notes were recognized. Try playing closer to the microphone, or lower Note confidence.';
         }
-        resumeAt = Math.max(context.currentTime, playbackEnd) + 0.75;
+        setResumeAt(Math.max(context.currentTime, playbackEnd) + 0.75);
       }
     }
   } catch (error) {
@@ -1318,7 +1331,7 @@ async function replayTarget() {
   if (!learning.target.length || busy) return;
   const generation = epoch;
   busy = true;
-  resumeAt = Infinity;
+  setResumeAt(Infinity);
   detector.reset();
   buttons();
   await context.resume();
@@ -1331,7 +1344,7 @@ async function replayTarget() {
     piano.play(note, playbackStart + note.start);
     playbackEnd = Math.max(playbackEnd, playbackStart + note.start + note.duration + 0.2);
   }
-  resumeAt = playbackEnd + 0.75;
+  setResumeAt(playbackEnd + 0.75);
   learningStep('listen', 'Listen to the practice target again.');
   status('Playing the practice target.', '#95c8d2');
 }
@@ -1463,6 +1476,24 @@ function drawRoll() {
   }
 }
 
+function finishPlayback() {
+  busy = false;
+  setResumeAt(Infinity);
+  playbackStart = null;
+  detector.reset();
+  status(microphone ? 'Your turn. Take it somewhere.' : 'Ready when you are');
+  if (reply.length) $('message').textContent = microphone
+    ? 'Listening again. Build on the reply, or start a different idea.'
+    : 'That was a local audio-to-piano duet. Enable your microphone to play your own phrase.';
+  previewing = null;
+  listening = false;
+  playbackScale = 1;
+  learningReady();
+  practiceReady();
+  songReady();
+  buttons();
+}
+
 function draw() {
   if (!$('rollPanel').hidden) drawRoll();
   sheet.playback(busy && playbackStart !== null ? (context.currentTime - playbackStart) / playbackScale : null);
@@ -1472,21 +1503,7 @@ function draw() {
   $('level').parentElement.setAttribute('aria-valuenow', Math.round(level));
   $('levelText').textContent = microphone ? `${Math.round(db)} dB` : 'MIC OFF';
   if (busy && context.currentTime >= resumeAt) {
-    busy = false;
-    resumeAt = Infinity;
-    playbackStart = null;
-    detector.reset();
-    status(microphone ? 'Your turn. Take it somewhere.' : 'Ready when you are');
-    if (reply.length) $('message').textContent = microphone
-      ? 'Listening again. Build on the reply, or start a different idea.'
-      : 'That was a local audio-to-piano duet. Enable your microphone to play your own phrase.';
-    previewing = null;
-    listening = false;
-    playbackScale = 1;
-    learningReady();
-    practiceReady();
-    songReady();
-    buttons();
+    finishPlayback();
   }
   if (previewing && busy && playbackStart !== null) previewTick();
   // Drills are transcribed afterwards, so the score follows the drill's tempo from the first note heard.

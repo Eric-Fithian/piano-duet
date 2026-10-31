@@ -1,6 +1,15 @@
 export type ModelId = "aria" | "live-transcription" | "phrase-transcription" | "recording-transcription" | "midi-to-score";
 export type AssetId = ModelId | "piano-samples";
 
+export interface ModelFile {
+  model: AssetId;
+  name: string;
+  revision: string;
+  url: string;
+  sha256: string;
+  bytes: number;
+}
+
 export interface PianoNote {
   pitch: number;
   start: number;
@@ -39,10 +48,13 @@ export interface DownloadProgress {
   total: number | null;
 }
 
-export interface InferenceSession<K extends ModelId> {
-  readonly model: K;
+export interface InferenceBackendRecord {
   readonly provider: "webgpu" | "wasm" | "native";
   readonly fallback?: { provider: "webgpu"; message: string; stack?: string };
+}
+
+export interface InferenceSession<K extends ModelId> extends InferenceBackendRecord {
+  readonly model: K;
   run(input: ModelInputs[K], signal?: AbortSignal): Promise<ModelOutputs[K]>;
   close(): Promise<void>;
 }
@@ -52,7 +64,25 @@ export interface InferenceBackend {
     signal?: AbortSignal): Promise<InferenceSession<K>>;
 }
 
-export function describeInferenceBackend(session: InferenceSession<ModelId>): string {
+export function describeInferenceBackend(session: InferenceBackendRecord & { model: ModelId }): string {
   const provider = session.provider === "wasm" ? "CPU" : session.provider === "webgpu" ? "WebGPU" : "Native";
   return `${session.model}: ${provider}${session.fallback ? ` (WebGPU failed: ${session.fallback.message})` : ""}`;
+}
+
+export async function initializeWithWebGPUFallback<T>(model: ModelId, provider: "webgpu" | "wasm",
+  initialize: (provider: "webgpu" | "wasm") => Promise<T>, signal?: AbortSignal): Promise<{ value: T; backend: InferenceBackendRecord }> {
+  signal?.throwIfAborted();
+  try { return { value: await initialize(provider), backend: { provider } }; }
+  catch (error) {
+    if (signal?.aborted) throw signal.reason;
+    if (provider !== "webgpu" || !(error instanceof Error) || error.name !== "WebGPUInitializationError") throw error;
+    console.info(`WebGPU could not initialize ${model}; retrying with WASM: ${error.message}\n${error.stack ?? ""}`);
+    const fallback = { provider: "webgpu" as const, message: error.message, stack: error.stack };
+    try { return { value: await initialize("wasm"), backend: { provider: "wasm", fallback } }; }
+    catch (fallbackError) {
+      if (signal?.aborted) throw signal.reason;
+      const reason = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
+      throw new AggregateError([error, fallbackError], `Could not initialize ${model}: WebGPU: ${error.message}; CPU: ${reason}`);
+    }
+  }
 }

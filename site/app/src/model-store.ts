@@ -1,15 +1,6 @@
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
-import type { AssetId, DownloadProgress } from "./inference.ts";
-
-export interface ModelFile {
-  model: AssetId;
-  name: string;
-  revision: string;
-  url: string;
-  sha256: string;
-  bytes: number;
-}
+import type { DownloadProgress, ModelFile } from "./inference.ts";
 
 export class ModelStore {
   private cache = caches.open("piano-duet-models");

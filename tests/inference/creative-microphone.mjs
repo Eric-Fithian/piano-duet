@@ -45,7 +45,7 @@ try {
   page.on("pageerror", (error) => errors.push(String(error)));
   page.on("console", (message) => process.stderr.write(`Page ${message.type()}: ${message.text()}\n`));
   await page.addInitScript(({ selectedProvider, selectedPhraseProvider }) => {
-    window.__duetTest = { audio: null, destination: null, providers: [], captures: [], progress: 0 };
+    window.__duetTest = { audio: null, destination: null, providers: [], captures: [], events: [], progress: 0 };
     document.addEventListener("DOMContentLoaded", () => {
       const input = document.querySelector("#length");
       if (!input) throw new Error("The reply length control is missing");
@@ -94,16 +94,41 @@ try {
   await page.locator("#length").evaluate((input) => { input.value = "2"; input.dispatchEvent(new Event("input", { bubbles: true })); });
   assert.equal(await page.locator("#length").inputValue(), "2", await diagnostic("Duet reply length did not change to two seconds"));
   await page.locator('[data-close="settingsDialog"]').click();
+  const staticBase = `/@fs${resolve("src/piano_duet/static")}`;
+  await page.evaluate(async (path) => {
+    const { PianoSound, PhraseDetector } = await import(`${path}/audio.mjs`);
+    const audible = Object.getOwnPropertyDescriptor(PianoSound.prototype, "audibleUntil");
+    if (!audible?.get) throw new Error("The piano guard is unavailable to the test");
+    Object.defineProperty(PianoSound.prototype, "audibleUntil", { configurable: true, get() {
+      const until = audible.get.call(this), value = this.context.currentTime < until, test = window.__duetTest;
+      if (this.context !== test.audio) {
+        const guard = { audible: value, at: performance.now(), outputTime: this.context.currentTime,
+          outputUntil: this.until, microphoneTime: test.audio?.currentTime ?? null };
+        if (test.guard?.audible !== value) test.events.push({ type: "guard", ...guard });
+        test.guard = guard;
+      }
+      return until;
+    } });
+    const feed = PhraseDetector.prototype.feed;
+    PhraseDetector.prototype.feed = function (chunk) {
+      const active = this.active, result = feed.call(this, chunk);
+      if (active !== this.active || result.phrase) window.__duetTest.events.push({ type: "detector", active: this.active,
+        samples: result.phrase?.length ?? this.samples, rms: result.rms, microphoneTime: window.__duetTest.audio?.currentTime });
+      return result;
+    };
+  }, staticBase);
   await page.locator("#start").click();
   await page.waitForFunction(() => window.__duetTest.audio && window.__duetTest.destination);
   const waitForListening = async (label) => {
     await page.waitForFunction(() => document.querySelector("#status")?.textContent.startsWith("Your turn"), null, { timeout: 30000 });
+    const observedAt = await page.evaluate(() => performance.now());
+    await page.waitForFunction((after) => window.__duetTest.guard?.at >= after && !window.__duetTest.guard.audible, observedAt, { timeout: 30000 });
     await page.waitForTimeout(250);
-    const status = await page.locator("#status").textContent();
-    assert.ok(status?.startsWith("Your turn"), await diagnostic(`${label}: microphone-ready signal did not remain visible`));
-    process.stderr.write(`${label}: microphone-ready signal ${JSON.stringify(status)}\n`);
+    const ready = await page.evaluate(() => ({ status: document.querySelector("#status")?.textContent, guard: window.__duetTest.guard }));
+    assert.ok(ready.status?.startsWith("Your turn") && ready.guard?.audible === false,
+      await diagnostic(`${label}: microphone-ready signal did not remain visible: ${JSON.stringify(ready)}`));
+    process.stderr.write(`${label}: microphone-ready signal ${JSON.stringify(ready)}\n`);
   };
-  const staticBase = `/@fs${resolve("src/piano_duet/static")}`;
   const waitForProgress = (label, kind, turn) => waitForCreativeProgress({ label, diagnostic, errors,
     pause: () => page.waitForTimeout(1000), read: () => page.evaluate(({ kind, turn }) => {
         const error = document.querySelector("#error"), status = document.querySelector("#status")?.textContent;
@@ -124,7 +149,7 @@ try {
       const start = audio.currentTime + 0.5;
       window.__duetTest.expected = { pitches, performanceSeconds: (pitches.length - 1) * 0.5 + 0.35, sampleRate: 16000 };
       for (const [index, pitch] of pitches.entries()) piano.play({ pitch, start: 0, duration: 0.35, velocity: 90 }, start + index * 0.5, audio, destination);
-      return { scheduled: start, audioTime: audio.currentTime, status, pitches };
+      return { scheduled: start, audioTime: audio.currentTime, status, pitches, guard: window.__duetTest.guard };
     }, { path: staticBase, pitches });
     process.stderr.write(`Scheduled synthetic piano: ${JSON.stringify(scheduled)}\n`);
   };
@@ -132,6 +157,7 @@ try {
   await play();
   process.stderr.write(`Waiting for first Duet exchange at ${Math.round(performance.now() - started)} ms\n`);
   await waitForProgress("First Duet exchange", "duet", "01");
+  process.stderr.write(`First Duet capture trace: ${JSON.stringify(await page.evaluate(() => window.__duetTest.events.splice(0)))}\n`);
   const result = await page.evaluate(async (path) => {
     const { localRequest } = await import(`${path}/practice.mjs`);
     const profile = await localRequest("/api/profile");
@@ -151,6 +177,7 @@ try {
   await play();
   process.stderr.write(`Waiting for second Duet exchange at ${Math.round(performance.now() - started)} ms\n`);
   await waitForProgress("Second Duet exchange", "duet", "02");
+  process.stderr.write(`Second Duet capture trace: ${JSON.stringify(await page.evaluate(() => window.__duetTest.events.splice(0)))}\n`);
   const again = await page.evaluate(async (path) => {
     const { localRequest } = await import(`${path}/practice.mjs`);
     const profile = await localRequest("/api/profile");
