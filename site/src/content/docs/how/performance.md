@@ -56,7 +56,7 @@ The Library timings cover the file selection through the saved song, including a
 
 Model files are verified against their pinned SHA-256 and size when downloaded. A marker tied to the exact URL, revision, hash and size allows later loads to check the stored size without hashing the entire file again. If the marker is missing, the file is hashed again; a size mismatch fails the integrity check. As requested, a same-size change to a marked cached file is not detected until the file is reverified or inference fails.
 
-For a three-second synthetic stereo fixture, Chrome and Playwright WebKit decoded MP3, M4A/AAC, FLAC and WebM/Opus at the file's native sample rate and then used the same polyphase resampling as Python. All eight results had the same sample count as ffmpeg and RMS error below 0.000027 on normalized audio (the regression tolerance is 0.005). Chrome used WebCodecs for AAC, FLAC and WebM/Opus and Web Audio for MP3; Playwright WebKit used WebCodecs for AAC and WebM/Opus and Web Audio for MP3 and FLAC. The WebM path accounts for Opus pre-skip and discard padding explicitly. A synthetic Chrome MediaRecorder recording also matched ffmpeg's sample count and had RMS error below 0.000001. These are not real Safari format-decoding results.
+For a three-second synthetic stereo fixture, Chrome, Playwright WebKit and real Safari decoded MP3, M4A/AAC, FLAC and WebM/Opus at the file's native sample rate and then used the same polyphase resampling as Python. All twelve results had the same sample count as ffmpeg and RMS error below 0.000027 on normalized audio (the regression tolerance is 0.005). Chrome used WebCodecs for AAC, FLAC and WebM/Opus and Web Audio for MP3; Safari and Playwright WebKit used WebCodecs for AAC and WebM/Opus and Web Audio for MP3 and FLAC. The WebM path accounts for Opus pre-skip and discard padding explicitly. A synthetic Chrome MediaRecorder recording also matched ffmpeg's sample count and had RMS error below 0.000001. The Safari format checks used `safaridriver` on the same Mac, not an iPhone.
 
 Transkun's current WebGPU feature graph is not used for recordings: on the first padded 16-second window it chose different interval paths on 10 of 90 tracks, while browser WASM and Python ONNX CPU matched PyTorch. The spectrogram was close to the CPU reference, but the first convolution already differed substantially. ORT graph optimization set to `disabled` or `basic` did not remove the discrepancy. Further GPU investigation is needed before enabling that path.
 
@@ -78,6 +78,8 @@ node tests/inference/measure-browser.mjs chrome transcription split-fp32
 PIANO_ARIA_MODEL_DIR=.cache/ci-models/aria node tests/inference/measure-safari.mjs aria webgpu
 node tests/inference/measure-safari.mjs transcription split-fp32
 PIANO_ARIA_MODEL_DIR=.cache/ci-models/aria node tests/inference/verify-aria-safari.mjs
+uv run --frozen python tests/inference/audio_fixtures.py
+node tests/inference/audio-decoding.mjs --safari
 node tests/inference/verify-recording-transcription.mjs path/to/mono-44100hz.wav 180 pool 4 3 --score
 ```
 
