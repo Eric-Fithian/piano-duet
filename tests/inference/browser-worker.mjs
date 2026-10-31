@@ -38,6 +38,16 @@ function liveNotes(onset, frame, velocity, frames, threshold = 0.8) {
 }
 
 async function measure(model, backend, verbose) {
+  const providerDiagnostics = [];
+  let collecting = verbose;
+  if (verbose) for (const method of ["debug", "info", "log", "warn", "error"]) {
+    const original = console[method].bind(console);
+    console[method] = (...args) => {
+      const message = args.map(String).join(" "), lower = message.toLowerCase();
+      if (collecting && ["node", "provider", "kernel", "execution"].some((term) => lower.includes(term))) providerDiagnostics.push(message);
+      original(...args);
+    };
+  }
   ort.env.logLevel = verbose ? "verbose" : "warning";
   const adapter = navigator.gpu ? await navigator.gpu.requestAdapter() : null;
   if (["webgpu", "split-fp32"].includes(backend) && !adapter) throw new Error("WebGPU adapter unavailable");
@@ -51,6 +61,7 @@ async function measure(model, backend, verbose) {
       split ? "/models/transcription-convolution-fp32.onnx" : "/models/transcription.onnx", options);
     const recurrent = split ? await ort.InferenceSession.create(
       "/models/transcription-recurrent.onnx", { ...options, executionProviders: ["wasm"] }) : null;
+    collecting = false;
     const loaded = performance.now();
     const input = new ort.Tensor("float32", Float32Array.from(fixture.audio), [1, fixture.audio.length]);
     const runs = [];
@@ -72,7 +83,7 @@ async function measure(model, backend, verbose) {
       runs.push(performance.now() - runStart);
     }
     const notes = liveNotes(result.reg_onset.data, result.frame.data, result.velocity.data, result.reg_onset.dims[1]);
-    return { model, backend, userAgent: navigator.userAgent, gpu: Boolean(adapter),
+    return { model, backend, userAgent: navigator.userAgent, gpu: Boolean(adapter), ...(verbose ? { providerDiagnostics } : {}),
       input_samples: fixture.audio.length, threads: ort.env.wasm.numThreads, isolated: crossOriginIsolated,
       simd: ort.env.wasm.simd,
       load_ms: loaded - started, runs_ms: runs, convolution_ms: convolutionRuns, recurrent_ms: recurrentRuns,
@@ -89,6 +100,7 @@ async function measure(model, backend, verbose) {
     );
   }
   const session = await ort.InferenceSession.create("/models/aria/model.onnx", options);
+  collecting = false;
   const loaded = performance.now();
   let cache = Object.fromEntries(session.inputNames.slice(1).map((name) =>
     [name, new ort.Tensor("float32", new Float32Array(0), [1, 24, 0, 64])]));
@@ -107,7 +119,7 @@ async function measure(model, backend, verbose) {
     for (const value of Object.values(previous)) value.dispose();
     output.logits.dispose();
   }
-  return { model, backend, userAgent: navigator.userAgent, gpu: Boolean(adapter),
+  return { model, backend, userAgent: navigator.userAgent, gpu: Boolean(adapter), ...(verbose ? { providerDiagnostics } : {}),
     cache_locations: [...new Set(Object.values(cache).map((value) => value.location))],
     load_ms: loaded - started, steps };
 }
