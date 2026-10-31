@@ -70,6 +70,7 @@ export class LocalService {
   private responseBusy = false;
   private readonly store: LocalEventStore;
   private readonly transcriber?: LocalTranscriber;
+  private readonly phraseTranscriber?: LocalPhraseTranscriber;
   private readonly now: () => number;
   private readonly assets?: LocalAssets;
   private readonly rng: ComposerRandom & FoundationRandom;
@@ -77,7 +78,6 @@ export class LocalService {
   private readonly recording?: LocalRecordingTranscriber;
   private readonly recordingImporter?: LocalRecordingImporter;
   private readonly duetService: DuetService;
-  private readonly phraseTranscriber?: LocalPhraseTranscriber;
   private readonly tasks = new Map<string, { task: PracticeTask; completed: boolean }>();
   private completionBusy = false;
 
@@ -87,13 +87,13 @@ export class LocalService {
     duetGenerator?: LocalDuetGenerator) {
     this.store = store;
     this.transcriber = transcriber;
+    this.phraseTranscriber = phraseTranscriber;
     this.now = now;
     this.assets = assets;
     this.rng = rng;
     this.phrase = phrase;
     this.recording = recording;
     this.recordingImporter = recordingImporter;
-    this.phraseTranscriber = phraseTranscriber;
     this.duetService = new DuetService(store, phraseTranscriber, duetGenerator, () => this.responseBusy || this.readingBusy,
       (busy) => { this.responseBusy = busy; });
   }
@@ -103,6 +103,7 @@ export class LocalService {
     const url = new URL(path, "http://piano.local");
     if (url.origin !== "http://piano.local") throw new Error("Local service requests must use a local path");
     const method = (options.method ?? "GET").toUpperCase();
+    if (method === "POST" && url.pathname === "/api/respond" && url.searchParams.get("mode") === "practice") return this.respondPractice(url, options);
     if (url.pathname.startsWith("/samples/")) {
       if (!this.assets) return Response.json({ detail: "Piano samples are not available yet" }, { status: 501 });
       return this.assets.fetch(url.pathname, options);
@@ -297,7 +298,6 @@ export class LocalService {
     if (method === "POST" && url.pathname === "/api/reading/listen") return this.listen(url, options);
     if (method === "POST" && url.pathname === "/api/reading/complete") return this.completeReading(options);
     if (method === "POST" && url.pathname === "/api/respond" && url.searchParams.get("mode") === "drills") return this.respondDrill(url, options);
-    if (method === "POST" && url.pathname === "/api/respond" && url.searchParams.get("mode") === "practice") return this.respondPractice(url, options);
     if (method === "POST" && url.pathname === "/api/respond" && (url.searchParams.get("mode") ?? "duet") === "duet") return this.duetService.respond(url, options);
     return Response.json({ detail: `Local service does not yet implement ${method} ${url.pathname}` }, { status: 501 });
   }
