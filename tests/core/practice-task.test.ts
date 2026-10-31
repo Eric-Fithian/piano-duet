@@ -43,13 +43,27 @@ events = []
 with patch('piano_duet.practice.uuid4', return_value='task'):
   task = next_task(Store(copy.deepcopy(profile), [piece], []), 'guided', RecordingRandom(0, events))
 cases.append({'profile':profile,'focus':'guided','pieces':[piece],'attempts':[],'events':events,'task':task})
+profile = build_profile([], now=1000000)
+for skill in profile['skills']:
+  if skill['id'] == 'technique.chords':
+    skill['conditions'] = [{'id':'chord:60,64,67', 'accuracy':45, 'attempts':2}]
+last = {'created_at':999999, 'context':{'family':'repertoire','hearings':0,'reveals':0,'hints':0},
+        'assessment':{'score':{'score':60}, 'evidence':[{'skill':'technique.chords','facet':'all','value':0.4},
+          {'skill':'technique.chords','facet':'chord:60,64,67','value':0.4}], 'observations':[]},
+        'key':key, 'shape':'melody', 'excluded':False}
+profile['practice_recent'] = [last]
+profile['recent'] = [last]
+events = []
+with patch('piano_duet.practice.uuid4', return_value='task'):
+  task = next_task(Store(copy.deepcopy(profile), [piece], []), 'guided', RecordingRandom(0, events))
+cases.append({'profile':profile,'focus':'guided','pieces':[piece],'attempts':[],'events':events,'task':task})
 print(json.dumps(cases))
 `], { encoding: "utf8", maxBuffer: 30_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const cases: { profile: Parameters<typeof generatePracticeTask>[0]; focus: Parameters<typeof generatePracticeTask>[1];
     pieces: Parameters<typeof generatePracticeTask>[5]; attempts: Parameters<typeof generatePracticeTask>[6]; events: ReplayEvent[];
     task: ReturnType<typeof generatePracticeTask> }[] = JSON.parse(reference.stdout);
-  assert.equal(cases.length, 61);
+  assert.equal(cases.length, 62);
   for (const [index, item] of cases.entries()) {
     const replay = new ReadingReplay(item.events);
     const task = generatePracticeTask(item.profile, item.focus, "task", replay, 1000000, item.pieces, item.attempts);
