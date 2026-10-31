@@ -12,7 +12,7 @@ import {ENABLED_MODES} from './enabled_modes.mjs';
 import {setupAppearance} from './appearance.mjs';
 
 const $ = id => document.getElementById(id);
-const appearance = setupAppearance({root: document.documentElement, theme: $('appearanceTheme'), night: $('nightPage'), storage: localStorage, system: matchMedia('(prefers-color-scheme: dark)')});
+const appearance = setupAppearance({root: document.documentElement, theme: $('appearanceTheme'), night: $('nightPage'), themeColor: $('themeColor'), storage: localStorage, system: matchMedia('(prefers-color-scheme: dark)')});
 const ALL_MODES = ['practice', 'reading', 'drills', 'library', 'duet', 'learning'];
 const EMPTY_SCORE = '<span aria-hidden="true">𝄞</span><p>Start with a few notes.</p><small>Your music will appear here.</small>';
 // What each part of the app shows on top of the music. The player's own layout, zoom, look-ahead and following

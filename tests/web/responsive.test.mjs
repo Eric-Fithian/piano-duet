@@ -173,9 +173,11 @@ for (const [engineName, engine] of [['chromium', chromium], ['webkit', webkit]])
     await checkLayout(page, `${engineName} playing at 360px`);
     await page.setViewportSize({width: 375, height: 667});
     const themeDuringTake = await page.locator('html').getAttribute('data-theme');
+    const colorDuringTake = await page.locator('#themeColor').getAttribute('content');
     const nextSystemTheme = themeDuringTake === 'light' ? 'dark' : 'light';
     await page.emulateMedia({colorScheme: nextSystemTheme});
     assert.equal(await page.locator('html').getAttribute('data-theme'), themeDuringTake);
+    assert.equal(await page.locator('#themeColor').getAttribute('content'), colorDuringTake);
     await page.locator('#openSettings').click();
     assert.equal(await page.locator('#appearanceTheme').isDisabled(), true);
     assert.equal(await page.locator('#nightPage').isDisabled(), true);
@@ -189,7 +191,18 @@ for (const [engineName, engine] of [['chromium', chromium], ['webkit', webkit]])
     assert.equal(await page.locator('#start').getAttribute('aria-pressed'), 'true');
     await page.locator('#start').click();
     await page.waitForFunction(theme => document.documentElement.dataset.theme === theme, nextSystemTheme);
+    assert.equal(await page.locator('#themeColor').getAttribute('content'), nextSystemTheme === 'dark' ? '#14211a' : '#f5f1e8');
     await page.emulateMedia({colorScheme: 'light'});
+    await page.locator('#openSettings').click();
+    await page.locator('#appearanceTheme').selectOption('dark');
+    assert.equal(await page.locator('#themeColor').getAttribute('content'), '#14211a');
+    await page.locator('#nightPage').check();
+    assert.equal(await page.locator('#themeColor').getAttribute('content'), '#14211a');
+    await page.locator('#appearanceTheme').selectOption('light');
+    assert.equal(await page.locator('#themeColor').getAttribute('content'), '#f5f1e8');
+    await page.locator('#nightPage').uncheck();
+    await page.locator('#appearanceTheme').selectOption('system');
+    await page.locator('[data-close="settingsDialog"]').click();
     async function capture(name) {
       await checkLayout(page, `${engineName} ${name}`);
       if (process.env.RESPONSIVE_SCREENSHOTS) {

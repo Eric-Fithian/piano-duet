@@ -74,6 +74,17 @@ def test_brand_manifest_and_icons_are_served_from_signed_off_assets(client):
         assert response.content == (Path("design/brand/assets") / name).read_bytes()
 
 
+def test_appearance_bootstrap_is_served_before_styles_under_the_script_policy(client):
+    page = client.get("/")
+    policy = page.headers["content-security-policy"]
+    assert "script-src 'self'" in policy
+    assert "'unsafe-inline'" not in policy
+    assert page.text.index('/static/appearance-bootstrap.js') < page.text.index('/static/style.css')
+    script = client.get("/static/appearance-bootstrap.js")
+    assert script.status_code == 200
+    assert script.text == Path("src/piano_duet/static/appearance-bootstrap.js").read_text()
+
+
 def test_cross_origin_audio_is_rejected(client):
     response = client.post(
         f"/api/respond?session={uuid4()}",

@@ -45,3 +45,37 @@ export async function enableAllModes(context) {
   await context.route('**/enabled_modes.mjs*', route => route.fulfill({contentType: 'text/javascript',
     body: "export const ENABLED_MODES = ['practice', 'reading', 'drills', 'library', 'duet', 'learning'];"}));
 }
+
+export async function startReferenceServer(directory) {
+  const probe = createServer();
+  await new Promise((ready) => probe.listen(0, "127.0.0.1", ready));
+  const port = probe.address().port;
+  await new Promise((closed) => probe.close(closed));
+  const code = "import sys, pathlib, uvicorn; from piano_duet import server; "
+    + "root = pathlib.Path(sys.argv[2]); server.SAMPLES = root; server.NOTATION = root; "
+    + "uvicorn.run(server.create_app(profile_path=root / 'profile.sqlite3'), host='127.0.0.1', "
+    + "port=int(sys.argv[1]), lifespan='off', log_level='error')";
+  const server = spawn("uv", ["run", "--frozen", "python", "-c", code, String(port), directory],
+    {stdio: ["ignore", "pipe", "pipe"]});
+  server.stderr.on("data", (chunk) => process.stderr.write(chunk));
+  await new Promise((ready, reject) => {
+    const deadline = Date.now() + 45000;
+    const fail = (error) => { server.kill("SIGTERM"); reject(error); };
+    server.once("error", fail);
+    server.once("exit", (code) => fail(new Error(`Reference server exited before startup: ${code}`)));
+    const poll = () => {
+      if (Date.now() >= deadline) return fail(new Error("Reference server did not start within 45 seconds"));
+      const request = get(`http://127.0.0.1:${port}/`, (response) => {
+        response.resume();
+        if (response.statusCode === 200) ready();
+        else fail(new Error(`Reference server returned ${response.statusCode}`));
+      });
+      request.on("error", (error) => {
+        if (error.code === "ECONNREFUSED") setTimeout(poll, 100);
+        else fail(error);
+      });
+    };
+    poll();
+  });
+  return {server, port};
+}

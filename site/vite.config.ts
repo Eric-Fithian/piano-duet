@@ -104,6 +104,19 @@ export default defineConfig({
       }
     },
   }, {
+    name: "appearance-bootstrap",
+    configureServer(server) {
+      server.middlewares.use((request, response, next) => {
+        if (request.url?.split("?")[0] !== "/static/appearance-bootstrap.js") return next();
+        response.setHeader("Content-Type", "text/javascript");
+        response.end(readFileSync(new URL("../src/piano_duet/static/appearance-bootstrap.js", import.meta.url)));
+      });
+    },
+    generateBundle() {
+      this.emitFile({ type: "asset", fileName: "static/appearance-bootstrap.js",
+        source: readFileSync(new URL("../src/piano_duet/static/appearance-bootstrap.js", import.meta.url)) });
+    },
+  }, {
     name: "offline-app-shell",
     generateBundle(_options, bundle) {
       const files = Object.keys(bundle).filter((name) => !name.endsWith(".map") && name !== "sync-config.json").sort();
