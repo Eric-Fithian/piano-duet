@@ -159,6 +159,9 @@ jobs:
           PIANO_SITE_PORT: "5182"
           PIANO_PHRASE_MODEL: .cache/ci-models/phrase-transcription/piano_crnn.onnx
           PIANO_PHRASE_SPLIT_DIR: .cache/ci-models/phrase-transcription
+      - name: Remove WebKit model browser profile
+        if: always()
+        run: rm -rf .cache/browser-inference/webkit-profile
       - run: node tests/inference/drill-microphone.mjs
         timeout-minutes: 3
         env:
@@ -173,9 +176,6 @@ jobs:
       - name: Remove temporary model browser profile
         if: always()
         run: rm -rf .cache/browser-inference/model-profile
-      - name: Remove WebKit model browser profile
-        if: always()
-        run: rm -rf .cache/browser-inference/webkit-profile
 
   site:
     name: Website
