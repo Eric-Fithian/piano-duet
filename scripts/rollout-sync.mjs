@@ -5,6 +5,10 @@ import {setTimeout as delay} from 'node:timers/promises';
 async function main() {
   const options = parseArguments(process.argv.slice(2));
   const token = accessToken();
+  if (options.redirectsOnly) {
+    await updateRedirects(token, options.projectRef, options.vercelScope);
+    return;
+  }
   const organization = await management(token, `/v1/organizations/${encodeURIComponent(options.organization)}`);
   if (typeof organization.id !== 'string' || !organization.id) throw new Error('Supabase returned an invalid organization.');
   if (organization.plan !== 'free') throw new Error('The selected Supabase organization is not on the Free plan.');
@@ -48,7 +52,7 @@ async function main() {
   const childEnv = {...process.env, SUPABASE_DB_PASSWORD: password};
   run('supabase', ['link', '--project-ref', ref, '--yes'], {env: childEnv});
   run('supabase', ['db', 'push', '--linked', '--skip-vault', '--yes'], {env: childEnv});
-  const redirects = ['https://piano-duet.vercel.app/', `https://piano-duet-*-${scope}.vercel.app/**`];
+  const redirects = redirectUrls(scope);
   const auth = {site_url: 'https://piano-duet.vercel.app', uri_allow_list: redirects.join(','),
     external_email_enabled: true, disable_signup: false, mailer_autoconfirm: false,
     external_apple_enabled: false, external_google_enabled: false};
@@ -70,16 +74,38 @@ async function main() {
   console.log('Configuration is ready. New production and preview builds are needed to publish sync-config.json.');
 }
 
+function redirectUrls(scope) {
+  const production = 'https://piano-duet.vercel.app';
+  const preview = `https://piano-duet-*-${scope}.vercel.app`;
+  return [production, `${production}/`, preview, `${preview}/**`];
+}
+
+async function updateRedirects(token, ref, scope) {
+  const path = `/v1/projects/${ref}/config/auth`;
+  const current = await management(token, path);
+  if (typeof current.uri_allow_list !== 'string') throw new Error('Unexpected Supabase redirect allow-list.');
+  const redirects = [...new Set([...current.uri_allow_list.split(',').map((item) => item.trim()).filter(Boolean), ...redirectUrls(scope)])];
+  await management(token, path, {method: 'PATCH', body: {uri_allow_list: redirects.join(',')}});
+  const applied = await management(token, path);
+  if (typeof applied.uri_allow_list !== 'string') throw new Error('Unexpected Supabase redirect allow-list after update.');
+  const actual = applied.uri_allow_list.split(',').map((item) => item.trim());
+  if (redirects.some((url) => !actual.includes(url))) throw new Error('Supabase did not apply every redirect URL.');
+  console.log(`Updated redirect allow-list for ${ref}: ${actual.join(', ')}`);
+}
+
 function parseArguments(args) {
-  const options = {organization: '', projectRef: '', projectName: 'piano-duet', region: 'us-east-2', vercelScope: 'eric-fithians-projects'};
+  const options = {organization: '', projectRef: '', projectName: 'piano-duet', region: 'us-east-2', vercelScope: 'eric-fithians-projects', redirectsOnly: false};
   const names = {'--organization': 'organization', '--project-ref': 'projectRef', '--project-name': 'projectName',
     '--region': 'region', '--vercel-scope': 'vercelScope'};
-  for (let index = 0; index < args.length; index += 2) {
+  for (let index = 0; index < args.length;) {
+    if (args[index] === '--redirects-only') { options.redirectsOnly = true; index++; continue; }
     const key = names[args[index]];
     if (!key || !args[index + 1] || args[index + 1].startsWith('--')) throw new Error(`Invalid argument: ${args[index]}`);
     options[key] = args[index + 1];
+    index += 2;
   }
-  if (!options.organization) throw new Error('Specify the Free-plan Supabase organization with --organization.');
+  if (options.redirectsOnly && !options.projectRef) throw new Error('Specify the existing project with --project-ref.');
+  if (!options.redirectsOnly && !options.organization) throw new Error('Specify the Free-plan Supabase organization with --organization.');
   // A Vercel team slug is a single DNS label used in the preview redirect pattern.
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(options.vercelScope)) throw new Error('Invalid Vercel scope.');
   // Supabase project references contain exactly 20 lowercase letters.

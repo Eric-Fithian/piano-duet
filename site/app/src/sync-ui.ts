@@ -24,7 +24,7 @@ export async function setupSyncUi(log: EventLog, refresh: () => Promise<void>): 
     throw new Error("Invalid sync configuration");
   }
   localStorage.setItem("piano-duet.sync-config", JSON.stringify(config));
-  const remote = createClient(config.url, config.anonKey, { auth: { flowType: "pkce" } });
+  const remote = createClient(config.url, config.anonKey, { auth: { flowType: "pkce", detectSessionInUrl: true } });
   panel.innerHTML = `<p class="setting-help">Signing in merges this device's practice attempts, songs, edits, exclusions and learner settings with your account. Audio and models stay on this device. Signing out leaves your history here.</p>
     <p id="syncStatus" role="status" aria-live="polite"></p>
     <p id="syncEmailUnavailable" class="setting-help" hidden>Email sign-in is not available yet. Your progress stays on this device.</p>
@@ -95,7 +95,7 @@ export async function setupSyncUi(log: EventLog, refresh: () => Promise<void>): 
     button.className = "secondary";
     button.textContent = `Continue with ${provider === "apple" ? "Apple" : "Google"}`;
     button.addEventListener("click", () => {
-      void remote.auth.signInWithOAuth({ provider, options: { redirectTo: location.origin + "/" } }).then(({ error }) => {
+      void remote.auth.signInWithOAuth({ provider, options: { redirectTo: location.origin, ...(provider === "google" ? { scopes: "openid email profile" } : {}) } }).then(({ error }) => {
         if (error) status.textContent = `Sign-in failed: ${error.message}`;
       });
     });
@@ -114,4 +114,6 @@ export async function setupSyncUi(log: EventLog, refresh: () => Promise<void>): 
   window.addEventListener("offline", () => { if (sync) status.textContent = "Offline · changes will sync when you reconnect"; });
   window.setInterval(() => { void exchange(); }, 30000);
   remote.auth.onAuthStateChange((_event, value) => { session(value?.user.id, value?.user.email); });
+  const { error } = await remote.auth.initialize();
+  if (error) status.textContent = `Sign-in failed: ${error.message}`;
 }

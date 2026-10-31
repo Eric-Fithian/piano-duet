@@ -17,6 +17,7 @@ function build(outDir, settings) {
   delete env.SUPABASE_URL;
   delete env.SUPABASE_ANON_KEY;
   delete env.SUPABASE_EMAIL_ENABLED;
+  delete env.SUPABASE_GOOGLE_ENABLED;
   Object.assign(env, settings);
   return spawnSync(process.execPath, [vite, 'build', '--config', 'vite.config.ts', '--outDir', outDir], {cwd: site, env, encoding: 'utf8'});
 }
@@ -50,7 +51,7 @@ test('production build serves optional sync configuration and rejects partial co
     assert.equal(missing.status, 0, missing.stderr);
     assert.equal(existsSync(join(absent, 'sync-config.json')), false);
     const configured = join(directory, 'configured');
-    const config = {url: 'https://example.invalid', anonKey: 'synthetic-anon', emailEnabled: false};
+    const config = {url: 'https://example.invalid', anonKey: 'synthetic-anon', emailEnabled: false, providers: []};
     const present = build(configured, {SUPABASE_URL: config.url, SUPABASE_ANON_KEY: config.anonKey});
     assert.equal(present.status, 0, present.stderr);
     assert.deepEqual(JSON.parse(await readFile(join(configured, 'sync-config.json'), 'utf8')), config);
@@ -58,6 +59,10 @@ test('production build serves optional sync configuration and rejects partial co
     const withEmail = build(enabled, {SUPABASE_URL: config.url, SUPABASE_ANON_KEY: config.anonKey, SUPABASE_EMAIL_ENABLED: 'true'});
     assert.equal(withEmail.status, 0, withEmail.stderr);
     assert.deepEqual(JSON.parse(await readFile(join(enabled, 'sync-config.json'), 'utf8')), {...config, emailEnabled: true});
+    const google = join(directory, 'google');
+    const withGoogle = build(google, {SUPABASE_URL: config.url, SUPABASE_ANON_KEY: config.anonKey, SUPABASE_GOOGLE_ENABLED: 'true'});
+    assert.equal(withGoogle.status, 0, withGoogle.stderr);
+    assert.deepEqual(JSON.parse(await readFile(join(google, 'sync-config.json'), 'utf8')), {...config, providers: ['google']});
     assert.equal((await readFile(join(configured, 'service-worker.js'), 'utf8')).includes('/sync-config.json'), false);
     for (const settings of [{SUPABASE_URL: config.url}, {SUPABASE_ANON_KEY: config.anonKey}, {SUPABASE_URL: ''}]) {
       const incomplete = build(join(directory, 'partial'), settings);
@@ -67,17 +72,34 @@ test('production build serves optional sync configuration and rejects partial co
     const invalidEmail = build(join(directory, 'invalid-email'), {SUPABASE_URL: config.url, SUPABASE_ANON_KEY: config.anonKey, SUPABASE_EMAIL_ENABLED: 'yes'});
     assert.notEqual(invalidEmail.status, 0);
     assert.ok(invalidEmail.stderr.includes('SUPABASE_EMAIL_ENABLED must be true or false'));
-    for (const [outDir, expected] of [[absent, 'Account sync is not configured yet.'], [configured, 'Signing in merges'], [enabled, 'Signing in merges']]) {
+    const invalidGoogle = build(join(directory, 'invalid-google'), {SUPABASE_URL: config.url, SUPABASE_ANON_KEY: config.anonKey, SUPABASE_GOOGLE_ENABLED: 'yes'});
+    assert.notEqual(invalidGoogle.status, 0);
+    assert.ok(invalidGoogle.stderr.includes('SUPABASE_GOOGLE_ENABLED must be true or false'));
+    for (const [outDir, expected] of [[absent, 'Account sync is not configured yet.'], [configured, 'Signing in merges'], [enabled, 'Signing in merges'], [google, 'Signing in merges']]) {
       const {server, origin} = await preview(outDir);
       const context = await browser.newContext();
       try {
         await context.route('https://raw.githubusercontent.com/**', (route) => route.abort());
-        if (outDir === configured) {
-          await context.route('**/sync-config.json', (route) => route.fulfill({json: {...config, providers: ['google']}}));
-        }
         let requests = 0;
+        let authorize;
+        let tokenExchanges = 0;
+        let syncRequests = 0;
         await context.route('https://example.invalid/**', (route) => {
           requests++;
+          const url = new URL(route.request().url());
+          if (url.pathname === '/auth/v1/authorize') {
+            authorize = url;
+            return route.fulfill({status: 302, headers: {location: `${origin}/?code=synthetic-code`}});
+          }
+          if (url.pathname === '/auth/v1/token') {
+            tokenExchanges++;
+            const accessToken = `eyJhbGciOiJub25lIn0.${Buffer.from(JSON.stringify({sub: 'synthetic-user', exp: Math.floor(Date.now() / 1000) + 3600})).toString('base64url')}.signature`;
+            return route.fulfill({status: 200, headers: {'Access-Control-Allow-Origin': '*'}, json: {access_token: accessToken, token_type: 'bearer', expires_in: 3600, refresh_token: 'synthetic-refresh', user: {id: 'synthetic-user', email: 'person@example.com', app_metadata: {}, user_metadata: {}, aud: 'authenticated', created_at: '2026-01-01T00:00:00Z'}}});
+          }
+          if (url.pathname.startsWith('/rest/v1/')) {
+            syncRequests++;
+            return route.fulfill({status: 200, headers: {'Access-Control-Allow-Origin': '*'}, json: url.pathname.includes('/rpc/') ? null : []});
+          }
           return route.fulfill({status: 200, json: {}});
         });
         const page = await context.newPage();
@@ -89,7 +111,7 @@ test('production build serves optional sync configuration and rejects partial co
           await page.waitForFunction(() => !document.querySelector('#syncEmailUnavailable').hidden);
           assert.equal(await page.locator('#syncSignIn').isVisible(), false);
           assert.ok((await page.locator('#syncEmailUnavailable').innerText()).includes('Email sign-in is not available yet'));
-          assert.equal(await page.getByRole('button', {name: 'Continue with Google'}).isVisible(), true);
+          assert.equal(await page.getByRole('button', {name: 'Continue with Google'}).count(), 0);
           await page.locator('#syncSignIn input').evaluate((input) => { input.value = 'person@example.com'; });
           await page.locator('#syncSignIn').evaluate((form) => form.dispatchEvent(new Event('submit', {cancelable: true})));
           assert.equal(await page.locator('#syncStatus').innerText(), 'Email sign-in is not available yet.');
@@ -101,6 +123,21 @@ test('production build serves optional sync configuration and rejects partial co
           await page.locator('#syncSignIn button').click();
           await page.waitForFunction(() => document.querySelector('#syncStatus').textContent.includes('Check your email'));
           assert.equal(requests, 1, 'enabled email sign-in sends an OTP request');
+        }
+        if (outDir === google) {
+          const exchanged = page.waitForResponse((response) => response.url().startsWith('https://example.invalid/auth/v1/token'));
+          await page.getByRole('button', {name: 'Continue with Google'}).click();
+          await exchanged;
+          await page.waitForURL((url) => url.origin === origin && !url.searchParams.has('code'));
+          await page.locator('#openSettings').click();
+          await page.getByText('Up to date', {exact: true}).waitFor({timeout: 30000});
+          assert.equal(authorize.searchParams.get('provider'), 'google');
+          assert.equal(authorize.searchParams.get('redirect_to'), origin);
+          assert.equal(authorize.searchParams.get('scopes'), 'openid email profile');
+          assert.ok(authorize.searchParams.get('code_challenge'));
+          assert.equal(tokenExchanges, 1, 'callback exchanges its PKCE code');
+          assert.ok(syncRequests > 0, 'the returned session starts account sync');
+          assert.equal(await page.locator('#syncSignOut').isVisible(), true);
         }
       } finally {
         await context.close();
