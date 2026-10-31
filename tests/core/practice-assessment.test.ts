@@ -66,3 +66,40 @@ print(json.dumps([assess(c['prompt'], [Note.model_validate(n) for n in c['notes'
     assert.deepEqual(actual, expected[index], `case ${index}: ${item.prompt.family}`);
   }
 });
+
+test("recorded Reading assessments match Python at every curriculum stage", () => {
+  const reference = spawnSync("uv", ["run", "--frozen", "python", "-c", `
+import json, sys
+sys.path.insert(0, 'tests')
+from piano_duet.assessment import assess
+from piano_duet.notes import Note
+from piano_duet.reading_stages import STAGES
+from reading_recording import record_composition
+cases = []
+for stage in STAGES:
+    task = record_composition(stage, 7)['score']
+    task['family'] = 'reading'
+    for scenario in ('correct', 'wrong', 'assisted'):
+        notes = [{k: note[k] for k in ('pitch','start','duration','velocity')} for note in task['target']]
+        for note in notes: note['start'] += 1
+        if scenario == 'wrong': notes[0]['pitch'] = 21 if notes[0]['pitch'] != 21 else 22
+        context = {'source':'microphone','notation_visible':True,'hearings':0,'reveals':0,'hints':int(scenario == 'assisted'),'familiar':False}
+        quality = {'usable':True,'reason':'synthetic'}
+        cases.append({'task':task, 'notes':notes, 'context':context, 'quality':quality,
+                      'expected':assess(task, [Note.model_validate(note) for note in notes], context, quality)})
+print(json.dumps(cases))
+`], { encoding: "utf8", maxBuffer: 50_000_000 });
+  assert.equal(reference.status, 0, reference.stderr);
+  const cases: { task: PracticePrompt; notes: PracticeNote[]; context: PracticeContext; quality: PracticeQuality;
+    expected: ReturnType<typeof assessPractice> }[] = JSON.parse(reference.stdout);
+  assert.equal(cases.length, 72);
+  for (const [index, item] of cases.entries()) {
+    const actual = assessPractice(item.task, item.notes, item.context, item.quality);
+    assert.equal(actual.evidence.length, item.expected.evidence.length);
+    for (const [row, evidence] of actual.evidence.entries()) {
+      assert.ok(Math.abs(evidence.value - item.expected.evidence[row].value) < 1e-12, `evidence ${row} in case ${index}`);
+      evidence.value = item.expected.evidence[row].value;
+    }
+    assert.deepEqual(actual, item.expected, `case ${index}`);
+  }
+});

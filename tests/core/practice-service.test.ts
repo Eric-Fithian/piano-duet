@@ -38,8 +38,7 @@ print(json.dumps({'task':task,'events':events,'saved':saved,'profile':profile}))
   assert.equal(reference.status, 0, reference.stderr);
   const expected = JSON.parse(reference.stdout);
   const events: ReadingLogEvent[] = [];
-  const store: LocalEventStore = { async list() { return [...events]; }, async append(kind, payload: LocalJsonValue, id) {
-    if (!id) throw new Error("Expected an explicit event ID");
+  const store: LocalEventStore = { async list() { return [...events]; }, async append(kind, payload: LocalJsonValue, id = crypto.randomUUID()) {
     const event = { id, kind, payload, deviceId: "test-device", clock: events.length + 1, createdAt: "2024-01-01T00:00:00.000Z" };
     events.push(event); return event;
   } };
@@ -102,7 +101,12 @@ print(json.dumps({'task':task, 'events':events}))
   const expected = JSON.parse(reference.stdout);
   const { ReadingReplay } = await import("./reading-replay.ts");
   const replay = new ReadingReplay(expected.events);
-  const service = new LocalService({ async list() { return []; } }, undefined, () => 1000000, undefined, replay, (context) => {
+  const events: ReadingLogEvent[] = [];
+  const store: LocalEventStore = { async list() { return [...events]; }, async append(kind, payload, id = crypto.randomUUID()) {
+    const event = { id, kind, payload, deviceId: "test-device", clock: events.length + 1, createdAt: "2024-01-01T00:00:00.000Z" };
+    events.push(event); return event;
+  } };
+  const service = new LocalService(store, undefined, () => 1000000, undefined, replay, (context) => {
     replay.phrase(context as never);
     return { note: (onset, pitches, durations) => replay.note(onset, [...pitches], [...durations]), chordChance: (pitches) => replay.chordChance(pitches) };
   });
@@ -187,7 +191,11 @@ print(json.dumps(output))
 `], { input: JSON.stringify(bodies), encoding: "utf8" });
   assert.equal(reference.status, 0, reference.stderr);
   const expected = JSON.parse(reference.stdout);
-  const service = new LocalService({ async list() { return []; } });
+  const events: ReadingLogEvent[] = [];
+  const service = new LocalService({ async list() { return [...events]; }, async append(kind, payload, id = crypto.randomUUID()) {
+    const event = { id, kind, payload, deviceId: "test-device", clock: events.length + 1, createdAt: "2024-01-01T00:00:00.000Z" };
+    events.push(event); return event;
+  } });
   for (const [index, body] of bodies.entries()) {
     const response = await service.fetch("/api/practice/next", { method: "POST", body: JSON.stringify(body) });
     assert.equal(response.status, expected[index].status);
@@ -223,9 +231,10 @@ test("ear practice requires hearing and records aided recall correctly", async (
 
 test("a second take cannot save an exercise completed during request processing", async () => {
   const events: ReadingLogEvent[] = [];
-  let delay = false, release: (() => void) | undefined;
+  let delay = false, release: (() => void) | undefined, entered: (() => void) | undefined;
+  const delayedList = new Promise<void>((resolve) => { entered = resolve; });
   const store: LocalEventStore = { async list() {
-    if (delay) { delay = false; await new Promise<void>((resolve) => { release = resolve; }); }
+    if (delay) { delay = false; await new Promise<void>((resolve) => { release = resolve; entered!(); }); }
     return [...events];
   }, async append(kind, payload, id = crypto.randomUUID()) {
     const event = { id, kind, payload, deviceId: "test-device", clock: events.length + 1, createdAt: "2024-01-01T00:00:00.000Z" };
@@ -242,6 +251,7 @@ test("a second take cannot save an exercise completed during request processing"
     { method: "POST", body: new Float32Array(3200).buffer });
   delay = true;
   const delayed = play("5cfb60dc-a9f7-4e10-9b04-033934f96d90");
+  await delayedList;
   assert.ok(release);
   const first = await play("5cfb60dc-a9f7-4e10-9b04-033934f96d91");
   assert.equal(first.status, 200);
@@ -249,4 +259,32 @@ test("a second take cannot save an exercise completed during request processing"
   release();
   assert.equal((await delayed).status, 409);
   assert.equal(events.filter((event) => event.kind === "attempt").length, 1);
+});
+
+test("unfinished tasks and aids survive reload and completed tasks stay closed", async () => {
+  const events: ReadingLogEvent[] = [];
+  const store: LocalEventStore = { async list() { return [...events]; }, async append(kind, payload, id = crypto.randomUUID()) {
+    const event = { id, kind, payload, deviceId: "test-device", clock: events.length + 1, createdAt: "2024-01-01T00:00:00.000Z" };
+    events.push(event); return event;
+  } };
+  let notes: PracticeNote[] = [];
+  const transcriber: LocalPhraseTranscriber = { async run() { return { notes,
+    quality: { usable: true, onset_support: 0.95, supported_fraction: 1, note_support: notes.map(() => 0.95), reason: "synthetic" } }; } };
+  const open = () => new LocalService(store, undefined, () => 1704067200, undefined, undefined, undefined, undefined, undefined, transcriber);
+  let service = open();
+  const task = await (await service.fetch("/api/practice/next", { method: "POST", body: JSON.stringify({ focus: "theory" }) })).json();
+  const aid = (kind: string) => service.fetch(`/api/practice/${task.id}/aid`, { method: "POST", body: JSON.stringify({ kind }) });
+  assert.equal((await (await aid("reveals")).json()).context.reveals, 1);
+  service = open();
+  const aided = await (await aid("hints")).json();
+  assert.equal(aided.context.reveals, 1);
+  assert.equal(aided.context.hints, 1);
+  notes = task.target;
+  const params = new URLSearchParams({ mode: "practice", session: "9cfb60dc-a9f7-4e10-9b04-033934f96d9b", task: task.id });
+  const response = await service.fetch(`/api/respond?${params}`, { method: "POST", body: new Float32Array(3200).buffer });
+  assert.equal(response.status, 200);
+  await response.text();
+  service = open();
+  assert.equal((await aid("hints")).status, 409);
+  assert.equal((await (await service.fetch("/api/profile")).json()).included_attempts, 1);
 });

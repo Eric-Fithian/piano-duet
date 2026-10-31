@@ -42,6 +42,7 @@ import { ScoreError } from "./score-midi.ts";
 import { editSong, revertSong, songAttacks, songStats, songSummary, songVersion } from "./library.ts";
 import type { Song, SongNote } from "./library.ts";
 import { libraryFromEvents } from "./library-events.ts";
+import { practiceTasksFromEvents } from "./practice-task-events.ts";
 import { exportMidi } from "./midi-export.ts";
 import { DuetService } from "./duet-service.ts";
 import type { LocalPhraseTranscriber, LocalDuetGenerator } from "./duet-service.ts";
@@ -52,7 +53,7 @@ import type { LocalVariationAnalyzer } from "./variation-service.ts";
 export type LocalJsonValue = null | boolean | number | string | LocalJsonValue[] | { [key: string]: LocalJsonValue };
 export interface LocalEventStore {
   list(): Promise<ReadingLogEvent[]>;
-  append?(kind: "attempt" | "exclusion" | "song" | "edit", payload: LocalJsonValue, eventId?: string): Promise<ReadingLogEvent>;
+  append?(kind: "attempt" | "exclusion" | "song" | "edit" | "setting", payload: LocalJsonValue, eventId?: string): Promise<ReadingLogEvent>;
 }
 export interface LocalTranscriber {
   run(input: { audio: Float32Array; sampleRate: 16000; threshold: number }, signal?: AbortSignal): Promise<{ notes: unknown[] }>;
@@ -83,6 +84,7 @@ export class LocalService {
   private readonly duetService: DuetService;
   private readonly variationService: VariationService;
   private readonly tasks = new Map<string, { task: PracticeTask; completed: boolean }>();
+  private taskLoading?: Promise<void>;
   private completionBusy = false;
 
   constructor(store: LocalEventStore, transcriber?: LocalTranscriber, now: () => number = () => Date.now() / 1000, assets?: LocalAssets,
@@ -106,6 +108,7 @@ export class LocalService {
 
   async fetch(path: string, options: RequestInit = {}): Promise<Response> {
     options.signal?.throwIfAborted();
+    await this.loadTasks();
     const url = new URL(path, "http://piano.local");
     if (url.origin !== "http://piano.local") throw new Error("Local service requests must use a local path");
     const method = (options.method ?? "GET").toUpperCase();
@@ -268,6 +271,7 @@ export class LocalService {
       }
       if (request.stage != null && focus !== "reading") return Response.json({ detail: "Only reading practice can replay a stage" }, { status: 400 });
       const events = await this.store.list(), attempts = attemptsFromEvents(events);
+      if (!this.store.append) return Response.json({ detail: "Saving practice is not available yet" }, { status: 501 });
       const pieces = piecesFromEvents(events);
       if (request.piece && !pieces.some((piece) => piece.id === request.piece)) return Response.json({ detail: "Unknown practice piece" }, { status: 404 });
       const profile = learnerProfile(attempts, this.now());
@@ -283,7 +287,7 @@ export class LocalService {
       const task = generatePracticeTask(profile as unknown as Parameters<typeof generatePracticeTask>[0],
         focus as Parameters<typeof generatePracticeTask>[1], crypto.randomUUID(), this.rng, this.now(), pieces,
         attempts as unknown as Parameters<typeof generatePracticeTask>[6], request.piece);
-      this.tasks.set(task.id, { task, completed: false });
+      await this.saveTask(task);
       return Response.json(task);
     }
     const parts = url.pathname.split("/").filter(Boolean);
@@ -317,6 +321,10 @@ export class LocalService {
       if (typeof options.body !== "string") return Response.json({ detail: "An aid request needs JSON" }, { status: 400 });
       const request = JSON.parse(options.body) as { kind?: "hearings" | "reveals" | "hints" };
       if (request.kind !== "hearings" && request.kind !== "reveals" && request.kind !== "hints") return Response.json({ detail: "Invalid aid" }, { status: 422 });
+      if (!("drill" in task)) {
+        if (!this.store.append) return Response.json({ detail: "Saving practice is not available yet" }, { status: 501 });
+        await this.store.append("setting", { type: "practice-aid", taskId: task.id, kind: request.kind });
+      }
       task.context[request.kind]++;
       return Response.json(task);
     }
@@ -326,6 +334,19 @@ export class LocalService {
     if (method === "POST" && url.pathname === "/api/respond" && (url.searchParams.get("mode") ?? "duet") === "duet") return this.duetService.respond(url, options);
     if (method === "POST" && url.pathname === "/api/respond" && url.searchParams.get("mode") === "learning") return this.variationService.respond(url, options);
     return Response.json({ detail: `Local service does not yet implement ${method} ${url.pathname}` }, { status: 501 });
+  }
+
+  private async loadTasks(): Promise<void> {
+    this.taskLoading ??= this.store.list().then((events) => {
+      for (const [id, entry] of practiceTasksFromEvents<PracticeTask>(events)) this.tasks.set(id, entry);
+    });
+    await this.taskLoading;
+  }
+
+  private async saveTask(task: ReadingTask | GeneratedPracticeTask): Promise<void> {
+    if (!this.store.append) throw new Error("Saving practice is not available");
+    await this.store.append("setting", { type: "practice-task", task: structuredClone(task) } as unknown as LocalJsonValue);
+    this.tasks.set(task.id, { task, completed: false });
   }
 
   private async libraryRequest(method: string, parts: string[], options: RequestInit): Promise<Response> {
@@ -420,7 +441,7 @@ export class LocalService {
       instruction: candidate.instruction + (stepByStep ? " There is no time limit; the score waits for the right note." : ""),
       context: { notation_visible: true, hearings: 0, reveals: 0, hints: 0, familiar: false,
         ...(stepByStep ? { interaction: "step_by_step", introduction: candidate.reading.introduce !== null } : {}) } };
-    this.tasks.set(task.id, { task, completed: false });
+    await this.saveTask(task);
     return Response.json(task);
   }
 
