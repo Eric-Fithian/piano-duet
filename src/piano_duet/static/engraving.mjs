@@ -106,10 +106,7 @@ function buildBars(model, doc, clefs, flats) {
     const voices = clefs.flatMap(clef => parts[clef].map(layer => layer.voice));
     const formatter = new Formatter();
     for (const clef of clefs) formatter.joinVoices(parts[clef].map(layer => layer.voice));
-    const onsets = new Set(clefs.flatMap(clef => parts[clef].flatMap(layer => layer.notes.map(item => item.part.start)))).size;
-    // Dense bars need room between noteheads even when the formatter's minimum permits them to touch.
-    const clearance = 10 + Math.max(0, onsets - 2) * 24;
-    return {source: bar, parts, voices, formatter, minimum: formatter.preCalculateMinTotalWidth(voices) + clearance};
+    return {source: bar, parts, voices, formatter, minimum: formatter.preCalculateMinTotalWidth(voices) + 10};
   });
 }
 
@@ -267,6 +264,7 @@ function engraveSpaced(doc, host, options, extraSpace, attempt) {
     delete system.renderer;
     delete system.staves;
   }
+  // VexFlow's minimum can let dense noteheads touch, so feed measured deficits back into the system plan.
   const deficits = new Map();
   for (const system of systems) for (const clef of clefs) {
     const columns = new Map();

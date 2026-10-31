@@ -123,6 +123,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) {
         }));
         assert.ok(gaps.length && Math.min(...gaps) >= 0.5, `${width}: adjacent notehead gaps in staff spaces: ${gaps.join(', ')}`);
         if (width === 393) assert.ok(await page.evaluate(() => window.scoreFixture.phrase.systems.length > 1));
+        if (width === 1440) assert.equal(await page.evaluate(() => window.scoreFixture.phrase.systems.length), 1);
       }
     } finally {
       await context.close();
