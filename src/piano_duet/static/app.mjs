@@ -9,8 +9,10 @@ import {DrillPicker, attackPlan, followPosition, heardAttacks, planSession, play
 import {METERS, SongEditor, musicalKey} from './song_editor.mjs';
 import {readLearnerSetting, refreshLearnerSettings, writeLearnerSetting} from './learner-settings.mjs';
 import {ENABLED_MODES} from './enabled_modes.mjs';
+import {setupAppearance} from './appearance.mjs';
 
 const $ = id => document.getElementById(id);
+const appearance = setupAppearance({root: document.documentElement, theme: $('appearanceTheme'), night: $('nightPage'), storage: localStorage, system: matchMedia('(prefers-color-scheme: dark)')});
 const ALL_MODES = ['practice', 'reading', 'drills', 'library', 'duet', 'learning'];
 const EMPTY_SCORE = '<span aria-hidden="true">𝄞</span><p>Start with a few notes.</p><small>Your music will appear here.</small>';
 // What each part of the app shows on top of the music. The player's own layout, zoom, look-ahead and following
@@ -971,6 +973,7 @@ function status(text, color = '#9ab89d') {
 }
 
 function buttons() {
+  appearance.setLocked(Boolean(microphone));
   $('songEdit').disabled = busy || Boolean(songEditor);
   $('start').disabled = !ready || (!microphone && busy && !previewing) || (mode === 'library' && !song);
   $('start').setAttribute('aria-pressed', Boolean(microphone));

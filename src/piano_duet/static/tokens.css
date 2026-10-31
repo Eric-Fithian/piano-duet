@@ -1,0 +1,66 @@
+/* Generated from design/brand/tokens.json by generate-css-tokens.mjs. */
+:root, [data-theme=light] {
+  --folio-bg: #f5f1e8;
+  --folio-surface: #fffdf8;
+  --folio-raised: #eee8db;
+  --folio-text: #1c2821;
+  --folio-muted: #4e5d52;
+  --folio-border: #6c796d;
+  --folio-action: #286b4c;
+  --folio-onAction: #ffffff;
+  --folio-focus: #56447e;
+  --folio-paper: #fffdf8;
+  --folio-ink: #0b100d;
+  --folio-correct: #174f2b;
+  --folio-error: #a83e1f;
+  --folio-cursor: #357db0;
+  --folio-nightPaper: #1c2a23;
+  --folio-nightInk: #f5ebd8;
+  --folio-progress: #286b4c;
+  --folio-successSurface: #d6eddd;
+  --folio-nightError: #c36e48;
+  --folio-success: #18532d;
+  --folio-warning: #785009;
+  --folio-errorText: #9f3c21;
+  --folio-mark: #286b4c;
+  --folio-rewardFill: #e9b949;
+  --folio-onReward: #0b100d;
+  --folio-nightCursor: #65b6e8;
+  --folio-nightCorrect: #9dd5b0;
+}
+[data-theme=dark] {
+  --folio-bg: #14211a;
+  --folio-surface: #203027;
+  --folio-raised: #304338;
+  --folio-text: #f7f2e8;
+  --folio-muted: #d4decf;
+  --folio-border: #98ab9a;
+  --folio-action: #286b4c;
+  --folio-onAction: #ffffff;
+  --folio-focus: #d5c7f4;
+  --folio-paper: #e9dfcd;
+  --folio-ink: #0b100d;
+  --folio-correct: #174f2b;
+  --folio-error: #a83e1f;
+  --folio-cursor: #357db0;
+  --folio-nightPaper: #1c2a23;
+  --folio-nightInk: #f5ebd8;
+  --folio-progress: #9dd5b0;
+  --folio-successSurface: #304b39;
+  --folio-nightError: #c36e48;
+  --folio-success: #a8dbb2;
+  --folio-warning: #f2cf8b;
+  --folio-errorText: #ffb9aa;
+  --folio-mark: #9dd5b0;
+  --folio-rewardFill: #efc15d;
+  --folio-onReward: #0b100d;
+  --folio-nightCursor: #65b6e8;
+  --folio-nightCorrect: #9dd5b0;
+}
+[data-night=true] {
+  --folio-paper: var(--folio-nightPaper);
+  --folio-ink: var(--folio-nightInk);
+  --folio-correct: var(--folio-nightCorrect);
+  --folio-error: var(--folio-nightError);
+  --folio-cursor: var(--folio-nightCursor);
+}

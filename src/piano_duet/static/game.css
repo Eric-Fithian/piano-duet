@@ -1,30 +1,32 @@
 :root {
-  --bg: #0b0f15; --panel: #121821; --panel-2: #18202b; --line: #273140; --line-strong: #3a4659;
-  --text: #ebe9e3; --muted: #8b97a8; --dim: #5d6879;
-  --gold: #f1aa1c; --red: #ef5a4c; --green: #45d483; --cyan: #38c6e8; --yellow: #f5c93d; --pink: #e0589a;
-  --paper: #f6f3e9;
-  --display: "DIN Alternate", "DIN Condensed", -apple-system, sans-serif;
-  color: var(--text); background: var(--bg);
+  --bg: var(--folio-bg); --panel: var(--folio-surface); --panel-2: var(--folio-raised);
+  --line: var(--folio-border); --line-strong: var(--folio-border);
+  --text: var(--folio-text); --muted: var(--folio-muted); --dim: var(--folio-muted);
+  --gold: var(--folio-rewardFill); --red: var(--folio-errorText); --green: var(--folio-progress);
+  --cyan: var(--folio-cursor); --yellow: var(--folio-rewardFill); --pink: var(--folio-errorText);
+  --paper: var(--folio-paper); --display: Atkinson, sans-serif;
+  color: var(--text); background: var(--bg); color-scheme: light;
 }
-body.piano-app { background: radial-gradient(120% 80% at 50% -10%, #172030 0%, var(--bg) 60%) fixed; }
-:focus-visible { outline-color: var(--gold); }
+[data-theme=dark] { color-scheme: dark; }
+body.piano-app { background: var(--bg); font-family: Atkinson, sans-serif; font-variant-numeric: tabular-nums; }
+:focus-visible { outline-color: var(--folio-focus); }
 
 /* Shared type */
 .eyebrow, .rule-heading, .hud-tag, .key-cap, .level-caption, .career-stats dt, .xp-toast-label {
-  font-family: var(--display); text-transform: uppercase; letter-spacing: 1.4px;
+  font-family: var(--display); text-transform: none; letter-spacing: normal;
 }
 .rule-heading { display: flex; align-items: center; gap: 14px; margin: 0 0 14px; font-size: 14px; font-weight: 700; color: var(--text); }
 .rule-heading::after { content: ''; flex: 1; height: 1px; background: var(--line-strong); }
 .rule-heading > span { color: var(--muted); font-size: 12px; }
 .dialog-heading h2, .practice-panel h2, .skill-card h3, .attempt-detail h3, .reading-stat strong, .practice-result>strong, .learning-result strong {
-  font-family: var(--display) !important; font-weight: 700; letter-spacing: .5px;
+  font-family: Fraunces, serif !important; font-weight: 600; letter-spacing: normal;
 }
-.dialog-heading h2 { font-size: 20px !important; text-transform: uppercase; letter-spacing: 1.6px; }
+.dialog-heading h2 { font-size: 22px !important; text-transform: none; letter-spacing: normal; }
 
 /* Buttons */
-button { border-radius: 6px; }
-.primary { background: var(--gold); color: #15120a; font-family: var(--display); text-transform: uppercase; letter-spacing: 1.2px; }
-.primary:hover:not(:disabled) { background: #f7bd45; }
+button { border-radius: 4px; }
+.primary { background: var(--folio-action); color: var(--folio-onAction); border-color: var(--folio-action); font-family: var(--display); text-transform: none; letter-spacing: normal; }
+.primary:hover:not(:disabled) { filter: brightness(1.1); }
 .secondary, .stop { background: var(--panel-2); border-color: var(--line-strong); color: var(--text); }
 .icon-button { display: inline-grid; place-items: center; width: 38px; height: 38px; padding: 0; background: transparent; color: var(--muted); border: 1px solid transparent; }
 .icon-button:hover:not(:disabled) { color: var(--text); background: #ffffff0d; border-color: var(--line); }
@@ -38,7 +40,7 @@ button { border-radius: 6px; }
 .mark i:nth-child(1) { background: var(--red); } .mark i:nth-child(2) { background: var(--yellow); }
 .mark i:nth-child(3) { background: var(--green); } .mark i:nth-child(4) { background: var(--cyan); }
 .app-header .mode-switch { position: absolute; left: 50%; transform: translateX(-50%); border: 0; background: none; gap: 2px; padding: 0; }
-.mode-switch button { font-family: var(--display); text-transform: uppercase; letter-spacing: 1.4px; font-size: 14px; color: var(--muted); padding: 7px 16px; border: 1.5px solid transparent; border-radius: 999px; background: none; }
+.mode-switch button { font-family: var(--display); text-transform: none; letter-spacing: normal; font-size: 14px; color: var(--muted); padding: 7px 16px; border: 1.5px solid transparent; border-radius: 999px; background: none; }
 .mode-switch button:hover:not(:disabled) { color: var(--text); }
 .mode-switch button[aria-pressed=true] { color: var(--text); border-color: var(--text); background: none; }
 .header-actions { gap: 8px; }
@@ -200,9 +202,9 @@ button { border-radius: 6px; }
 @keyframes banner { 0% { opacity: 0; transform: scaleY(.2); } 12% { opacity: 1; transform: none; } 82% { opacity: 1; } 100% { opacity: 0; } }
 
 /* Dialog chrome */
-dialog { background: #10151d; border: 1px solid var(--line-strong); border-radius: 12px; color: var(--text); }
+dialog { background: var(--panel); border: 1px solid var(--line-strong); border-radius: 4px; color: var(--text); }
 dialog::backdrop { background: #05080cc4; backdrop-filter: blur(8px); }
-.dialog-heading { background: #10151d; }
+.dialog-heading { background: var(--panel); }
 .help-actions { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
 .help-actions .setting-help { margin: 10px 0 0; }
 

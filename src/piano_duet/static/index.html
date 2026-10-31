@@ -210,6 +210,13 @@
     <div class="controls">
       <div class="session-info"><span id="turnCount">YOUR FIRST SESSION</span><p>Audio and AI stay on your Mac.</p></div>
           <div class="session-actions"><button id="reset" class="text-button" disabled hidden>Clear conversation</button><button id="export" class="text-button" disabled hidden>Save MIDI ↓</button></div>
+      <section class="appearance-settings" aria-labelledby="appearanceHeading">
+        <h3 id="appearanceHeading">Appearance</h3>
+        <label for="appearanceTheme">Theme</label>
+        <select id="appearanceTheme"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select>
+        <label class="check-setting" for="nightPage"><input id="nightPage" type="checkbox"> Night page</label>
+        <p class="setting-help">Appearance is held steady while the microphone is on.</p>
+      </section>
       <h3>Listening</h3>
           <label for="microphone">Microphone</label><select id="microphone"><option value="">System default</option></select>
           <p class="setting-help">Choose an input before enabling your microphone. Stay quiet for the first second while it calibrates.</p>

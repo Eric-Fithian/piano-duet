@@ -47,6 +47,8 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 24
+      - run: node design/brand/generate-css-tokens.mjs --check
+      - run: node design/brand/contrast.mjs
       - run: node --test tests/*.test.mjs
 
   core:
