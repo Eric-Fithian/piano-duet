@@ -150,6 +150,10 @@ async function listenLive(audio, threshold) {
 
 self.onmessage = async ({ data }) => {
   try {
+    if (data.wasmThreads !== undefined) {
+      if (!Number.isInteger(data.wasmThreads) || data.wasmThreads < 1 || data.wasmThreads > navigator.hardwareConcurrency) throw new Error("Invalid WASM thread limit");
+      ort.env.wasm.numThreads = data.wasmThreads;
+    }
     const value = data.action === "prepare" ? await prepareLive()
       : data.action === "listen" ? await listenLive(data.audio, data.threshold)
       : await measure(data.model, data.backend, data.verbose);
