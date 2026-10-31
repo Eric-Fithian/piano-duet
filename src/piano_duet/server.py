@@ -55,6 +55,7 @@ from piano_duet.reading_curriculum import measure_landings
 from piano_duet.reading_music import reading_attacks
 from piano_duet.reading_rewards import score_xp
 from piano_duet.reading_stages import STAGES
+from piano_duet.recording_audio import decode_recording
 from piano_duet.recording_transcription import SAMPLE_RATE as RECORDING_RATE
 from piano_duet.recording_transcription import RecordingTranscriber
 from piano_duet.score_import import ScoreError, build_song, parse_score
@@ -569,6 +570,28 @@ def create_app(
         song = build_song(parse_score(filename, data), title, artist, filename)
         stored = app.state.store.add_song({"id": str(uuid4()), **song})
         return summary(stored, [])
+
+    @app.post("/api/library/import-audio")
+    async def import_recording(request: Request, filename: str = Query(min_length=1, max_length=200),
+                               rights: Literal["1"] = Query()):
+        if app.state.busy or app.state.reading_busy:
+            raise HTTPException(409, "The piano is processing another performance")
+        data = await request.body()
+        app.state.busy = True
+
+        def perform():
+            audio = decode_recording(data)
+            if app.state.recording is None:
+                app.state.recording = RecordingTranscriber()
+            notes = app.state.recording.transcribe(audio, Event(), lambda _progress: None)
+            song = build_song(performance_to_score(notes), Path(filename).stem, None, filename, transcribed=True)
+            stored = app.state.store.add_song({"id": str(uuid4()), **song})
+            return summary(stored, [])
+
+        loop = asyncio.get_running_loop()
+        future = executor.submit(perform)
+        future.add_done_callback(lambda _job: loop.call_soon_threadsafe(setattr, app.state, "busy", False))
+        return await asyncio.wrap_future(future)
 
     @app.post("/api/library/youtube")
     async def import_youtube(payload: YoutubeRequest):

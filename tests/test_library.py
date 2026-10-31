@@ -1,5 +1,7 @@
+import io
 import json
 import struct
+import wave
 from uuid import uuid4
 
 import numpy as np
@@ -281,3 +283,44 @@ def test_a_grace_note_is_kept_on_the_beat_of_the_note_it_ornaments():
     assert (grace["pitch"], grace["start"], grace["staff"]) == (78, main["start"], "treble")
     assert grace["duration"] > 0 and not any(note.get("grace") for note in song["notes"] if note is not grace)
     assert [note["pitch"] for note in song["notes"] if not note.get("grace")] == [48, 72, 79]
+
+
+def test_local_recording_import_transcribes_and_saves_without_writing_audio(client, monkeypatch):  # noqa: F811
+    notes = [Note(pitch=60 + i % 12, start=i * 0.3, duration=0.3, velocity=80) for i in range(16)]
+    monkeypatch.setattr("piano_duet.server.decode_recording", lambda data: np.ones(44100, dtype=np.float32))
+    monkeypatch.setattr("piano_duet.server.RecordingTranscriber", lambda: Recording(notes))
+    monkeypatch.setattr("piano_duet.server.performance_to_score", lambda result: {
+        "notes": [{"pitch": note.pitch, "beat": i / 2, "length": 0.5, "velocity": 80, "staff": "treble"}
+                  for i, note in enumerate(result)],
+        "meters": [(0, "4/4")], "measures": [0.0, 4.0], "bpm": 90, "key": None,
+        "title": None, "composer": None, "pickup": 0,
+    })
+    assert client.post("/api/library/import-audio?filename=take.wav", content=b"audio", headers=HEADERS).status_code == 422
+    response = client.post("/api/library/import-audio?filename=take.wav&rights=1", content=b"audio", headers=HEADERS)
+    assert response.status_code == 200
+    assert response.json()["title"] == "take"
+    assert client.get("/api/library").json()["songs"][0]["title"] == "take"
+    assert not client.app.state.busy
+
+
+def test_recording_decoder_rejects_empty_and_invalid_audio():
+    from piano_duet.recording_audio import decode_recording
+
+    with pytest.raises(ScoreError, match="under 100 MB"):
+        decode_recording(b"")
+    with pytest.raises(ScoreError, match="could not be decoded"):
+        decode_recording(b"not audio")
+
+
+def test_recording_decoder_reads_audio_in_memory():
+    from piano_duet.recording_audio import decode_recording
+
+    output = io.BytesIO()
+    with wave.open(output, "wb") as recording:
+        recording.setnchannels(1)
+        recording.setsampwidth(2)
+        recording.setframerate(44100)
+        recording.writeframes(np.full(4410, 4096, dtype="<i2").tobytes())
+    audio = decode_recording(output.getvalue())
+    assert len(audio) == 4410
+    assert np.allclose(audio, 0.125)
