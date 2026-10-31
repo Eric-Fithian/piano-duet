@@ -9,6 +9,7 @@ import { startTestServer } from "../web/server.mjs";
 import { browserProfile } from "./browser-profile.mjs";
 import { waitForCreativeProgress } from "./creative-progress.mjs";
 import { hasSpacedOnsets } from "./capture-onsets.mjs";
+import { installDeterministicCapture } from "./creative-capture-seam.mjs";
 
 const started = performance.now();
 let page;
@@ -20,6 +21,7 @@ async function diagnostic(condition) {
 }
 const provider = process.env.PIANO_CREATIVE_PROVIDER ?? "webgpu";
 const phraseProvider = process.env.PIANO_CREATIVE_PHRASE_PROVIDER ?? provider;
+const deterministicCapture = process.env.PIANO_CREATIVE_CAPTURE_SEAM === "1";
 if (![provider, phraseProvider].every((value) => ["webgpu", "wasm"].includes(value))) throw new Error("Choose webgpu or wasm for the creative microphone test");
 const sample = await readFile(".cache/browser-inference/C4.mp3");
 const entry = { pitch: 60, file: "C4.mp3", sha256: "a265c8cfd4140cf27b55054b4953b6c691fce3523530ca8ae0faed5e4cd39063", bytes: 239164 };
@@ -42,6 +44,7 @@ try {
   await browser.route("https://raw.githubusercontent.com/**/local-fixture/samples/piano/C4.mp3", (route) => route.fulfill({ body: sample,
     headers: { "Content-Type": "audio/mpeg", "Access-Control-Allow-Origin": "*", "Cross-Origin-Resource-Policy": "cross-origin" } }));
   page = await browser.newPage();
+  if (deterministicCapture) await page.addInitScript(installDeterministicCapture);
   const errors = [];
   page.on("pageerror", (error) => errors.push(String(error)));
   page.on("console", (message) => process.stderr.write(`Page ${message.type()}: ${message.text()}\n`));
@@ -139,19 +142,42 @@ try {
       await diagnostic(`${label}: microphone-ready signal did not remain visible: ${JSON.stringify(ready)}`));
     process.stderr.write(`${label}: microphone-ready signal ${JSON.stringify(ready)}\n`);
   };
+  let checkedCaptures = 0;
   const waitForProgress = (label, kind, turn) => waitForCreativeProgress({ label, diagnostic, errors,
-    pause: () => page.waitForTimeout(1000), read: () => page.evaluate(({ kind, turn }) => {
+    pause: () => page.waitForTimeout(1000), read: async () => {
+      const state = await page.evaluate(({ kind, turn }) => {
         const error = document.querySelector("#error"), status = document.querySelector("#status")?.textContent;
         return { status, timing: document.querySelector("#timing")?.textContent, error: error.hidden ? null : error.textContent,
           download: document.querySelector(".asset-download")?.textContent, providers: window.__duetTest.providers,
-          progress: window.__duetTest.progress,
+          progress: window.__duetTest.progress, captures: window.__duetTest.captures.length,
           done: kind === "duet" ? document.querySelector("#turnCount")?.textContent.includes(`${turn} EXCHANGES`)
             : kind === "idea" ? status === "Your turn. Play back the target." : !document.querySelector("#learningResult").hidden };
-    }, { kind, turn }) });
+      }, { kind, turn });
+      if (state.captures > checkedCaptures) {
+        await assertCaptureSpacing(label, kind === "duet" ? 4 : 3);
+        checkedCaptures = state.captures;
+      }
+      return state;
+    } });
   const play = async (pitches = [60, 64, 67, 72], spacing = 0.5, duration = 0.35) => {
-    const scheduled = await page.evaluate(async ({ path, pitches, spacing, duration }) => {
+    const scheduled = await page.evaluate(async ({ path, pitches, spacing, duration, deterministicCapture }) => {
       const { PianoSound } = await import(`${path}/audio.mjs`);
       const { audio, destination } = window.__duetTest;
+      if (deterministicCapture) {
+        const seconds = 0.25 + (pitches.length - 1) * spacing + duration + 1.5;
+        const offline = new OfflineAudioContext(1, Math.ceil(seconds * 16000), 16000);
+        const piano = new PianoSound(offline);
+        await piano.load();
+        for (const [index, pitch] of pitches.entries()) {
+          piano.play({ pitch, start: 0, duration, velocity: 90 }, 0.25 + index * spacing, offline, offline.destination);
+        }
+        const rendered = await offline.startRendering();
+        const status = document.querySelector("#status")?.textContent;
+        if (!status?.startsWith("Your turn")) throw new Error(`Microphone was not ready when synthetic audio was delivered: ${status}`);
+        window.__duetTest.expected = { pitches, spacing, performanceSeconds: (pitches.length - 1) * spacing + duration, sampleRate: 16000 };
+        await window.__duetTest.inject(rendered.getChannelData(0));
+        return { deterministic: true, samples: rendered.length, pitches };
+      }
       const piano = new PianoSound(audio);
       await piano.load();
       const status = document.querySelector("#status")?.textContent;
@@ -164,14 +190,14 @@ try {
         piano.play({ pitch, start: 0, duration, velocity: 90 }, when, audio, destination);
       }
       return { scheduled: start, audioTime: audio.currentTime, status, pitches, guard: window.__duetTest.guard };
-    }, { path: staticBase, pitches, spacing, duration });
+    }, { path: staticBase, pitches, spacing, duration, deterministicCapture });
     process.stderr.write(`Scheduled synthetic piano: ${JSON.stringify(scheduled)}\n`);
   };
   const assertCaptureSpacing = async (label, expectedCount) => {
     const capture = await page.evaluate(() => window.__duetTest.captures.at(-1));
     assert.ok(capture && capture.sampleRate === 16000 && capture.expected?.pitches.length === expectedCount
       && hasSpacedOnsets(capture.onsets, expectedCount, capture.expected.spacing, 0.15),
-    await diagnostic(`${label}: captured PCM did not preserve the scheduled notes: ${JSON.stringify(capture)}`));
+    await diagnostic(`${label}: harness input corrupted; captured PCM did not preserve the scheduled notes: ${JSON.stringify(capture)}`));
   };
   await waitForListening("First Duet phrase");
   await play();

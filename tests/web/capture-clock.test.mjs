@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { after, before, test } from "node:test";
 import { chromium, webkit } from "playwright";
+import { installDeterministicCapture } from "../inference/creative-capture-seam.mjs";
 
 const files = Object.fromEntries(["capture.js", "audio.mjs", "practice.mjs", "learning.mjs"]
   .map((name) => [`/${name}`, readFileSync(`src/piano_duet/static/${name}`)]));
@@ -75,3 +76,29 @@ for (const [name, engine] of [["Chromium", chromium], ["WebKit", webkit]]) {
     } finally { await browser.close(); }
   });
 }
+
+test("hosted creative capture delivers complete timestamped chunks through the worklet handler", { timeout: 30000 }, async () => {
+  const browser = await chromium.launch({ headless: true, channel: "chromium", args: ["--autoplay-policy=no-user-gesture-required"] });
+  try {
+    const page = await browser.newPage();
+    await page.addInitScript(installDeterministicCapture);
+    await page.goto(`http://127.0.0.1:${server.address().port}/`);
+    const result = await page.evaluate(async () => {
+      window.__duetTest = {};
+      const context = new AudioContext({ sampleRate: 16000 });
+      await context.resume();
+      await context.audioWorklet.addModule("/capture.js");
+      const node = new AudioWorkletNode(context, "piano-capture"), received = [];
+      node.port.onmessage = ({ data }) => received.push({ capturedAt: data.capturedAt, samples: Array.from(data.samples) });
+      const audio = Float32Array.from({ length: 2500 }, (_, index) => index / 2500);
+      await window.__duetTest.inject(audio);
+      node.port.onmessage = null;
+      await context.close();
+      return { received, expected: Array.from(audio) };
+    });
+    assert.deepEqual(result.received.flatMap((chunk) => chunk.samples), result.expected);
+    assert.deepEqual(result.received.map((chunk) => chunk.samples.length), [1024, 1024, 452]);
+    assert.ok(Math.abs(result.received[1].capturedAt - result.received[0].capturedAt - 1024 / 16000) < 1e-8);
+    assert.ok(Math.abs(result.received[2].capturedAt - result.received[1].capturedAt - 1024 / 16000) < 1e-8);
+  } finally { await browser.close(); }
+});
