@@ -4,6 +4,8 @@ import wasmModuleUrl from "onnxruntime-web/ort-wasm-simd-threaded.asyncify.mjs?u
 import { scoreInput } from "../../../src/core/score-input.ts";
 import { scoreMusicXml } from "../../../src/core/score-output.ts";
 import type { ScoreInputNote } from "../../../src/core/score-input.ts";
+import { describeInferenceBackend, initializeWithWebGPUFallback } from "./inference";
+import type { InferenceBackendRecord } from "./inference";
 import { ModelStore } from "./model-store";
 import type { ModelAsset, ModelRole } from "./browser-inference";
 import { RecordingPool } from "./recording-pool";
@@ -21,7 +23,7 @@ ort.env.wasm.wasmPaths = { wasm: new URL(wasmUrl, self.location.origin).href,
 const store = new ModelStore(), controllers = new Map<number, AbortController>();
 let pool: RecordingPool | undefined, score: ScoreRuntime | undefined, busy = false;
 
-async function open(id: number, recording: ModelAsset[], files: ModelAsset[], signal: AbortSignal): Promise<void> {
+async function open(id: number, recording: ModelAsset[], files: ModelAsset[], signal: AbortSignal): Promise<InferenceBackendRecord> {
   if (pool || score) throw new Error("Recording import is already open");
   const cancellation = new AbortController();
   signal.throwIfAborted();
@@ -45,7 +47,8 @@ async function open(id: number, recording: ModelAsset[], files: ModelAsset[], si
       const encoder = await load(files, "score-encoder"), first = await load(files, "score-first");
       const context = await load(files, "score-context"), step = await load(files, "score-step");
       cancellation.signal.throwIfAborted();
-      return ScoreRuntime.open({ encoder, first, context, step }, provider);
+      return initializeWithWebGPUFallback("midi-to-score", provider,
+        (selected) => ScoreRuntime.open({ encoder, first, context, step }, selected), cancellation.signal);
     }),
     guard(async () => {
       const features = await load(recording, "features"), attributes = await load(recording, "attributes");
@@ -53,11 +56,13 @@ async function open(id: number, recording: ModelAsset[], files: ModelAsset[], si
       return RecordingPool.open(features, attributes, count, Math.max(1, Math.floor(navigator.hardwareConcurrency / count)));
     }),
   ]);
-  if (written.status === "fulfilled") score = written.value;
+  if (written.status === "fulfilled") score = written.value.value;
   if (transcriber.status === "fulfilled") pool = transcriber.value;
   if (written.status === "rejected" || transcriber.status === "rejected") throw failure ?? new Error("Could not initialize recording import");
   signal.throwIfAborted();
-  self.postMessage({ id, stage: `Ready · ${provider.toUpperCase()} score writing` });
+  if (written.status !== "fulfilled") throw new Error("Score model did not initialize");
+  self.postMessage({ id, stage: `Ready · ${describeInferenceBackend({ model: "midi-to-score", ...written.value.backend })}` });
+  return written.value.backend;
 }
 
 async function run(id: number, audio: Float32Array, signal: AbortSignal): Promise<{ musicXml: string; notes: ScoreInputNote[] }> {
@@ -101,6 +106,10 @@ self.onmessage = async ({ data }: MessageEvent<Request>) => {
   } catch (error) {
     await close();
     self.postMessage({ id: data.id, error: error instanceof Error ? error.message : String(error),
-      errorName: error instanceof Error ? error.name : "Error" });
+      errorName: error instanceof Error ? error.name : "Error", errorStack: error instanceof Error ? error.stack : undefined,
+      errorCauses: error instanceof AggregateError ? error.errors.map((cause: unknown) => ({
+        message: cause instanceof Error ? cause.message : String(cause), name: cause instanceof Error ? cause.name : "Error",
+        stack: cause instanceof Error ? cause.stack : undefined,
+      })) : undefined });
   } finally { controllers.delete(data.id); busy = false; }
 };

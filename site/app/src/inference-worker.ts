@@ -97,7 +97,7 @@ async function open(id: number, name: ModelId, files: ModelAsset[], preference: 
     const first = await (await asset("score-first")).arrayBuffer();
     const context = await (await asset("score-context")).arrayBuffer();
     const step = await (await asset("score-step")).arrayBuffer();
-    scoreRuntime = await initializeProvider(() => ScoreRuntime.open({ encoder, first, context, step }, provider));
+    scoreRuntime = await ScoreRuntime.open({ encoder, first, context, step }, provider);
   } else {
     options.graphOptimizationLevel = "disabled";
     if (provider === "webgpu") {

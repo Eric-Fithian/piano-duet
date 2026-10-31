@@ -18,7 +18,7 @@ import { WebKitInferenceTransport } from "./webkit-inference-transport";
 import type { WebKitMessageHandler } from "./webkit-inference-transport";
 import { MODEL_CATALOG } from "./model-catalog";
 import { describeInferenceBackend } from "./inference";
-import type { DownloadProgress, InferenceSession, ModelId } from "./inference";
+import type { DownloadProgress, InferenceBackendRecord, InferenceSession, ModelId } from "./inference";
 import { EventLog, requestPersistentStorage } from "./event-log";
 import { PIANO_SAMPLES } from "./piano-samples";
 import { SampleStore } from "./sample-store";
@@ -74,10 +74,13 @@ async function start(): Promise<void> {
   const backendStatus = document.createElement("p"), backends = new Map<ModelId, string>();
   backendStatus.setAttribute("aria-live", "polite");
   settings.append(backendStatus);
+  const reportBackend = (model: ModelId, record: InferenceBackendRecord) => {
+    backends.set(model, describeInferenceBackend({ model, provider: record.provider, fallback: record.fallback }));
+    backendStatus.textContent = `Model backends: ${[...backends.values()].join("; ")}`;
+  };
   const openSession = async <K extends ModelId>(model: K, signal?: AbortSignal): Promise<InferenceSession<K>> => {
     const session = await backend.createSession(model, report, signal);
-    backends.set(model, describeInferenceBackend(session));
-    backendStatus.textContent = `Model backends: ${[...backends.values()].join("; ")}`;
+    reportBackend(model, session);
     return session;
   };
   let live: Promise<InferenceSession<"live-transcription">> | undefined;
@@ -142,7 +145,7 @@ async function start(): Promise<void> {
     indicator.hidden = true; recordingStage(stage);
   };
   const importer = native ? new NativeRecordingImporter(backend, report, importStage)
-    : new BrowserRecordingImporter(recordingAssets, scoreAssets, report, importStage);
+    : new BrowserRecordingImporter(recordingAssets, scoreAssets, report, importStage, (record) => reportBackend("midi-to-score", record));
   setLocalService(new LocalService(log, transcriber, undefined, new SampleStore(report), random, phrase, recordingTranscriber, importer,
     phraseTranscriber, duetGenerator, variationAnalyzer));
   if (import.meta.env.PROD && "serviceWorker" in navigator) await navigator.serviceWorker.register("/service-worker.js");
