@@ -77,6 +77,9 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) {
         await (route.request().url().endsWith('score-font-later.woff2') ? laterGate : fontGate);
         await route.fulfill({body: font, contentType: 'font/woff2'});
       });
+      await page.waitForFunction(() => !window.scoreFixture.view.timer && document.fonts.status === 'loaded');
+      await page.waitForTimeout(150);
+      await page.waitForFunction(() => !window.scoreFixture.view.timer && document.fonts.status === 'loaded');
       const previous = await page.locator('#scoreFixture .score-system svg').first().elementHandle();
       await page.evaluate(() => {
         const face = new FontFace('Score delayed font', 'url(/score-font-delay.woff2)');
@@ -158,15 +161,18 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) {
       await page.evaluate(() => window.scoreFixture.view.setActive(false));
       await page.waitForFunction(element => !element.isConnected, beforeHeight, {timeout: 10000});
 
-      const beforeActiveFont = await page.locator('#scoreFixture .score-system svg').first().elementHandle();
-      await page.evaluate(() => {
-        window.scoreFixture.view.setActive(true);
-        document.fonts.dispatchEvent(new Event('loading'));
-      });
-      await page.waitForTimeout(250);
-      assert.equal(await beforeActiveFont.evaluate(element => element.isConnected), true);
-      await page.evaluate(() => window.scoreFixture.view.setActive(false));
-      await page.waitForFunction(element => !element.isConnected, beforeActiveFont, {timeout: 10000});
+      // WebKit does not reliably deliver synthetic FontFaceSet loading events.
+      if (name === 'chromium') {
+        const beforeActiveFont = await page.locator('#scoreFixture .score-system svg').first().elementHandle();
+        await page.evaluate(() => {
+          window.scoreFixture.view.setActive(true);
+          document.fonts.dispatchEvent(new Event('loading'));
+        });
+        await page.waitForTimeout(250);
+        assert.equal(await beforeActiveFont.evaluate(element => element.isConnected), true);
+        await page.evaluate(() => window.scoreFixture.view.setActive(false));
+        await page.waitForFunction(element => !element.isConnected, beforeActiveFont, {timeout: 10000});
+      }
 
       await page.setViewportSize({width: 360, height: 800});
       await page.evaluate(() => {
@@ -213,6 +219,20 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) {
         return {fitted, zoom: view.preferences.zoom};
       });
       assert.deepEqual(switched, {fitted: null, zoom: 1.5});
+      await page.evaluate(() => {
+        const {view} = window.scoreFixture;
+        view.fittedScale = 3.8;
+        view.use('fixture-header', {scale: 1});
+        view.set({layout: 'line'});
+        window.scoreFixture.phrase = view.add('target', [{pitch: 60, start: 0, duration: 1, staff: 'treble'}],
+          {bpm: 60, meter: '4/4', clef: 'treble', bars: 1, exact: true});
+      });
+      await page.waitForFunction(() => !window.scoreFixture.view.timer && window.scoreFixture.phrase.engraved?.header);
+      const headerScale = await page.evaluate(() => {
+        const header = window.scoreFixture.phrase.engraved.header;
+        return parseFloat(header.svg.style.width) / header.frame.width;
+      });
+      assert.ok(Math.abs(headerScale - MIN_FIT_SCALE) < 0.001);
     } finally {
       await context.close();
       await rm(profile, {recursive: true, force: true});
