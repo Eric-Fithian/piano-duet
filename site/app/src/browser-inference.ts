@@ -35,7 +35,8 @@ export class BrowserInference implements InferenceBackend {
         } catch (fallbackError) {
           fallback.terminate();
           if (signal?.aborted) throw signal.reason;
-          throw new AggregateError([error, fallbackError], `Could not initialize ${model} with WebGPU or WASM`);
+          const reason = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
+          throw new AggregateError([error, fallbackError], `Could not initialize ${model}: WebGPU: ${error.message}; CPU: ${reason}`);
         }
       }
       throw error;

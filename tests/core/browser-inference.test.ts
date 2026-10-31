@@ -41,7 +41,8 @@ test("browser inference retries only failed WebGPU initialization and retains th
 
     outcomes = ["gpu-failure", "wasm-failure"];
     await assert.rejects(new BrowserInference(MODEL_CATALOG).createSession("aria", () => {}), (error: unknown) =>
-      error instanceof AggregateError && error.errors.map((cause: Error) => cause.message).join(", ") === "GPU session failed, WASM session failed");
+      error instanceof AggregateError && error.message.includes("WebGPU: GPU session failed; CPU: WASM session failed")
+        && error.errors.map((cause: Error) => cause.message).join(", ") === "GPU session failed, WASM session failed");
     assert.ok(workers[2].terminated && workers[3].terminated);
 
     outcomes = ["other-failure"];
