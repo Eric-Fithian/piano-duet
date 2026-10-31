@@ -112,3 +112,85 @@ print(json.dumps({'task':task, 'events':events}))
   assert.deepEqual(task, expected.task);
   replay.finish();
 });
+
+test("a failed theory attempt leads to the Python execution check", async () => {
+  const reference = spawnSync("uv", ["run", "--frozen", "python", "-c", `
+import contextlib, io, json, tempfile
+from pathlib import Path
+from types import SimpleNamespace
+import numpy as np
+from fastapi.testclient import TestClient
+import piano_duet.server as server
+from piano_duet.notes import Note
+quality = {'usable':True,'onset_support':0.95,'supported_fraction':1,'note_support':[0.95], 'reason':'synthetic'}
+class Transcriber:
+    last_quality = quality
+    def transcribe(self, audio, threshold, cancel, on_progress): return [Note(pitch=60,start=0,duration=1,velocity=80)]
+engine = SimpleNamespace(transcriber=Transcriber(), generator=SimpleNamespace(phrase=None))
+with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.StringIO()):
+    server.SAMPLES = server.NOTATION = Path(directory)
+    with TestClient(server.create_app(engine_factory=lambda: engine, profile_path=Path(directory) / 'learner.sqlite3')) as client:
+        headers = {'X-Duet-Client':'1'}
+        task = client.post('/api/practice/next', json={'focus':'theory'}, headers=headers).json()
+        response = client.post('/api/respond', params={'mode':'practice','session':'9cfb60dc-a9f7-4e10-9b04-033934f96d9b','task':task['id']}, content=np.zeros(3200,dtype='<f4').tobytes(), headers=headers)
+        assert response.status_code == 200
+        check = client.post('/api/practice/next', json={'focus':'guided'}, headers=headers).json()
+print(json.dumps({'task':task,'check':check}))
+`], { encoding: "utf8", maxBuffer: 10_000_000 });
+  assert.equal(reference.status, 0, reference.stderr);
+  const expected = JSON.parse(reference.stdout);
+  const events: ReadingLogEvent[] = [];
+  const store: LocalEventStore = { async list() { return [...events]; }, async append(kind, payload, id = crypto.randomUUID()) {
+    const event = { id, kind, payload, deviceId: "test-device", clock: events.length + 1, createdAt: "2024-01-01T00:00:00.000Z" };
+    events.push(event); return event;
+  } };
+  const transcriber: LocalPhraseTranscriber = { async run() { return { notes: [{ pitch: 60, start: 0, duration: 1, velocity: 80 }],
+    quality: { usable: true, onset_support: 0.95, supported_fraction: 1, note_support: [0.95], reason: "synthetic" } }; } };
+  const service = new LocalService(store, undefined, () => 1704067200, undefined, undefined, undefined, undefined, undefined, transcriber);
+  const request = (focus: string) => service.fetch("/api/practice/next", { method: "POST", body: JSON.stringify({ focus }) });
+  const task = await (await request("theory")).json();
+  expected.task.id = task.id;
+  assert.deepEqual(task, expected.task);
+  const params = new URLSearchParams({ mode: "practice", session: "9cfb60dc-a9f7-4e10-9b04-033934f96d9b", task: task.id });
+  const result = await service.fetch(`/api/respond?${params}`, { method: "POST", body: new Float32Array(3200).buffer });
+  assert.equal(result.status, 200);
+  await result.text();
+  const check = await (await request("guided")).json();
+  expected.check.id = check.id;
+  assert.deepEqual(check, expected.check);
+  assert.equal(check.purpose, "Check");
+});
+
+test("practice request validation matches FastAPI for missing previews and locked stages", async () => {
+  const bodies = [
+    { focus: "theory", step_by_step: true },
+    { focus: "technique", stage: 1 },
+    { focus: "reading", stage: 25 },
+    { focus: "reading", stage: 2 },
+    { focus: "reading", step_by_step: true, after: "9cfb60dc-a9f7-4e10-9b04-033934f96d9b" },
+    { focus: "repertoire", piece: "5cfb60dc-a9f7-4e10-9b04-033934f96d90" },
+  ];
+  const reference = spawnSync("uv", ["run", "--frozen", "python", "-c", `
+import contextlib, io, json, sys, tempfile
+from pathlib import Path
+from types import SimpleNamespace
+from fastapi.testclient import TestClient
+import piano_duet.server as server
+class Engine:
+    def __init__(self): self.generator = SimpleNamespace(phrase=None)
+with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.StringIO()):
+    server.SAMPLES = server.NOTATION = Path(directory)
+    with TestClient(server.create_app(engine_factory=Engine, profile_path=Path(directory) / 'learner.sqlite3')) as client:
+        results = [client.post('/api/practice/next', json=body, headers={'X-Duet-Client':'1'}) for body in json.load(sys.stdin)]
+        output = [{'status':r.status_code, 'body':r.json()} for r in results]
+print(json.dumps(output))
+`], { input: JSON.stringify(bodies), encoding: "utf8" });
+  assert.equal(reference.status, 0, reference.stderr);
+  const expected = JSON.parse(reference.stdout);
+  const service = new LocalService({ async list() { return []; } });
+  for (const [index, body] of bodies.entries()) {
+    const response = await service.fetch("/api/practice/next", { method: "POST", body: JSON.stringify(body) });
+    assert.equal(response.status, expected[index].status);
+    if (response.status !== 422) assert.deepEqual(await response.json(), expected[index].body);
+  }
+});

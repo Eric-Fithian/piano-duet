@@ -254,8 +254,18 @@ export class LocalService {
       const request = JSON.parse(options.body) as { focus?: string; step_by_step?: boolean; piece?: string | null; stage?: number | null; after?: string | null };
       const focus = request.focus ?? "guided";
       if (!["guided", "technique", "reading", "theory", "ear", "repertoire"].includes(focus)) return Response.json({ detail: "Invalid practice focus" }, { status: 422 });
+      if ((request.piece != null && !validUuid(request.piece)) || (request.after != null && !validUuid(request.after))
+        || (request.stage != null && (!Number.isInteger(request.stage) || request.stage < 1 || request.stage > READING_STAGES.length))) {
+        return Response.json({ detail: "Invalid practice request" }, { status: 422 });
+      }
       if (request.step_by_step && focus !== "reading") return Response.json({ detail: "Step-by-step practice requires the reading focus" }, { status: 400 });
-      if (request.after && (!request.step_by_step || focus !== "reading")) return Response.json({ detail: "A preview requires a preceding step-by-step reading score" }, { status: 400 });
+      if (request.after) {
+        const preceding = this.tasks.get(request.after);
+        if (!preceding) return Response.json({ detail: "Unknown preceding reading score" }, { status: 404 });
+        if (!request.step_by_step || focus !== "reading" || preceding.task.family !== "reading" || preceding.task.context.interaction !== "step_by_step") {
+          return Response.json({ detail: "A preview requires a preceding step-by-step reading score" }, { status: 400 });
+        }
+      }
       if (request.stage != null && focus !== "reading") return Response.json({ detail: "Only reading practice can replay a stage" }, { status: 400 });
       const events = await this.store.list(), attempts = attemptsFromEvents(events);
       const pieces = piecesFromEvents(events);

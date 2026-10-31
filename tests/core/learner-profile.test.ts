@@ -3,6 +3,8 @@ import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { learnerProfile } from "../../src/core/learner-profile.ts";
 import type { ProfileAttempt } from "../../src/core/learner-profile.ts";
+import { attemptsFromEvents } from "../../src/core/reading-events.ts";
+import type { ReadingLogEvent } from "../../src/core/reading-events.ts";
 
 test("learner profiles match Python for reading and other practice evidence", () => {
   const reference = spawnSync("uv", ["run", "--frozen", "python", "-c", `
@@ -35,4 +37,20 @@ print(json.dumps({"histories": histories, "expected": [build_profile(history, no
   assert.equal(reference.status, 0, reference.stderr);
   const data: { histories: ProfileAttempt[][]; expected: unknown[] } = JSON.parse(reference.stdout);
   assert.deepEqual(data.histories.map((attempts) => learnerProfile(attempts, 1703000000)), data.expected);
+  for (const [index, history] of data.histories.entries()) {
+    const events: ReadingLogEvent[] = [];
+    for (const attempt of history) {
+      const { id, created_at, excluded, ...payload } = attempt;
+      events.push({ id, deviceId: "device", clock: events.length + 1, createdAt: new Date(created_at * 1000).toISOString(), kind: "attempt", payload });
+      if (excluded) events.push({ id: `exclude-${id}`, deviceId: "device", clock: events.length + 1,
+        createdAt: new Date(created_at * 1000).toISOString(), kind: "exclusion", payload: { attemptId: id, excluded: true } });
+      else {
+        events.push({ id: `exclude-${id}`, deviceId: "device", clock: events.length + 1,
+          createdAt: new Date(created_at * 1000).toISOString(), kind: "exclusion", payload: { attemptId: id, excluded: true } });
+        events.push({ id: `restore-${id}`, deviceId: "device", clock: events.length + 1,
+          createdAt: new Date(created_at * 1000).toISOString(), kind: "exclusion", payload: { attemptId: id, excluded: false } });
+      }
+    }
+    assert.deepEqual(learnerProfile(attemptsFromEvents(events.reverse()), 1703000000), data.expected[index]);
+  }
 });

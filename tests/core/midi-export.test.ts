@@ -9,6 +9,8 @@ test("MIDI export reproduces Python's performance notes and response headers", a
     [{ pitch: 60, start: 1, duration: 0.5, velocity: 80 }, { pitch: 64, start: 1.5, duration: 1, velocity: 90 }],
     [{ pitch: 67, start: 0, duration: 1, velocity: 95 }, { pitch: 60, start: 0, duration: 0.5, velocity: 75 },
       { pitch: 64, start: 0.5, duration: 0.999, velocity: 85 }],
+    [{ pitch: 60, start: 0, duration: 2, velocity: 75 }, { pitch: 60, start: 1, duration: 1, velocity: 85 },
+      { pitch: 60, start: 1, duration: 2, velocity: 90 }, { pitch: 60, start: 1, duration: 2, velocity: 100 }],
   ];
   const reference = spawnSync("uv", ["run", "--frozen", "python", "-c", `
 import contextlib, io, json, sys, tempfile
