@@ -13,6 +13,9 @@ import type { ContextNote } from "../../../src/core/aria-tokenizer.ts";
 import type { PhraseContext } from "../../../src/core/aria-tokenizer.ts";
 import { RandomSource } from "../../../src/core/random.ts";
 import { BrowserInference } from "./browser-inference";
+import { NativeInference } from "./native-inference";
+import { WebKitInferenceTransport } from "./webkit-inference-transport";
+import type { WebKitMessageHandler } from "./webkit-inference-transport";
 import { MODEL_CATALOG } from "./model-catalog";
 import type { DownloadProgress, InferenceSession } from "./inference";
 import { EventLog, requestPersistentStorage } from "./event-log";
@@ -52,7 +55,8 @@ async function start(): Promise<void> {
   const log = new EventLog();
   await requestPersistentStorage();
   await log.open();
-  const backend = new BrowserInference(MODEL_CATALOG);
+  const native = (window as Window & { webkit?: { messageHandlers?: { pianoInference?: WebKitMessageHandler } } }).webkit?.messageHandlers?.pianoInference;
+  const backend = native ? new NativeInference(new WebKitInferenceTransport(native, window)) : new BrowserInference(MODEL_CATALOG);
   let live: Promise<InferenceSession<"live-transcription">> | undefined;
   const transcriber = {
     async run(input: { audio: Float32Array; sampleRate: 16000; threshold: number }, signal?: AbortSignal) {
