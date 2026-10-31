@@ -128,6 +128,13 @@ try {
       await page.locator('#modeMenuButton').click();
       await page.locator('#libraryMode').click();
       await page.screenshot({path: `${qaDir}/${engineName}-${theme}-library.png`});
+      const music = '<score-partwise><work><work-title>Study in C</work-title></work><part id="P1"><measure number="1"><attributes><divisions>1</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes><note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note><note><pitch><step>E</step><octave>4</octave></pitch><duration>1</duration></note></measure></part></score-partwise>';
+      await page.locator('#libraryFile').setInputFiles({name: 'study.musicxml', mimeType: 'application/xml', buffer: Buffer.from(music)});
+      await page.getByText('Study in C', {exact: true}).waitFor({timeout: 30000});
+      await page.screenshot({path: `${qaDir}/${engineName}-${theme}-library-populated.png`});
+      await page.locator('#importMenu summary').click();
+      await page.screenshot({path: `${qaDir}/${engineName}-${theme}-library-import.png`});
+      await page.locator('#importMenu summary').click();
       await page.setViewportSize({width: 393, height: 852});
       await page.screenshot({path: `${qaDir}/${engineName}-${theme}-library-portrait.png`});
       assert.deepEqual(errors, [], `${engineName} ${theme} page errors`);
