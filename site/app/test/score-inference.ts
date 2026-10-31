@@ -1,6 +1,10 @@
 import * as ort from "onnxruntime-web/webgpu";
 import wasmUrl from "onnxruntime-web/ort-wasm-simd-threaded.asyncify.wasm?url";
 import wasmModuleUrl from "onnxruntime-web/ort-wasm-simd-threaded.asyncify.mjs?url";
+import { scoreInput } from "../../../src/core/score-input.ts";
+import type { ScoreInputNote } from "../../../src/core/score-input.ts";
+import { BrowserInference } from "../src/browser-inference";
+import type { ModelAsset } from "../src/browser-inference";
 
 const INPUTS = { offset: 145, downbeat: 146, duration: 97, pitch: 128, accidental: 7, keysignature: 16,
   grace: 2, trill: 2, staccato: 2, voice: 9, stem: 4, hand: 3 };
@@ -53,8 +57,7 @@ function contextInput(history: Record<string, number[]>): Record<string, ort.Ten
   return tokens;
 }
 
-Object.assign(window, {
-  async verifyScore(base: string, provider: "webgpu" | "wasm") {
+async function verifyScore(base: string, provider: "webgpu" | "wasm", notes?: ScoreInputNote[], includeTokens = false) {
     const response = await fetch(`${base}/fixtures/score-fixture.json`);
     if (!response.ok) throw new Error("Score fixture is unavailable");
     const fixture = await response.json() as Fixture;
@@ -66,7 +69,11 @@ Object.assign(window, {
     const first = await ort.InferenceSession.create(`${base}/models/score/decoder-first.onnx`, options);
     const context = await ort.InferenceSession.create(`${base}/models/score/decoder-context.onnx`, options);
     const step = await ort.InferenceSession.create(`${base}/models/score/decoder-step.onnx`, options);
-    const n = fixture.source_notes;
+    const converted = notes ? scoreInput(notes) : null;
+    const n = converted ? converted.pad.length : fixture.source_notes;
+    const inputDifferences = converted && n === fixture.source_notes ? Object.fromEntries(
+      Object.entries({ onset: converted.onset, duration: converted.duration, pitch: converted.pitch, velocity: converted.velocity }).map(([name, values]) =>
+        [name, values.reduce((sum, value, index) => sum + Number(value !== fixture.source[name][0][index].indexOf(1)), 0)])) : null;
     const result: Record<string, number[]> = Object.fromEntries(ORDER.map((name) => [name, []]));
     const started = performance.now();
     let chunks = 0;
@@ -74,9 +81,12 @@ Object.assign(window, {
       const length = Math.min(512, n - from);
       const source: Record<string, ort.Tensor> = {};
       for (const [name, width] of Object.entries({ onset: 200, duration: 200, pitch: 128, velocity: 8 })) {
-        source[name] = new ort.Tensor("float32", Float32Array.from(fixture.source[name][0].slice(from, from + length).flat()), [1, length, width]);
+        const values = converted ? new Float32Array(length * width) : Float32Array.from(fixture.source[name][0].slice(from, from + length).flat());
+        if (converted) for (let index = 0; index < length; index++) values[index * width + converted[name as keyof typeof converted][from + index]] = 1;
+        source[name] = new ort.Tensor("float32", values, [1, length, width]);
       }
-      source.pad = new ort.Tensor("int64", BigInt64Array.from(fixture.source.pad[0].slice(from, from + length).map(BigInt)), [1, length]);
+      const padding = converted ? converted.pad.slice(from, from + length) : fixture.source.pad[0].slice(from, from + length);
+      source.pad = new ort.Tensor("int64", BigInt64Array.from(padding.map(BigInt)), [1, length]);
       const encoded = (await encoder.run(source)).encoded;
       let cache: Record<string, ort.Tensor> = {};
       let token: Record<string, ort.Tensor>;
@@ -129,7 +139,25 @@ Object.assign(window, {
       return [name, result[name].reduce((sum, value, index) => sum + Number(value !== fixture.expected[name][index]), 0)];
     }));
     await Promise.all([encoder.release(), first.release(), context.release(), step.release()]);
-    return { sourceNotes: n, chunks, elapsedMs, referenceMs: fixture.reference_ms, valid: result.pad.reduce((sum, value) => sum + value, 0),
-      referenceValid: fixture.expected.pad.reduce((sum, value) => sum + value, 0), mismatches };
+    return { sourceNotes: n, chunks, elapsedMs, referenceMs: fixture.reference_ms, inputDifferences,
+      valid: result.pad.reduce((sum, value) => sum + value, 0), referenceValid: fixture.expected.pad.reduce((sum, value) => sum + value, 0),
+      mismatches, ...(includeTokens ? { tokens: result } : {}) };
+}
+
+Object.assign(window, {
+  verifyScore,
+  async verifyRecordingScore(base: string, assets: ModelAsset[]) {
+    const response = await fetch(`${base}/fixtures/recording.pcm`);
+    if (!response.ok) throw new Error("Recording fixture is unavailable");
+    const audio = new Float32Array(await response.arrayBuffer());
+    const backend = new BrowserInference({ "recording-transcription": assets });
+    const session = await backend.createSession("recording-transcription", () => {});
+    const started = performance.now();
+    const recording = await session.run({ audio, sampleRate: 44100 });
+    const transcriptionMs = performance.now() - started;
+    const score = await verifyScore(base, "webgpu", recording.notes, true);
+    const elapsedMs = performance.now() - started;
+    await session.close();
+    return { transcriptionMs, score, elapsedMs, recordingProvider: session.provider };
   },
 });

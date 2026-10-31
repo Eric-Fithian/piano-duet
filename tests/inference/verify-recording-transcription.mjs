@@ -13,9 +13,11 @@ const pool = process.argv[4] === "pool";
 const workers = pool ? Number(process.argv[5] ?? "3") : 1;
 const threads = pool ? Number(process.argv[6] ?? "4") : 12;
 const score = process.argv.includes("--score");
+const midi = process.argv.includes("--midi-fixture");
 if (!Number.isFinite(seconds) || seconds <= 0) throw new Error("A positive recording length is required");
 const reference = spawnSync("uv", ["run", "--frozen", "python", "-c", `
 import json, sys, time
+from pathlib import Path
 from threading import Event
 import numpy as np
 import soundfile as sf
@@ -27,6 +29,10 @@ model = RecordingTranscriber()
 start = time.perf_counter()
 notes = model.transcribe(samples, Event(), lambda progress: None)
 elapsed = 1000*(time.perf_counter()-start)
+if sys.argv[4] == "midi":
+    from piano_duet.notes import midi_bytes
+    Path(".cache/m2st/recording-fixture.mid").write_bytes(midi_bytes(notes))
+    Path(".cache/m2st/recording-notes.json").write_text(json.dumps([note.model_dump() for note in notes]))
 score_result = None
 if sys.argv[3] == "score":
     from piano_duet.score_model import checkpoint, performance_to_score
@@ -34,7 +40,7 @@ if sys.argv[3] == "score":
     result = performance_to_score(notes)
     score_result = {"checkpoint": checkpoint().name, "notes": len(result["notes"]), "elapsedMs": 1000*(time.perf_counter()-start)}
 print(json.dumps({"notes": [note.model_dump() for note in notes], "seconds": len(samples)/rate, "elapsedMs": elapsed, "score": score_result}))
-`, source, String(seconds), score ? "score" : "none"], { encoding: "utf8", maxBuffer: 8_000_000 });
+`, source, String(seconds), score ? "score" : "none", midi ? "midi" : "none"], { encoding: "utf8", maxBuffer: 8_000_000 });
 assert.equal(reference.status, 0, reference.stderr);
 const expected = JSON.parse(reference.stdout);
 const assets = [];
