@@ -4,6 +4,7 @@ import wasmModuleUrl from "onnxruntime-web/ort-wasm-simd-threaded.asyncify.mjs?u
 import { decodeLiveOnsets } from "./live-onsets";
 import { transcribeRecording } from "./recording-runtime";
 import { RecordingPool } from "./recording-pool";
+import { resample16To441 } from "../../../src/core/resample.ts";
 import { ModelStore } from "./model-store";
 import type { ModelAsset, ModelRole } from "./browser-inference";
 import type { ModelId, ModelInputs } from "./inference";
@@ -14,7 +15,8 @@ type Request =
   | { id: number; action: "close" }
   | { action: "cancel"; target: number };
 
-ort.env.wasm.numThreads = self.crossOriginIsolated ? navigator.hardwareConcurrency : 1;
+const wasmThreads = self.crossOriginIsolated ? navigator.hardwareConcurrency : 1;
+ort.env.wasm.numThreads = wasmThreads;
 ort.env.wasm.simd = true;
 ort.env.wasm.wasmPaths = { wasm: new URL(wasmUrl, self.location.origin).href,
   mjs: new URL(wasmModuleUrl, self.location.origin).href };
@@ -29,7 +31,7 @@ const controllers = new Map<number, AbortController>();
 const store = new ModelStore();
 let busy = false;
 
-async function open(id: number, name: ModelId, files: ModelAsset[], preference: "auto" | "wasm", signal: AbortSignal): Promise<{ provider: "webgpu" | "wasm" }> {
+async function open(id: number, name: ModelId, files: ModelAsset[], preference: "auto" | "wasm", signal: AbortSignal): Promise<{ provider: "webgpu" | "wasm"; recordingWorkers?: { provider: "wasm"; threads: number }[] }> {
   if (session || recordingPool) throw new Error("The inference session is already open");
   if (name !== "aria" && name !== "live-transcription" && name !== "recording-transcription") throw new Error(`${name} inference is not available yet`);
   if (files.some((file) => file.model !== name)) throw new Error("Model catalog contains a mismatched file");
@@ -77,7 +79,8 @@ async function open(id: number, name: ModelId, files: ModelAsset[], preference: 
   }
   model = name;
   signal.throwIfAborted();
-  return { provider };
+  return { provider, ...(name === "recording-transcription" ? { recordingWorkers: recordingPool?.diagnostics
+    ?? [{ provider: "wasm" as const, threads: wasmThreads }] } : {}) };
 }
 
 function resetCache(): void {
@@ -92,10 +95,12 @@ async function run(input: ModelInputs[ModelId], signal: AbortSignal): Promise<un
   if (!model) throw new Error("The inference session is not open");
   if (model === "recording-transcription") {
     const recording = input as ModelInputs["recording-transcription"];
-    if (recording.sampleRate !== 44100) throw new Error("Recording transcription needs 44.1 kHz audio");
-    if (recordingPool) return { notes: await recordingPool.run(recording.audio, signal) };
+    if (recording.sampleRate !== 16000 && recording.sampleRate !== 44100) throw new Error("Recording transcription needs 16 kHz or 44.1 kHz audio");
+    const audio = recording.sampleRate === 16000 ? resample16To441(recording.audio) : recording.audio;
+    signal.throwIfAborted();
+    if (recordingPool) return { notes: await recordingPool.run(audio, signal) };
     if (!session || !recurrent) throw new Error("Recording transcription is not open");
-    return { notes: await transcribeRecording(session, recurrent, recording.audio, signal) };
+    return { notes: await transcribeRecording(session, recurrent, audio, signal) };
   }
   if (!session) throw new Error("The inference session is not open");
   if (model === "aria") {

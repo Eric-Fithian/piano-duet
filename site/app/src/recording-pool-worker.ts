@@ -21,6 +21,7 @@ self.onmessage = async ({ data }: MessageEvent<Request>) => {
         mjs: new URL(wasmModuleUrl, self.location.origin).href };
       features = await ort.InferenceSession.create(data.features, { executionProviders: ["wasm"] });
       attributes = await ort.InferenceSession.create(data.attributes, { executionProviders: ["wasm"] });
+      value = { provider: "wasm", threads: data.threads };
     } else if (data.action === "compute") {
       if (!features || current) throw new Error("Recording worker is not ready for a segment");
       const input = new ort.Tensor("float32", new Float32Array(data.frames), [1, 1, RECORDING_FRAMES, RECORDING_WINDOW]);

@@ -14,6 +14,8 @@ const workers = pool ? Number(process.argv[5] ?? "3") : 1;
 const threads = pool ? Number(process.argv[6] ?? "4") : 12;
 const score = process.argv.includes("--score");
 const midi = process.argv.includes("--midi-fixture");
+const microphone = process.argv.includes("--microphone");
+if (microphone && pool) throw new Error("Microphone resampling uses the inference session, not the pool probe");
 if (!Number.isFinite(seconds) || seconds <= 0) throw new Error("A positive recording length is required");
 const reference = spawnSync("uv", ["run", "--frozen", "python", "-c", `
 import json, sys, time
@@ -21,13 +23,17 @@ from pathlib import Path
 from threading import Event
 import numpy as np
 import soundfile as sf
+from scipy.signal import resample_poly
 from piano_duet.recording_transcription import RecordingTranscriber
 samples, rate = sf.read(sys.argv[1], frames=int(float(sys.argv[2]) * 44100), dtype="float32")
 assert rate == 44100 and samples.ndim == 1 and len(samples) > 0
+if sys.argv[5] == "microphone":
+    samples = resample_poly(samples, 16000, 44100).astype(np.float32)
 samples.astype("<f4").tofile(".cache/browser-inference/recording.pcm")
+recording = resample_poly(samples, 44100, 16000).astype(np.float32) if sys.argv[5] == "microphone" else samples
 model = RecordingTranscriber()
 start = time.perf_counter()
-notes = model.transcribe(samples, Event(), lambda progress: None)
+notes = model.transcribe(recording, Event(), lambda progress: None)
 elapsed = 1000*(time.perf_counter()-start)
 if sys.argv[4] == "midi":
     from piano_duet.notes import midi_bytes
@@ -39,8 +45,8 @@ if sys.argv[3] == "score":
     start = time.perf_counter()
     result = performance_to_score(notes)
     score_result = {"checkpoint": checkpoint().name, "notes": len(result["notes"]), "elapsedMs": 1000*(time.perf_counter()-start)}
-print(json.dumps({"notes": [note.model_dump() for note in notes], "seconds": len(samples)/rate, "elapsedMs": elapsed, "score": score_result}))
-`, source, String(seconds), score ? "score" : "none", midi ? "midi" : "none"], { encoding: "utf8", maxBuffer: 8_000_000 });
+print(json.dumps({"notes": [note.model_dump() for note in notes], "seconds": len(recording)/rate, "elapsedMs": elapsed, "score": score_result}))
+`, source, String(seconds), score ? "score" : "none", midi ? "midi" : "none", microphone ? "microphone" : "recording"], { encoding: "utf8", maxBuffer: 8_000_000 });
 assert.equal(reference.status, 0, reference.stderr);
 const expected = JSON.parse(reference.stdout);
 const assets = [];
@@ -62,17 +68,17 @@ await page.goto(`http://127.0.0.1:${site.port}/test/${pool ? "recording-pool" : 
 await page.waitForFunction((pool) => pool ? typeof window.inspectRecordingPool === "function" : typeof window.createBrowserInference === "function", pool);
 const result = pool ? await page.evaluate(({ base, workers, threads }) => window.inspectRecordingPool(base, workers, threads),
   { base: `http://127.0.0.1:${modelPort}`, workers, threads })
-  : await page.evaluate(async ({ assets, modelPort }) => {
+  : await page.evaluate(async ({ assets, modelPort, sampleRate }) => {
   const audio = new Float32Array(await (await fetch(`http://127.0.0.1:${modelPort}/fixtures/recording.pcm`)).arrayBuffer());
   const backend = window.createBrowserInference({ "recording-transcription": assets });
   const session = await backend.createSession("recording-transcription", () => {});
   const start = performance.now();
-  const transcription = await session.run({ audio, sampleRate: 44100 });
+  const transcription = await session.run({ audio, sampleRate });
   const elapsedMs = performance.now() - start;
   const provider = session.provider;
   await session.close();
   return { ...transcription, elapsedMs, provider };
-  }, { assets, modelPort });
+  }, { assets, modelPort, sampleRate: microphone ? 16000 : 44100 });
 assert.equal(result.provider, "wasm");
 const remaining = new Set(expected.notes.map((_, index) => index));
 const matched = [];

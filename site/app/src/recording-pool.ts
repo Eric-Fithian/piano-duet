@@ -40,6 +40,7 @@ class RecordingWorker {
 export class RecordingPool {
   private readonly workers: RecordingWorker[];
   private closed = false;
+  diagnostics: { provider: "wasm"; threads: number }[] = [];
 
   private constructor(count: number) {
     this.workers = Array.from({ length: count }, () => new RecordingWorker());
@@ -49,7 +50,9 @@ export class RecordingPool {
     if (!Number.isInteger(count) || count < 1 || !Number.isInteger(threads) || threads < 1) throw new Error("Invalid recording worker configuration");
     const pool = new RecordingPool(count);
     try {
-      await Promise.all(pool.workers.map((worker) => worker.send({ action: "open", features, attributes, threads })));
+      const diagnostics = await Promise.all(pool.workers.map((worker) => worker.send<{ provider: string; threads: number }>({ action: "open", features, attributes, threads })));
+      if (diagnostics.some((item) => item.provider !== "wasm" || item.threads !== threads)) throw new Error("Unexpected recording worker backend");
+      pool.diagnostics = diagnostics as { provider: "wasm"; threads: number }[];
       return pool;
     } catch (error) {
       pool.close();

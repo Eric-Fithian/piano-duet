@@ -46,6 +46,9 @@ for (const [name, engine] of [['Chromium', chromium], ['WebKit', webkit]]) {
       await page.locator('#libraryMode').click();
       assert.equal(await page.locator('#recordingImportStatus').textContent(), 'Score writing for audio files and recordings is unavailable for now.');
       assert.equal(await page.locator('.recording-import button:disabled').count(), 2);
+      await page.locator('#drillsMode').click();
+      await page.waitForFunction(() => document.querySelector('#drillTitle')?.textContent?.includes('five-finger pattern'), null, {timeout: 30000});
+      assert.equal(await page.locator('#error').isHidden(), true);
       await page.locator('#readingMode').click();
       await page.waitForFunction(() => document.querySelector('#practiceTitle')?.textContent?.includes('Meet'), null, {timeout: 30000});
       await page.locator('#sheetMusic svg').first().waitFor({timeout: 15000});

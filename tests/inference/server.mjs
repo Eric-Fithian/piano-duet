@@ -2,6 +2,7 @@ import { createServer, request as httpRequest } from "node:http";
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 
+const recordingDirectory = process.env.PIANO_RECORDING_MODEL_DIR ?? ".cache/models/recording-transcription/onnx-fp32";
 const paths = {
   "/runner.mjs": "tests/inference/browser-runner.mjs",
   "/worker.mjs": "tests/inference/browser-worker.mjs",
@@ -16,8 +17,8 @@ const paths = {
   "/models/local-fixture/convolution.onnx": ".cache/browser-inference/transcription-convolution-fp32.onnx",
   "/models/local-fixture/recurrent.onnx": ".cache/browser-inference/transcription-recurrent.onnx",
   "/models/local-fixture/graph.onnx": ".cache/browser-inference/transcription.onnx",
-  "/models/local-fixture/recording-features.onnx": ".cache/models/recording-transcription/onnx-fp32/features.onnx",
-  "/models/local-fixture/recording-attributes.onnx": ".cache/models/recording-transcription/onnx-fp32/attributes.onnx",
+  "/models/local-fixture/recording-features.onnx": `${recordingDirectory}/features.onnx`,
+  "/models/local-fixture/recording-attributes.onnx": `${recordingDirectory}/attributes.onnx`,
   "/fixtures/recording.pcm": ".cache/browser-inference/recording.pcm",
   "/models/score/encoder.onnx": ".cache/m2st/onnx-public/encoder.onnx",
   "/models/score/decoder-first.onnx": ".cache/m2st/onnx-public/decoder-first.onnx",
