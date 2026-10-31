@@ -76,6 +76,7 @@ test("Chromium captures synthetic tab audio and saves a YouTube song", { timeout
     assert.equal(result.event.payload.song.source, "YouTube"); assert.equal(result.event.payload.song.transcribed, true);
     assert.equal(result.event.payload.song.url, "https://youtu.be/abcdefghijk");
     assert.equal(result.opened, "https://youtu.be/abcdefghijk");
+    assert.equal(await page.locator("#recordingImportStatus").textContent(), "Score saved to your library");
     assert.deepEqual(result.options, { video: true, audio: true, selfBrowserSurface: "exclude", preferCurrentTab: false, surfaceSwitching: "exclude" });
     assert.ok(result.event.payload.song.notes.length > 0);
   } finally { await browser.close(); }

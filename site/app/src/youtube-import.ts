@@ -16,6 +16,7 @@ export function setupYoutubeImport(refresh: () => Promise<void>): void {
   const error = get<HTMLElement>("#youtubeError"), support = get<HTMLElement>("#youtubeSupport");
   const record = get<HTMLButtonElement>("#youtubeRecord"), close = get<HTMLButtonElement>('[data-close="youtubeDialog"]');
   const progress = get<HTMLElement>("#youtubeProgress"), stage = get<HTMLElement>("#youtubeStage");
+  const libraryStatus = get<HTMLElement>("#recordingImportStatus");
   const fill = get<HTMLElement>("#youtubeFill");
   let controller: AbortController | undefined, capture: TabCapture | undefined, stream: MediaStream | undefined;
   let timer: number | undefined, cap: number | undefined, finishing = false, currentLink = "";
@@ -27,7 +28,7 @@ export function setupYoutubeImport(refresh: () => Promise<void>): void {
   };
   const fail = (cause: unknown) => {
     error.textContent = cause instanceof Error ? cause.message : String(cause);
-    error.hidden = false; progress.hidden = true;
+    error.hidden = false; progress.hidden = true; libraryStatus.textContent = "";
   };
   const finish = async () => {
     if (!controller || !capture || finishing) return;
@@ -43,7 +44,8 @@ export function setupYoutubeImport(refresh: () => Promise<void>): void {
       const saved = await localFetch(`/api/library/import-audio?${params}`, { method: "POST", body, signal: active.signal });
       if (!saved.ok) throw new Error((await saved.json()).detail);
       active.signal.throwIfAborted();
-      await refresh(); url.value = ""; dialog.close();
+      await refresh(); active.signal.throwIfAborted(); libraryStatus.textContent = "Score saved to your library";
+      controller = undefined; reset(); url.value = ""; dialog.close();
     } catch (cause) { if (!active.signal.aborted) fail(cause); }
     finally { if (controller === active) { controller = undefined; capture = undefined; stream = undefined; reset(); } }
   };
@@ -54,6 +56,7 @@ export function setupYoutubeImport(refresh: () => Promise<void>): void {
   record.addEventListener("click", () => { dialog.close(); get<HTMLButtonElement>("#recordAudio").click(); });
   dialog.addEventListener("close", () => {
     const active = controller; controller = undefined; active?.abort();
+    if (active) libraryStatus.textContent = "";
     stream?.getTracks().forEach((track) => track.stop()); stream = undefined;
     if (capture) void capture.cancel();
     capture = undefined;
