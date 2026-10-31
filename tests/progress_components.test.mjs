@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {levelRing, resultSummary, stagePath, stageWindow, streakBeam} from '../src/piano_duet/static/progress_components.mjs';
+import {tone} from '../src/piano_duet/static/library.mjs';
 
 class Node {
   constructor(tag) { this.tag = tag; this.attributes = {}; this.children = []; }
@@ -51,4 +52,10 @@ test('a stage-clear result includes the bonus in ordinary XP text', () => {
   const after = {curriculum: {number: 2, path: path.map(stage => ({...stage, status: stage.number === 1 ? 'Complete' : stage.number === 2 ? 'Current' : 'Ahead'}))}, xp: {xp: 1107}};
   const result = {assessment: {score: {first_try: 15, total: 16}, observations: [{matched: false, expected: 60, tries: [[62], [60]]}]}, xp: {total: 207}};
   assert.equal(resultSummary({reading: {stage_number: 1}}, result, before, after).xp, 507);
+});
+
+
+test('accuracy progress stays green without turning lower results into warnings', () => {
+  assert.equal(tone(null), 'var(--line-strong)');
+  for (const accuracy of [0, 74, 75, 90, 100]) assert.equal(tone(accuracy), 'var(--green)');
 });

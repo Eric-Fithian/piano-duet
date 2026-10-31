@@ -10,7 +10,7 @@ function element(tag, className, text) {
 }
 
 export function tone(accuracy) {
-  return accuracy === null ? 'var(--line-strong)' : accuracy >= 90 ? 'var(--green)' : accuracy >= 75 ? 'var(--gold)' : 'var(--red)';
+  return accuracy === null ? 'var(--line-strong)' : 'var(--green)';
 }
 
 export function ago(seconds, now = Date.now() / 1000) {

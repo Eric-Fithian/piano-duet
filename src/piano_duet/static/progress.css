@@ -31,10 +31,12 @@
 .reading-result[hidden], .progress-streak[hidden] { display: none; }
 
 
-.piano-app.is-playing #openProfile, .piano-app.is-playing #hudStreak { visibility: hidden; }
+.piano-app.is-playing #openProfile, .piano-app.is-playing #hudStreak,
+.piano-app.is-playing #drillProgress, .piano-app.is-playing #drillBest, .piano-app.is-playing #drillLevel { visibility: hidden; }
 
 .piano-app.is-playing .stage-summary { visibility: hidden; }
-.piano-app[data-mode=drills] #openProfile { display: none; }
+.piano-app[data-mode=drills] #openProfile, .piano-app[data-mode=library] #songAccuracy,
+.piano-app[data-mode=library] #songStreak { display: none; }
 
 .level-diamond:has(.progress-level-ring) { border: 0; }
 #hudNotes { display: flex; align-items: center; flex: none; }

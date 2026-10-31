@@ -236,7 +236,7 @@ function renderRecent(history, onReview) {
   for (const round of history) {
     const bar = element('button', 'recent-score');
     bar.style.setProperty('--accuracy', `${Math.max(4, round.accuracy)}%`);
-    bar.style.setProperty('--tone', round.accuracy >= 75 ? 'var(--green)' : 'var(--red)');
+    bar.style.setProperty('--tone', 'var(--green)');
     const date = new Date(round.at * 1000).toLocaleString([], {month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'});
     bar.title = `Stage ${round.stage} · ${round.accuracy}% first try${round.rhythm === null ? '' : ` · ♩ ${round.rhythm}%`} · +${round.xp} XP · ${date}`;
     bar.setAttribute('aria-label', `Review: ${bar.title}`);

@@ -132,7 +132,9 @@ for (const [name, engine] of [['Chromium', chromium], ['WebKit', webkit]]) for (
       await capture('result');
       if (process.env.PROGRESS_SCREENSHOTS) {
         await page.emulateMedia({reducedMotion: 'reduce'});
-        assert.equal(await page.locator('.progress-ring-fill').evaluate(node => getComputedStyle(node).animationName), 'none');
+        for (const selector of ['.progress-ring-fill', '.progress-result-fill', '.progress-beam']) {
+          assert.equal(await page.locator(selector).first().evaluate(node => getComputedStyle(node).animationName), 'none');
+        }
         await page.screenshot({path: `${process.env.PROGRESS_SCREENSHOTS}/${captureName}-portrait-reduced-motion.png`});
       }
       assert.ok(await page.locator('#sheetMusic .score-mark-cross').count() > 0);
@@ -196,12 +198,33 @@ for (const [name, engine] of [['Chromium', chromium], ['WebKit', webkit]]) for (
       assert.equal(await page.locator('#drillBest').evaluate(node => node.scrollWidth <= node.clientWidth), true);
       assert.equal(await page.locator('#openProfile').isVisible(), false);
       assert.equal(await page.locator('#noteStatus').innerText(), '');
+      await page.locator('#sheetMusic .score-system svg .vf-stavenote').first().waitFor();
+      if (process.env.PROGRESS_SCREENSHOTS) await page.screenshot({path: `${process.env.PROGRESS_SCREENSHOTS}/${captureName}-portrait-drills.png`});
+      await page.waitForFunction(() => !document.querySelector('#start').disabled);
+      await page.locator('#start').click();
+      await page.waitForFunction(() => document.querySelector('#start').getAttribute('aria-pressed') === 'true');
+      assert.equal(await page.locator('#drillProgress').isVisible(), false);
+      assert.equal(await page.locator('#drillBest').isVisible(), false);
+      if (process.env.PROGRESS_SCREENSHOTS) await page.screenshot({path: `${process.env.PROGRESS_SCREENSHOTS}/${captureName}-portrait-drills-playing.png`});
+      await page.locator('#start').click();
+      await page.waitForFunction(() => document.querySelector('#start').getAttribute('aria-pressed') === 'false');
+      assert.equal(await page.locator('#drillProgress').isVisible(), true);
+      assert.equal(await page.locator('#drillBest').isVisible(), true);
       await page.locator('#modeMenuButton').click();
       await page.locator('#libraryMode').click();
-      await page.waitForFunction(() => document.body.dataset.mode === 'library');
+      await page.waitForFunction(() => document.body.dataset.mode === 'library' && document.querySelector('#songEmpty').textContent.length > 0);
+      const measures = Array.from({length: 4}, (_, index) => `<measure number="${index + 1}">${index === 0 ? '<attributes><divisions>1</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>' : ''}<note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note></measure>`).join('');
+      const score = `<score-partwise><work><work-title>Practice song</work-title></work><part id="P1">${measures}</part></score-partwise>`;
+      await page.locator('#libraryFile').setInputFiles({name: 'practice.musicxml', mimeType: 'application/xml', buffer: Buffer.from(score)});
+      await page.getByText('Practice song', {exact: true}).waitFor();
+      if (process.env.PROGRESS_SCREENSHOTS) await page.screenshot({path: `${process.env.PROGRESS_SCREENSHOTS}/${captureName}-portrait-library.png`});
       assert.equal(await page.locator('#openProfile').isVisible(), false);
       assert.equal(await page.locator('#drillProgress').isVisible(), false);
       assert.equal(await page.locator('#hudNotes').isVisible(), false);
+      await page.getByText('Practice song', {exact: true}).click();
+      await page.waitForFunction(() => document.body.classList.contains('song-open'));
+      assert.equal(await page.locator('#songAccuracy').evaluate(node => getComputedStyle(node).display), 'none');
+      assert.equal(await page.locator('#songStreak').evaluate(node => getComputedStyle(node).display), 'none');
       assert.deepEqual(errors, []);
     } finally { await context.close(); await rm(profile, {recursive: true, force: true}); }
   });
