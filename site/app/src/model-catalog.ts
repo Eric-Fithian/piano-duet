@@ -7,15 +7,15 @@ function asset(model: ModelId, repository: string, revision: string, role: Model
     url: `https://huggingface.co/ericfithian/${repository}/resolve/${revision}/${name}` };
 }
 
-const aria = "5ac00cdb1b9debed833784c17a27286b788533e7";
+const aria = "b44e0b4d4c4f04fba050d003f511080605a66199";
 const live = "af9aad0409a25b7ebec9e09ac94013212c4d6dfc";
 const recording = "8f6f1c1ee3b9e546679364f49c8b64a2c64a9b81";
 const score = "c2bcbf58a22a2d23c2f9d1c7d5052bf9e85d757c";
 
 export const MODEL_CATALOG: ModelCatalog = {
   aria: [
-    asset("aria", "piano-duet-aria-onnx", aria, "graph", "model.onnx", 257414,
-      "08f7a2be505e9439ed07d5f2dd4627f8ab0907d1c72b9c2992fdf7dbd387bf2a"),
+    asset("aria", "piano-duet-aria-onnx", aria, "graph", "model.onnx", 259238,
+      "9a29ee51939f95bd54c8c4e97a1eb0fd09e7d18fe7041ec1989daeacf54762e9"),
     asset("aria", "piano-duet-aria-onnx", aria, "weights", "model.onnx.data", 469306260,
       "62251bfb6249f90fc47d7b9286f812181094a64342ea7fe5aa8a40c129542fc4"),
   ],
