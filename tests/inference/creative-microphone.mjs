@@ -8,6 +8,7 @@ import { startServer } from "./server.mjs";
 import { startTestServer } from "../web/server.mjs";
 import { browserProfile } from "./browser-profile.mjs";
 import { waitForCreativeProgress } from "./creative-progress.mjs";
+import { hasSpacedOnsets } from "./capture-onsets.mjs";
 
 const started = performance.now();
 let page;
@@ -70,8 +71,10 @@ try {
         }
         if (this.model === "phrase-transcription" && message.action === "run") {
           const audio = message.input.audio, rms = Math.sqrt(audio.reduce((sum, value) => sum + value * value, 0) / audio.length);
+          const counter = new window.__duetTest.AttackCounter();
+          for (let offset = 0; offset < audio.length; offset += 1024) counter.feed(audio.subarray(offset, offset + 1024), 0.004);
           const capture = { samples: audio.length, sampleRate: message.input.sampleRate, seconds: audio.length / message.input.sampleRate,
-            rms, expected: window.__duetTest.expected };
+            rms, onsets: counter.times, expected: window.__duetTest.expected };
           window.__duetTest.captures.push(capture);
           console.info(`Phrase PCM: ${JSON.stringify(capture)}`);
         }
@@ -102,7 +105,8 @@ try {
   await page.locator('[data-close="settingsDialog"]').click();
   const staticBase = `/@fs${resolve("src/piano_duet/static")}`;
   await page.evaluate(async (path) => {
-    const { PianoSound, PhraseDetector } = await import(`${path}/audio.mjs`);
+    const { PianoSound, PhraseDetector, AttackCounter } = await import(`${path}/audio.mjs`);
+    window.__duetTest.AttackCounter = AttackCounter;
     const audible = Object.getOwnPropertyDescriptor(PianoSound.prototype, "audibleUntil");
     if (!audible?.get) throw new Error("The piano guard is unavailable to the test");
     Object.defineProperty(PianoSound.prototype, "audibleUntil", { configurable: true, get() {
@@ -152,18 +156,29 @@ try {
       await piano.load();
       const status = document.querySelector("#status")?.textContent;
       if (!status?.startsWith("Your turn")) throw new Error(`Microphone was not ready when piano playback was scheduled: ${status}`);
-      const start = audio.currentTime + 0.5;
-      window.__duetTest.expected = { pitches, performanceSeconds: (pitches.length - 1) * spacing + duration, sampleRate: 16000 };
-      for (const [index, pitch] of pitches.entries()) piano.play({ pitch, start: 0, duration, velocity: 90 }, start + index * spacing, audio, destination);
+      const start = audio.currentTime + 2;
+      window.__duetTest.expected = { pitches, spacing, performanceSeconds: (pitches.length - 1) * spacing + duration, sampleRate: 16000 };
+      for (const [index, pitch] of pitches.entries()) {
+        const when = start + index * spacing;
+        if (when - audio.currentTime < 0.1) throw new Error(`Synthetic note ${index} was scheduled too late`);
+        piano.play({ pitch, start: 0, duration, velocity: 90 }, when, audio, destination);
+      }
       return { scheduled: start, audioTime: audio.currentTime, status, pitches, guard: window.__duetTest.guard };
     }, { path: staticBase, pitches, spacing, duration });
     process.stderr.write(`Scheduled synthetic piano: ${JSON.stringify(scheduled)}\n`);
+  };
+  const assertCaptureSpacing = async (label, expectedCount) => {
+    const capture = await page.evaluate(() => window.__duetTest.captures.at(-1));
+    assert.ok(capture && capture.sampleRate === 16000 && capture.expected?.pitches.length === expectedCount
+      && hasSpacedOnsets(capture.onsets, expectedCount, capture.expected.spacing, 0.15),
+    await diagnostic(`${label}: captured PCM did not preserve the scheduled notes: ${JSON.stringify(capture)}`));
   };
   await waitForListening("First Duet phrase");
   await play();
   process.stderr.write(`Waiting for first Duet exchange at ${Math.round(performance.now() - started)} ms\n`);
   await waitForProgress("First Duet exchange", "duet", "01");
   process.stderr.write(`First Duet capture trace: ${JSON.stringify(await page.evaluate(() => window.__duetTest.events.splice(0)))}\n`);
+  await assertCaptureSpacing("First Duet phrase", 4);
   const result = await page.evaluate(async (path) => {
     const { localRequest } = await import(`${path}/practice.mjs`);
     const profile = await localRequest("/api/profile");
@@ -184,6 +199,7 @@ try {
   process.stderr.write(`Waiting for second Duet exchange at ${Math.round(performance.now() - started)} ms\n`);
   await waitForProgress("Second Duet exchange", "duet", "02");
   process.stderr.write(`Second Duet capture trace: ${JSON.stringify(await page.evaluate(() => window.__duetTest.events.splice(0)))}\n`);
+  await assertCaptureSpacing("Second Duet phrase", 4);
   const again = await page.evaluate(async (path) => {
     const { localRequest } = await import(`${path}/practice.mjs`);
     const profile = await localRequest("/api/profile");
@@ -200,6 +216,7 @@ try {
   await play([60, 64, 67], 0.7, 0.45);
   process.stderr.write(`Waiting for Variations idea at ${Math.round(performance.now() - started)} ms\n`);
   await waitForProgress("Variations idea", "idea");
+  await assertCaptureSpacing("Variations idea", 3);
   const idea = await page.evaluate(() => ({ error: document.querySelector("#error").hidden ? null : document.querySelector("#error").textContent,
     analysis: document.querySelectorAll("#surpriseRows tr").length }));
   if (idea.error) throw new Error(idea.error);
@@ -208,6 +225,7 @@ try {
   await play([60, 64, 67], 0.7, 0.45);
   process.stderr.write(`Waiting for Variations playback at ${Math.round(performance.now() - started)} ms\n`);
   await waitForProgress("Variations playback", "score");
+  await assertCaptureSpacing("Variations playback", 3);
   const variation = await page.evaluate(async (path) => {
     const { localRequest } = await import(`${path}/practice.mjs`);
     const profile = await localRequest("/api/profile");
