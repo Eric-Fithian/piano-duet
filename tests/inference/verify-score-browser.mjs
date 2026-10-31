@@ -12,7 +12,13 @@ const page = await browser.newPage();
 const failedResponses = [];
 page.on("console", (message) => process.stderr.write(`${message.type()}: ${message.text()}\n`));
 page.on("pageerror", (error) => process.stderr.write(`${error}\n`));
-page.on("response", (response) => { if (response.status() >= 400) failedResponses.push(`${response.status()} ${response.url()}`); });
+page.on("response", (response) => {
+  if (response.status() >= 400) {
+    const failure = `${response.status()} ${response.url()}`;
+    failedResponses.push(failure);
+    process.stderr.write(`Score resource failure: ${failure}\n`);
+  }
+});
 let result;
 try {
   await page.goto(`http://127.0.0.1:${site.port}/test/score-inference.html`);
