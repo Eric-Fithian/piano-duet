@@ -18,14 +18,18 @@ export function libraryFromEvents(events: ReadingLogEvent[]): LibraryState {
       if (!payload.song || typeof payload.song !== "object" || Array.isArray(payload.song)) throw new Error("Invalid imported song");
       const song = payload.song as Omit<Song, "created_at">;
       if (typeof song.id !== "string" || !song.id || songs.has(song.id) || typeof song.title !== "string" || !Array.isArray(song.notes)) throw new Error("Invalid imported song");
-      songs.set(song.id, { ...song, created_at: Date.parse(event.createdAt) / 1000 });
+      const createdAt = payload.legacyCreatedAt ?? Date.parse(event.createdAt) / 1000;
+      if (typeof createdAt !== "number" || !Number.isFinite(createdAt)) throw new Error("Invalid song timestamp");
+      songs.set(song.id, { ...song, created_at: createdAt });
       plays.set(song.id, []);
     } else if (event.kind === "song" && payload.action === "delete") {
       if (typeof payload.songId !== "string" || !songs.has(payload.songId)) throw new Error("Deleting an unknown song");
       removed.add(payload.songId);
     } else if (event.kind === "song" && payload.action === "play") {
       if (typeof payload.songId !== "string" || !songs.has(payload.songId) || typeof payload.version !== "string" || !Array.isArray(payload.attacks)) throw new Error("Invalid song play");
-      plays.get(payload.songId)!.push({ created_at: Date.parse(event.createdAt) / 1000, version: payload.version, attacks: payload.attacks as [number, boolean][] });
+      const createdAt = payload.legacyCreatedAt ?? Date.parse(event.createdAt) / 1000;
+      if (typeof createdAt !== "number" || !Number.isFinite(createdAt)) throw new Error("Invalid play timestamp");
+      plays.get(payload.songId)!.push({ created_at: createdAt, version: payload.version, attacks: payload.attacks as [number, boolean][] });
     } else if (event.kind === "edit" && payload.action === "song") {
       if (typeof payload.songId !== "string" || !songs.has(payload.songId) || !payload.song || typeof payload.song !== "object" || Array.isArray(payload.song)) throw new Error("Invalid song edit");
       const song = payload.song as Song;
@@ -34,6 +38,7 @@ export function libraryFromEvents(events: ReadingLogEvent[]): LibraryState {
     } else throw new Error("Unknown library event");
   }
   for (const id of removed) { songs.delete(id); plays.delete(id); }
+  for (const entries of plays.values()) entries.sort((a, b) => a.created_at - b.created_at);
   return { songs, plays };
 }
 

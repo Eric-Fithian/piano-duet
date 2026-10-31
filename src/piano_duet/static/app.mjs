@@ -491,7 +491,7 @@ function showPracticeTarget() {
   $('emptyRoll').hidden = true;
 }
 
-async function refreshProfile() {
+export async function refreshProfile() {
   const profile = await localRequest('/api/profile');
   readingProfile = profile.reading;
   renderLevel(readingProfile.xp);

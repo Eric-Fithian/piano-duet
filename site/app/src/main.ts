@@ -18,6 +18,7 @@ import { PIANO_SAMPLES } from "./piano-samples";
 import { SampleStore } from "./sample-store";
 import { BrowserRecordingImporter } from "./recording-import";
 import { recordingStage, setupRecordingUi } from "./recording-ui";
+import { setupHistoryImport } from "./history-import";
 import "./style.css";
 
 Object.assign(window, { VexFlow });
@@ -110,6 +111,7 @@ async function start(): Promise<void> {
   if (import.meta.env.PROD && "serviceWorker" in navigator) await navigator.serviceWorker.register("/service-worker.js");
   const app = await import("../../../src/piano_duet/static/app.mjs");
   setupRecordingUi(importer, app.loadLibrary);
+  setupHistoryImport(log, async () => { await app.refreshProfile(); await app.loadLibrary(); });
 }
 
 start().catch((error: unknown) => {
