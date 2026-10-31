@@ -481,6 +481,7 @@ export class LocalService {
     if (peak > 1) for (let index = 0; index < audio.length; index++) audio[index] /= peak;
     if ((await this.store.list()).some((event) => event.id === attemptId)) return Response.json({ detail: "This performance has already been saved" }, { status: 409 });
     if (this.responseBusy || this.readingBusy) return Response.json({ detail: "The previous response is still finishing. Please retry." }, { status: 409 });
+    if (entry.completed) return Response.json({ detail: "This exercise was completed while the audio was being received" }, { status: 409 });
     this.responseBusy = true;
     const abort = new AbortController(), externalSignal = options.signal;
     const relay = () => abort.abort();

@@ -194,3 +194,59 @@ print(json.dumps(output))
     if (response.status !== 422) assert.deepEqual(await response.json(), expected[index].body);
   }
 });
+
+test("ear practice requires hearing and records aided recall correctly", async () => {
+  const events: ReadingLogEvent[] = [];
+  const store: LocalEventStore = { async list() { return [...events]; }, async append(kind, payload, id = crypto.randomUUID()) {
+    const event = { id, kind, payload, deviceId: "test-device", clock: events.length + 1, createdAt: "2024-01-01T00:00:00.000Z" };
+    events.push(event); return event;
+  } };
+  let notes: PracticeNote[] = [];
+  const transcriber: LocalPhraseTranscriber = { async run() { return { notes,
+    quality: { usable: true, onset_support: 0.95, supported_fraction: 1, note_support: notes.map(() => 0.95), reason: "synthetic" } }; } };
+  const service = new LocalService(store, undefined, () => 1704067200, undefined, undefined, undefined, undefined, undefined, transcriber);
+  const task = await (await service.fetch("/api/practice/next", { method: "POST", body: JSON.stringify({ focus: "ear" }) })).json();
+  const params = new URLSearchParams({ mode: "practice", session: "9cfb60dc-a9f7-4e10-9b04-033934f96d9b", task: task.id });
+  const play = () => service.fetch(`/api/respond?${params}`, { method: "POST", body: new Float32Array(3200).buffer });
+  assert.equal((await play()).status, 400);
+  const aid = () => service.fetch(`/api/practice/${task.id}/aid`, { method: "POST", body: JSON.stringify({ kind: "hearings" }) });
+  assert.equal((await (await aid()).json()).context.hearings, 1);
+  assert.equal((await (await aid()).json()).context.hearings, 2);
+  notes = task.target;
+  const result = await play();
+  assert.equal(result.status, 200);
+  const stream = (await result.text()).trim().split("\n").map((line) => JSON.parse(line));
+  const assessment = stream.find((event) => event.type === "assessment").assessment;
+  assert.equal(assessment.evidence.find((row: { skill: string; facet: string }) => row.skill === "ear.pitch" && row.facet === "all").weight, 0.7);
+  assert.equal((await aid()).status, 409);
+});
+
+test("a second take cannot save an exercise completed during request processing", async () => {
+  const events: ReadingLogEvent[] = [];
+  let delay = false, release: (() => void) | undefined;
+  const store: LocalEventStore = { async list() {
+    if (delay) { delay = false; await new Promise<void>((resolve) => { release = resolve; }); }
+    return [...events];
+  }, async append(kind, payload, id = crypto.randomUUID()) {
+    const event = { id, kind, payload, deviceId: "test-device", clock: events.length + 1, createdAt: "2024-01-01T00:00:00.000Z" };
+    events.push(event); return event;
+  } };
+  let notes: PracticeNote[] = [];
+  const transcriber: LocalPhraseTranscriber = { async run() { return { notes,
+    quality: { usable: true, onset_support: 0.95, supported_fraction: 1, note_support: notes.map(() => 0.95), reason: "synthetic" } }; } };
+  const service = new LocalService(store, undefined, () => 1704067200, undefined, undefined, undefined, undefined, undefined, transcriber);
+  const task = await (await service.fetch("/api/practice/next", { method: "POST", body: "{}" })).json();
+  notes = task.target;
+  const session = "9cfb60dc-a9f7-4e10-9b04-033934f96d9b";
+  const play = (attempt: string) => service.fetch(`/api/respond?${new URLSearchParams({ mode: "practice", session, task: task.id, attempt })}`,
+    { method: "POST", body: new Float32Array(3200).buffer });
+  delay = true;
+  const delayed = play("5cfb60dc-a9f7-4e10-9b04-033934f96d90");
+  assert.ok(release);
+  const first = await play("5cfb60dc-a9f7-4e10-9b04-033934f96d91");
+  assert.equal(first.status, 200);
+  await first.text();
+  release();
+  assert.equal((await delayed).status, 409);
+  assert.equal(events.filter((event) => event.kind === "attempt").length, 1);
+});

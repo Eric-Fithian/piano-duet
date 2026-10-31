@@ -29,6 +29,23 @@ test("recorded practice assessments match Python across focuses, assistance, qua
       }
     }
   }
+  let seed = 31;
+  const draw = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 0x100000000; };
+  for (let index = 0; index < 100; index++) {
+    const family = ["technique", "reading", "theory", "ear", "repertoire"][index % 5];
+    const target: PracticeNote[] = [];
+    for (let attack = 0; attack < 5; attack++) {
+      const count = draw() < 0.35 ? 2 : 1;
+      for (let i = 0; i < count; i++) target.push(note(48 + Math.floor(draw() * 30), attack * 0.75));
+    }
+    const played = target.filter(() => draw() > 0.15).map((item) => ({ ...item,
+      pitch: draw() < 0.2 ? item.pitch + 1 : item.pitch, start: 1 + item.start * (0.8 + Math.floor(draw() * 4) / 5),
+      velocity: 40 + Math.floor(draw() * 80) })).sort((a, b) => a.start - b.start || a.pitch - b.pitch);
+    cases.push({ prompt: { family, shape: index % 2 ? "scale" : "chord", target, challenge: index % 5 + 1,
+      bpm: 76, even: index % 2 === 1, dynamics: "even", key, title: "Synthetic", piece_id: "piece" }, notes: played,
+    context: { ...context, notation_visible: index % 3 === 0, familiar: index % 4 === 0,
+      hearings: family === "ear" ? index % 3 : 0, reveals: index % 7 === 0 ? 1 : 0, hints: index % 11 === 0 ? 1 : 0 }, quality });
+  }
   cases.push({ prompt: { family: "creating", target: [], challenge: 1, title: "Idea" }, notes: melody, context, quality });
   const reference = spawnSync("uv", ["run", "--frozen", "python", "-c", `
 import json, sys
