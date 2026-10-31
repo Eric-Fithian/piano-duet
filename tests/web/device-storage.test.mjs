@@ -100,7 +100,12 @@ for (const [name, engine] of [["Chromium", chromium], ["WebKit", webkit]]) {
       assert.equal(downloads, 1);
       await page.evaluate(async (file) => {
         const key = new URL(`/.piano-models/${file.model}/${file.revision}/${file.sha256}`, location.origin);
-        await (await caches.open("piano-duet-models")).put(key, new Response("corrupt"));
+        await (await caches.open("piano-duet-models")).put(key, new Response("x".repeat(file.bytes)));
+      }, descriptor);
+      assert.equal(await page.evaluate(async (file) => (await window.store.get(file, () => {})).text(), descriptor), "x".repeat(bytes.length));
+      await page.evaluate(async (file) => {
+        const marker = new URL(`/.piano-models/verified/${encodeURIComponent(file.url)}/${file.sha256}/${file.bytes}`, location.origin);
+        await (await caches.open("piano-duet-models")).delete(marker);
       }, descriptor);
       const failure = await page.evaluate(async (file) => {
         try { await window.store.get(file, () => {}); return null; }
@@ -109,6 +114,17 @@ for (const [name, engine] of [["Chromium", chromium], ["WebKit", webkit]]) {
       assert.ok(failure.includes("integrity check"));
       assert.equal(await page.evaluate(async (file) => (await window.store.get(file, () => {})).text(), descriptor), bytes.toString());
       assert.equal(downloads, 2);
+      await page.evaluate(async (file) => {
+        const key = new URL(`/.piano-models/${file.model}/${file.revision}/${file.sha256}`, location.origin);
+        await (await caches.open("piano-duet-models")).put(key, new Response("short"));
+      }, descriptor);
+      const truncated = await page.evaluate(async (file) => {
+        try { await window.store.get(file, () => {}); return null; }
+        catch (error) { return error.message; }
+      }, descriptor);
+      assert.ok(truncated.includes("integrity check"));
+      assert.equal(await page.evaluate(async (file) => (await window.store.get(file, () => {})).text(), descriptor), bytes.toString());
+      assert.equal(downloads, 3);
     } finally {
       await context.close();
       await rm(profile, { recursive: true, force: true });

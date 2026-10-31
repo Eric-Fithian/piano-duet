@@ -19,21 +19,25 @@ export class ModelStore {
     validateFile(file);
     const cache = await this.cache;
     const key = new Request(new URL(`/.piano-models/${encodeURIComponent(file.model)}/${encodeURIComponent(file.revision)}/${file.sha256}`, location.origin));
+    const marker = new Request(new URL(`/.piano-models/verified/${encodeURIComponent(file.url)}/${file.sha256}/${file.bytes}`, location.origin));
     const cached = await cache.match(key);
     if (cached) {
-      const verified = await verify(cached.clone().body, file, () => {}, signal);
+      const [blob, recorded] = await Promise.all([cached.blob(), cache.match(marker)]);
+      const verified = blob.size === file.bytes && (Boolean(recorded) || await verify(blob.stream(), file, () => {}, signal));
       if (!verified) {
-        await cache.delete(key);
+        await Promise.all([cache.delete(key), cache.delete(marker)]);
         throw new Error(`Cached ${file.name} failed its integrity check. Retry to download it again.`);
       }
-      return cached;
+      if (!recorded) await cache.put(marker, new Response("verified"));
+      return new Response(blob, { headers: cached.headers, status: cached.status });
     }
     const response = await fetch(file.url, { signal, mode: "cors" });
     if (!response.ok || !response.body) throw new Error(`Could not download ${file.name}: HTTP ${response.status}`);
     const [storage, checking] = response.body.tee();
-    const staging = new Request(new URL(`/.piano-models/staging/${crypto.randomUUID()}`, location.origin));
+    let complete = false;
+    await cache.delete(marker);
     try {
-      const writing = cache.put(staging, new Response(storage, { headers: response.headers, status: response.status }));
+      const writing = cache.put(key, new Response(storage, { headers: response.headers, status: response.status }));
       const checkingResult = verify(checking, file, (received) => onProgress({
         model: file.model, file: file.name, received, total: file.bytes,
       }), signal);
@@ -41,14 +45,13 @@ export class ModelStore {
       if (written.status === "rejected") throw written.reason;
       if (checked.status === "rejected") throw checked.reason;
       if (!checked.value) throw new Error(`Downloaded ${file.name} failed its integrity check`);
-      const complete = await cache.match(staging);
-      if (!complete) throw new Error(`Downloaded ${file.name} is missing from device storage`);
-      await cache.put(key, complete);
       const result = await cache.match(key);
       if (!result) throw new Error(`Could not store ${file.name} on this device`);
+      await cache.put(marker, new Response("verified"));
+      complete = true;
       return result;
     } finally {
-      await cache.delete(staging);
+      if (!complete) await Promise.all([cache.delete(key), cache.delete(marker)]);
     }
   }
 }

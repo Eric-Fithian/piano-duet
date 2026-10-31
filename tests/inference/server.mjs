@@ -6,6 +6,7 @@ const recordingDirectory = process.env.PIANO_RECORDING_MODEL_DIR ?? ".cache/mode
 const scoreDirectory = process.env.PIANO_SCORE_MODEL_DIR ?? ".cache/m2st/onnx-public";
 const scoreFixture = process.env.PIANO_SCORE_FIXTURE ?? ".cache/m2st/score-fixture.json";
 const recordingPcm = process.env.PIANO_RECORDING_PCM ?? ".cache/browser-inference/recording.pcm";
+const recordingWav = process.env.PIANO_RECORDING_WAV ?? ".cache/browser-inference/recording-three-minutes.wav";
 const paths = {
   "/runner.mjs": "tests/inference/browser-runner.mjs",
   "/worker.mjs": "tests/inference/browser-worker.mjs",
@@ -23,6 +24,12 @@ const paths = {
   "/models/local-fixture/recording-features.onnx": `${recordingDirectory}/features.onnx`,
   "/models/local-fixture/recording-attributes.onnx": `${recordingDirectory}/attributes.onnx`,
   "/fixtures/recording.pcm": recordingPcm,
+  "/fixtures/recording.wav": recordingWav,
+  "/fixtures/audio/fixture.mp3": ".cache/audio-formats/fixture.mp3",
+  "/fixtures/audio/fixture.m4a": ".cache/audio-formats/fixture.m4a",
+  "/fixtures/audio/fixture.flac": ".cache/audio-formats/fixture.flac",
+  "/fixtures/audio/fixture.webm": ".cache/audio-formats/fixture.webm",
+  "/fixtures/audio/mic-piano.wav": ".cache/audio-formats/mic-piano.wav",
   "/models/score/encoder.onnx": `${scoreDirectory}/encoder.onnx`,
   "/models/score/decoder-first.onnx": `${scoreDirectory}/decoder-first.onnx`,
   "/models/score/decoder-context.onnx": `${scoreDirectory}/decoder-context.onnx`,
