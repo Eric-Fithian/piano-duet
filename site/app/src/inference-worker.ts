@@ -4,7 +4,10 @@ import wasmModuleUrl from "onnxruntime-web/ort-wasm-simd-threaded.asyncify.mjs?u
 import { decodeLiveOnsets } from "./live-onsets";
 import { transcribeRecording } from "./recording-runtime";
 import { RecordingPool } from "./recording-pool";
+import { ScoreRuntime } from "./score-runtime";
 import { resample16To441 } from "../../../src/core/resample.ts";
+import { scoreInput } from "../../../src/core/score-input.ts";
+import { scoreMusicXml } from "../../../src/core/score-output.ts";
 import { ModelStore } from "./model-store";
 import type { ModelAsset, ModelRole } from "./browser-inference";
 import type { ModelId, ModelInputs } from "./inference";
@@ -26,14 +29,14 @@ let provider: "webgpu" | "wasm";
 let session: ort.InferenceSession | undefined;
 let recurrent: ort.InferenceSession | undefined;
 let recordingPool: RecordingPool | undefined;
+let scoreRuntime: ScoreRuntime | undefined;
 let cache: Record<string, ort.Tensor> = {};
 const controllers = new Map<number, AbortController>();
 const store = new ModelStore();
 let busy = false;
 
 async function open(id: number, name: ModelId, files: ModelAsset[], preference: "auto" | "wasm", signal: AbortSignal): Promise<{ provider: "webgpu" | "wasm"; recordingWorkers?: { provider: "wasm"; threads: number }[] }> {
-  if (session || recordingPool) throw new Error("The inference session is already open");
-  if (name !== "aria" && name !== "live-transcription" && name !== "recording-transcription") throw new Error(`${name} inference is not available yet`);
+  if (session || recordingPool || scoreRuntime) throw new Error("The inference session is already open");
   if (files.some((file) => file.model !== name)) throw new Error("Model catalog contains a mismatched file");
   const gpu = (navigator as Navigator & { gpu?: { requestAdapter(): Promise<unknown> } }).gpu;
   provider = name !== "recording-transcription" && preference === "auto" && gpu && await gpu.requestAdapter() ? "webgpu" : "wasm";
@@ -65,6 +68,12 @@ async function open(id: number, name: ModelId, files: ModelAsset[], preference: 
       session = await ort.InferenceSession.create(features, { executionProviders: ["wasm"] });
       recurrent = await ort.InferenceSession.create(attributes, { executionProviders: ["wasm"] });
     }
+  } else if (name === "midi-to-score") {
+    const encoder = await (await asset("score-encoder")).arrayBuffer();
+    const first = await (await asset("score-first")).arrayBuffer();
+    const context = await (await asset("score-context")).arrayBuffer();
+    const step = await (await asset("score-step")).arrayBuffer();
+    scoreRuntime = await ScoreRuntime.open({ encoder, first, context, step }, provider);
   } else {
     options.graphOptimizationLevel = "disabled";
     if (provider === "webgpu") {
@@ -93,6 +102,12 @@ function resetCache(): void {
 
 async function run(input: ModelInputs[ModelId], signal: AbortSignal): Promise<unknown> {
   if (!model) throw new Error("The inference session is not open");
+  if (model === "midi-to-score") {
+    if (!scoreRuntime) throw new Error("Score writing is not open");
+    const { notes } = input as ModelInputs["midi-to-score"];
+    const tokens = await scoreRuntime.generate(scoreInput(notes), signal);
+    return { musicXml: scoreMusicXml(tokens) };
+  }
   if (model === "recording-transcription") {
     const recording = input as ModelInputs["recording-transcription"];
     if (recording.sampleRate !== 16000 && recording.sampleRate !== 44100) throw new Error("Recording transcription needs 16 kHz or 44.1 kHz audio");
@@ -153,6 +168,8 @@ async function close(): Promise<void> {
   await session?.release();
   await recurrent?.release();
   recordingPool?.close();
+  await scoreRuntime?.close();
+  scoreRuntime = undefined;
   recordingPool = undefined;
   session = recurrent = undefined;
   model = undefined;

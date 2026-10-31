@@ -20,6 +20,7 @@ def main():
     parser.add_argument('--checkpoint', type=Path, default=ROOT / 'MIDI2ScoreTF.ckpt')
     parser.add_argument('--fixture', type=Path, default=ROOT / 'score-fixture.json')
     parser.add_argument('--browser-tokens', type=Path, default=ROOT / 'browser-score-tokens.json')
+    parser.add_argument('--browser-xml', type=Path)
     parser.add_argument('--notes', type=Path, default=ROOT / 'recording-notes.json')
     parser.add_argument('--output', type=Path, default=ROOT / 'score-sensitivity')
     args = parser.parse_args()
@@ -39,8 +40,11 @@ def main():
             duration = note['start'] + note['duration'] - start
             perturbed.append(Note(**{**note, 'start': start, 'duration': duration}))
         (args.output / f'jitter-{seed}.mid').write_bytes(midi_bytes(perturbed))
-    subprocess.run([str(ROOT / 'venv/bin/python'), '-I', str(Path(__file__)), '--worker', '--checkpoint', str(args.checkpoint),
-                    '--fixture', str(args.fixture), '--browser-tokens', str(args.browser_tokens), '--output', str(args.output)], check=True)
+    command = [str(ROOT / 'venv/bin/python'), '-I', str(Path(__file__)), '--worker', '--checkpoint', str(args.checkpoint),
+               '--fixture', str(args.fixture), '--browser-tokens', str(args.browser_tokens), '--output', str(args.output)]
+    if args.browser_xml:
+        command.extend(('--browser-xml', str(args.browser_xml)))
+    subprocess.run(command, check=True)
     scores = {name: parse_musicxml((args.output / f'{name}.musicxml').read_bytes())
               for name in ('reference', 'browser', *(f'jitter-{seed}' for seed in range(4)))}
     reference = scores['reference']
@@ -54,7 +58,7 @@ def main():
     result = {'jitter_seconds': 0.00002, 'jitter_runs': 4, 'reference_notes': len(reference['notes']),
               'jitter_muster_new_mean_error_range': [min(jitter), ceiling], 'browser_within_jitter_spread': passed,
               'jitter_aligned_pitch_f1_range': [min(jitter_f1), max(jitter_f1)],
-              'comparisons': comparisons, 'detokenizer': 'Python reference for both outputs'}
+              'comparisons': comparisons, 'detokenizer': 'browser MusicXML' if args.browser_xml else 'Python reference for both outputs'}
     (args.output / 'comparison.json').write_text(json.dumps(result, indent=2) + '\n')
     print(json.dumps(result, indent=2))
     if not passed:
@@ -71,7 +75,10 @@ def write_scores(args):
     reference = json.loads(args.fixture.read_text())['expected']
     browser = json.loads(args.browser_tokens.read_text())
     write_score(namespace, token_tensors(reference, model), args.output / 'reference.musicxml')
-    write_score(namespace, token_tensors(browser, model), args.output / 'browser.musicxml')
+    if args.browser_xml:
+        (args.output / 'browser.musicxml').write_bytes(args.browser_xml.read_bytes())
+    else:
+        write_score(namespace, token_tensors(browser, model), args.output / 'browser.musicxml')
     for seed in range(4):
         source = namespace['MultistreamTokenizer'].tokenize_midi(str(args.output / f'jitter-{seed}.mid'))
         torch.manual_seed(0)

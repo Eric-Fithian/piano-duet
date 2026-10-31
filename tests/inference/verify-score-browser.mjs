@@ -15,8 +15,9 @@ let result;
 try {
   await page.goto(`http://127.0.0.1:${site.port}/test/score-inference.html`);
   await page.waitForFunction(() => typeof window.verifyScore === "function");
-  result = await page.evaluate(({ base, provider }) => window.verifyScore(base, provider),
-    { base: `http://127.0.0.1:${models.address().port}`, provider });
+  result = await page.evaluate(({ base, provider, runtime }) => runtime
+    ? window.verifyScoreRuntime(base, provider) : window.verifyScore(base, provider),
+  { base: `http://127.0.0.1:${models.address().port}`, provider, runtime: process.env.PIANO_SCORE_RUNTIME === "1" });
   console.log(JSON.stringify({ provider, ...result }, null, 2));
 } finally {
   await browser.close();

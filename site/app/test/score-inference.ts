@@ -2,10 +2,13 @@ import * as ort from "onnxruntime-web/webgpu";
 import wasmUrl from "onnxruntime-web/ort-wasm-simd-threaded.asyncify.wasm?url";
 import wasmModuleUrl from "onnxruntime-web/ort-wasm-simd-threaded.asyncify.mjs?url";
 import { scoreInput } from "../../../src/core/score-input.ts";
+import { scoreMusicXml } from "../../../src/core/score-output.ts";
 import type { ScoreInputNote } from "../../../src/core/score-input.ts";
 import { BrowserInference } from "../src/browser-inference";
 import type { ModelAsset } from "../src/browser-inference";
 import { RecordingPool } from "../src/recording-pool";
+import { decodeAudioFile } from "../src/audio-decoder";
+import { ScoreRuntime } from "../src/score-runtime";
 
 const INPUTS = { offset: 145, downbeat: 146, duration: 97, pitch: 128, accidental: 7, keysignature: 16,
   grace: 2, trill: 2, staccato: 2, voice: 9, stem: 4, hand: 3 };
@@ -57,8 +60,14 @@ function contextInput(history: Record<string, number[]>): Record<string, ort.Ten
   return tokens;
 }
 
+async function decodeRecordingFile(base: string): Promise<Float32Array> {
+  const response = await fetch(`${base}/fixtures/recording.wav`);
+  if (!response.ok) throw new Error("Recording file is unavailable");
+  return (await decodeAudioFile(await response.arrayBuffer())).audio;
+}
+
 async function verifyScore(base: string, provider: "webgpu" | "wasm", notes?: ScoreInputNote[], includeTokens = false,
-  streaming?: { first: Promise<ScoreInputNote[]>; complete: Promise<ScoreInputNote[]>; ready?: () => void }) {
+  streaming?: { first: Promise<ScoreInputNote[]>; complete: Promise<ScoreInputNote[]>; ready?: () => void; warm?: boolean }) {
     const response = await fetch(`${base}/fixtures/score-fixture.json`);
     if (!response.ok) throw new Error("Score fixture is unavailable");
     const fixture = await response.json() as Fixture;
@@ -72,6 +81,22 @@ async function verifyScore(base: string, provider: "webgpu" | "wasm", notes?: Sc
     const first = await ort.InferenceSession.create(`${base}/models/score/decoder-first.onnx`, options);
     const context = await ort.InferenceSession.create(`${base}/models/score/decoder-context.onnx`, options);
     const step = await ort.InferenceSession.create(`${base}/models/score/decoder-step.onnx`, options);
+    if (streaming?.warm) {
+      const length = Math.min(512, fixture.source_notes), source: Record<string, ort.Tensor> = {};
+      for (const [name, width] of Object.entries({ onset: 200, duration: 200, pitch: 128, velocity: 8 })) {
+        source[name] = new ort.Tensor("float32", Float32Array.from(fixture.source[name][0].slice(0, length).flat()), [1, length, width]);
+      }
+      source.pad = new ort.Tensor("int64", BigInt64Array.from(fixture.source.pad[0].slice(0, length).map(BigInt)), [1, length]);
+      const encoded = (await encoder.run(source)).encoded, initial = tokenInput({}, 0);
+      const generated = await first.run({ encoder: encoded, encoder_pad: source.pad, ...initial });
+      const cache = Object.fromEntries(CACHES.map((name) => [`past_${name}`, generated[`present_${name}`]]));
+      const continued = await step.run({ encoder: encoded, encoder_pad: source.pad, ...initial, ...cache });
+      const history = Object.fromEntries(ORDER.map((name) => [name, Array(64).fill(0)]));
+      const contextTokens = contextInput(history);
+      const seeded = await context.run({ encoder: encoded, encoder_pad: source.pad, ...contextTokens });
+      for (const tensor of [...Object.values(source), ...Object.values(initial), ...Object.values(generated),
+        ...Object.values(continued), ...Object.values(contextTokens), ...Object.values(seeded), encoded]) tensor.dispose();
+    }
     streaming?.ready?.();
     let converted = streaming ? scoreInput(await streaming.first) : notes ? scoreInput(notes) : null;
     let n = converted ? converted.pad.length : fixture.source_notes;
@@ -159,6 +184,25 @@ async function verifyScore(base: string, provider: "webgpu" | "wasm", notes?: Sc
 
 Object.assign(window, {
   verifyScore,
+  async verifyScoreRuntime(base: string, provider: "webgpu" | "wasm") {
+    const response = await fetch(`${base}/fixtures/score-fixture.json`);
+    if (!response.ok) throw new Error("Score fixture is unavailable");
+    const fixture = await response.json() as Fixture;
+    if (fixture.decoder_layers !== 8) throw new Error("The published score runtime expects eight decoder layers");
+    const values = (name: string) => fixture.source[name][0].map((row) => row.indexOf(1));
+    const streams = { onset: values("onset"), duration: values("duration"), pitch: values("pitch"),
+      velocity: values("velocity"), pad: fixture.source.pad[0] };
+    const model = await ScoreRuntime.open({ encoder: `${base}/models/score/encoder.onnx`, first: `${base}/models/score/decoder-first.onnx`,
+      context: `${base}/models/score/decoder-context.onnx`, step: `${base}/models/score/decoder-step.onnx` }, provider);
+    const started = performance.now();
+    const tokens = await model.generate(streams);
+    const mismatches = Object.fromEntries(ORDER.map((name) => {
+      if (tokens[name].length !== fixture.expected[name].length) throw new Error(`Score length differs for ${name}`);
+      return [name, tokens[name].reduce((sum, value, index) => sum + Number(value !== fixture.expected[name][index]), 0)];
+    }));
+    await model.close();
+    return { sourceNotes: fixture.source_notes, elapsedMs: performance.now() - started, mismatches };
+  },
   async verifyRecordingScore(base: string, assets: ModelAsset[]) {
     const response = await fetch(`${base}/fixtures/recording.pcm`);
     if (!response.ok) throw new Error("Recording fixture is unavailable");
@@ -173,11 +217,12 @@ Object.assign(window, {
     await session.close();
     return { transcriptionMs, score, elapsedMs, recordingProvider: session.provider };
   },
-  async verifyRecordingScoreOverlap(base: string, assets: ModelAsset[], workers = 4) {
+  async verifyRecordingScoreOverlap(base: string, assets: ModelAsset[], workers = 4, full = false, cold = false) {
     const preparationStarted = performance.now();
-    const response = await fetch(`${base}/fixtures/recording.pcm`);
-    if (!response.ok) throw new Error("Recording fixture is unavailable");
-    const audio = new Float32Array(await response.arrayBuffer());
+    const audioPromise = full && cold ? decodeRecordingFile(base) : !full ? fetch(`${base}/fixtures/recording.pcm`).then(async (response) => {
+      if (!response.ok) throw new Error("Recording fixture is unavailable");
+      return new Float32Array(await response.arrayBuffer());
+    }) : null;
     const buffers = await Promise.all(assets.map(async (asset) => {
       const result = await fetch(asset.url);
       if (!result.ok) throw new Error(`Could not load ${asset.name}`);
@@ -192,9 +237,13 @@ Object.assign(window, {
     const complete = new Promise<ScoreInputNote[]>((resolve, reject) => { resolveComplete = resolve; rejectComplete = reject; });
     let resolveReady!: () => void;
     const ready = new Promise<void>((resolve) => { resolveReady = resolve; });
-    const scoring = verifyScore(base, "webgpu", undefined, true, { first, complete, ready: resolveReady });
+    const scoring = verifyScore(base, "webgpu", undefined, true, { first, complete, ready: resolveReady, warm: full && !cold });
     await Promise.race([ready, scoring.then(() => { throw new Error("Score completed before transcription began"); })]);
-    const started = performance.now();
+    if (full && !cold) await pool.run(new Float32Array(16 * 44100), new AbortController().signal);
+    const initialized = performance.now(), started = full && cold ? preparationStarted : initialized;
+    const decodeStarted = performance.now();
+    const audio = await (audioPromise ?? decodeRecordingFile(base));
+    const decoded = performance.now();
     let firstMs: number | undefined;
     const transcription = pool.run(audio, new AbortController().signal, (completed) => {
       if (firstMs === undefined && completed.length >= 512 && scoreInput(completed).pad.length >= 512) {
@@ -205,8 +254,10 @@ Object.assign(window, {
     transcription.then((completed) => { if (firstMs === undefined) resolveFirst(completed); resolveComplete(completed); },
       (error) => { if (firstMs === undefined) rejectFirst(error); else rejectComplete(error); });
     const score = await scoring;
+    const musicxml = full ? scoreMusicXml(score.tokens!) : undefined;
     const elapsedMs = performance.now() - started;
     pool.close();
-    return { preparationMs: started - preparationStarted, firstMs, score, elapsedMs, workers, threads: 3, recordingProvider: "wasm" };
+    return { preparationMs: initialized - preparationStarted, decodeWaitMs: decoded - decodeStarted, firstMs, score, musicxml,
+      elapsedMs, workers, threads: 3, recordingProvider: "wasm" };
   },
 });

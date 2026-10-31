@@ -85,28 +85,44 @@ jobs:
         with:
           path: .cache/ci-models
           key: published-models-${{ hashFiles('site/app/src/model-catalog.ts', 'tests/inference/download-models.mjs') }}
-      - run: node tests/inference/download-models.mjs
+      - run: node tests/inference/download-models.mjs aria live-transcription recording-transcription live-reference
       - run: uv run --frozen python tests/inference/published_model_parity.py
 
   browser-storage:
     name: Browser storage
     runs-on: macos-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: 24
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          version: "0.10.12"
+          enable-cache: true
       - run: npm ci
       - run: npm ci --prefix site
       - run: npx playwright install chromium webkit
       - run: npm run test:web
         timeout-minutes: 4
+      - run: uv run --frozen python tests/inference/audio_fixtures.py
+      - run: node tests/inference/audio-decoding.mjs
+        timeout-minutes: 3
       - uses: actions/cache@v4
         with:
-          path: .cache/ci-models/recording-transcription
+          path: |
+            .cache/ci-models/recording-transcription
+            .cache/ci-models/midi-to-score
           key: browser-recording-model-${{ hashFiles('site/app/src/model-catalog.ts', 'tests/inference/download-models.mjs') }}
-      - run: node tests/inference/download-models.mjs recording-transcription
+      - run: node tests/inference/download-models.mjs recording-transcription midi-to-score
+      - run: node tests/inference/expand-score-fixture.mjs
+      - run: node tests/inference/verify-score-browser.mjs webgpu
+        timeout-minutes: 3
+        env:
+          PIANO_SCORE_MODEL_DIR: .cache/ci-models/midi-to-score
+          PIANO_SCORE_FIXTURE: .cache/m2st/synthetic-parity.json
+          PIANO_SCORE_RUNTIME: "1"
       - run: mkdir -p .cache/browser-inference
       - run: curl --fail --silent --show-error --location https://raw.githubusercontent.com/nbrosowsky/tonejs-instruments/622c2f1c32c8cfce4158ddc3eb26e518ddef37e5/samples/piano/C4.mp3 --output .cache/browser-inference/C4.mp3
       - run: node tests/inference/drill-microphone.mjs

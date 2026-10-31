@@ -10,6 +10,7 @@ function asset(model: ModelId, repository: string, revision: string, role: Model
 const aria = "5ac00cdb1b9debed833784c17a27286b788533e7";
 const live = "af9aad0409a25b7ebec9e09ac94013212c4d6dfc";
 const recording = "8f6f1c1ee3b9e546679364f49c8b64a2c64a9b81";
+const score = "c2bcbf58a22a2d23c2f9d1c7d5052bf9e85d757c";
 
 export const MODEL_CATALOG: ModelCatalog = {
   aria: [
@@ -31,5 +32,15 @@ export const MODEL_CATALOG: ModelCatalog = {
       "8c9d550d34662cd89d9271711cf59e5cd53820861e1f706c1766df3eb7388757"),
     asset("recording-transcription", "piano-duet-recording-transcription-onnx", recording, "attributes", "attributes.onnx", 3423800,
       "3c23a41616772ae9bc7a0b090558d09848d7e13f99607f5dc82629a5decfa29c"),
+  ],
+  "midi-to-score": [
+    asset("midi-to-score", "piano-duet-score-onnx", score, "score-encoder", "encoder.onnx", 212157460,
+      "12e7ac5576c6b35ad5565a26c481bc10248430bb674156228dcf7908030ab36e"),
+    asset("midi-to-score", "piano-duet-score-onnx", score, "score-first", "decoder-first.onnx", 266641043,
+      "26a3cb37064dbc2d2757c7e38c49d3d3d89c17d981a334c8cfb0c43ffdddaddf"),
+    asset("midi-to-score", "piano-duet-score-onnx", score, "score-context", "decoder-context.onnx", 266702285,
+      "2164ad2f6b783fc6871d0decd30277a433b63316b7f23ddbd2b188bcd3999fb5"),
+    asset("midi-to-score", "piano-duet-score-onnx", score, "score-step", "decoder-step.onnx", 240273504,
+      "b0f93af7317e8ca8233d7f2d1b33064d9b1e545c4bab74b08858cfc090afe9aa"),
   ],
 };

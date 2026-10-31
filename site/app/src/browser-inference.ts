@@ -1,7 +1,8 @@
 import type { DownloadProgress, InferenceBackend, InferenceSession, ModelId, ModelInputs, ModelOutputs } from "./inference";
 import type { ModelFile } from "./model-store";
 
-export type ModelRole = "graph" | "weights" | "convolution" | "recurrent" | "features" | "attributes";
+export type ModelRole = "graph" | "weights" | "convolution" | "recurrent" | "features" | "attributes"
+  | "score-encoder" | "score-first" | "score-context" | "score-step";
 export type ModelAsset = ModelFile & { role: ModelRole };
 export type ModelCatalog = Partial<Record<ModelId, ModelAsset[]>>;
 

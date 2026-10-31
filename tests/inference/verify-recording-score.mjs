@@ -25,13 +25,16 @@ let result;
 try {
   await page.goto(`http://127.0.0.1:${site.port}/test/score-inference.html`);
   await page.waitForFunction(() => typeof window.verifyRecordingScore === "function");
-  result = await page.evaluate(({ base, assets, overlap, workers }) => overlap
-    ? window.verifyRecordingScoreOverlap(base, assets, workers) : window.verifyRecordingScore(base, assets),
-  { base, assets, overlap: process.env.PIANO_SCORE_OVERLAP === "1", workers: Number(process.env.PIANO_RECORDING_WORKERS ?? 4) });
+  result = await page.evaluate(({ base, assets, overlap, workers, full, cold }) => overlap
+    ? window.verifyRecordingScoreOverlap(base, assets, workers, full, cold) : window.verifyRecordingScore(base, assets),
+  { base, assets, overlap: process.env.PIANO_SCORE_OVERLAP === "1", workers: Number(process.env.PIANO_RECORDING_WORKERS ?? 4),
+    full: process.env.PIANO_FULL_IMPORT === "1", cold: process.env.PIANO_IMPORT_COLD === "1" });
   if (!result.score.tokens) throw new Error("The browser did not return score tokens");
   await writeFile(process.env.PIANO_SCORE_TOKEN_OUTPUT ?? ".cache/m2st/browser-score-tokens.json", JSON.stringify(result.score.tokens));
+  if (result.musicxml) await writeFile(process.env.PIANO_SCORE_XML_OUTPUT ?? ".cache/m2st/browser-score.musicxml", result.musicxml);
   const { tokens, ...summary } = result.score;
-  console.log(JSON.stringify({ ...result, score: summary }, null, 2));
+  const { musicxml, ...resultSummary } = result;
+  console.log(JSON.stringify({ ...resultSummary, score: summary, ...(musicxml ? { musicxmlBytes: Buffer.byteLength(musicxml) } : {}) }, null, 2));
 } finally {
   await browser.close();
   site.server.kill("SIGTERM");
