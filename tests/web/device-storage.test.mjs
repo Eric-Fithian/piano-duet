@@ -128,7 +128,7 @@ for (const [name, engine] of [["Chromium", chromium], ["WebKit", webkit]]) {
       assert.equal(downloads, 3);
       await page.evaluate(async (file) => {
         const key = new URL(`/.piano-models/${file.model}/${file.revision}/${file.sha256}`, location.origin);
-        await (await caches.open("piano-duet-models")).put(key, new Response("short"));
+        await (await caches.open("piano-duet-models")).put(key, new Response("short", { headers: { "Content-Length": "5" } }));
       }, descriptor);
       assert.equal(await page.evaluate((file) => window.store.status([file]), descriptor), "partially downloaded");
       const truncated = await page.evaluate(async (file) => {

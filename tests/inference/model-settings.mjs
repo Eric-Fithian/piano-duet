@@ -18,7 +18,7 @@ const browser = await (browserName === "chromium" ? chromium : webkit).launchPer
 try {
   const page = await browser.newPage();
   await page.goto(url.href);
-  await page.waitForFunction(() => document.querySelector("#accountSync")?.textContent.trim().length > 0, { timeout: 60000 });
+  await page.waitForFunction(() => document.querySelector("#accountSync")?.textContent.trim().length > 0, null, { timeout: 60000 });
   if (browserName === "chromium") {
     const adapter = await page.evaluate(async () => {
       const gpu = navigator.gpu;
@@ -31,13 +31,13 @@ try {
   await page.locator("#modelSettings > summary").click();
   await page.getByRole("button", { name: "Test all" }).click();
   await page.waitForFunction(() => !document.querySelector(".model-confirm").hidden
-    || !document.querySelector("[data-action=cancel-all]").hidden, { timeout: 120000 });
+    || !document.querySelector("[data-action=cancel-all]").hidden, null, { timeout: 120000 });
   const confirm = page.getByRole("button", { name: "Download and test" });
   if (await confirm.isVisible()) await confirm.click();
   await page.waitForFunction(() => {
     const text = document.querySelector(".model-message")?.textContent ?? "";
     return text === "All tests passed." || text.includes(" tests failed.");
-  }, { timeout: 1200000 });
+  }, null, { timeout: 1200000 });
   const results = await page.locator(".model-entry").evaluateAll((rows) => rows.map((row) => ({
     name: row.querySelector(".model-name")?.textContent, status: row.querySelector(".model-status")?.textContent,
     result: row.querySelector(".model-result")?.textContent,

@@ -30,6 +30,12 @@ test("model status and integrity follow stored bytes and verified downloads", as
     assert.equal(progress.at(-1), data.length);
     assert.equal(await store.status([file]), "downloaded");
     assert.equal(await store.status([file, another]), "partially downloaded");
+    await store.verifyStored(file, () => {});
+    const key = new URL(`/.piano-models/${file.model}/${file.revision}/${file.sha256}`, location.origin);
+    records.set(key.href, new Response("x".repeat(data.length)));
+    assert.equal(await store.status([file]), "downloaded");
+    await assert.rejects(store.verifyStored(file, () => {}), { message: "Cached model.bin failed its integrity check. Re-download it to try again." });
+    assert.equal(await store.status([file]), "partially downloaded");
     await store.delete([file]);
     assert.equal(await store.status([file]), "not downloaded");
     let started;
@@ -46,6 +52,38 @@ test("model status and integrity follow stored bytes and verified downloads", as
     assert.equal(await store.status([file]), "not downloaded");
   } finally {
     globalThis.fetch = originalFetch;
+    if (originalCaches) Object.defineProperty(globalThis, "caches", originalCaches); else Reflect.deleteProperty(globalThis, "caches");
+    if (originalLocation) Object.defineProperty(globalThis, "location", originalLocation); else Reflect.deleteProperty(globalThis, "location");
+  }
+});
+
+test("status checks markers and headers without reading cached bodies", async () => {
+  const originalCaches = Object.getOwnPropertyDescriptor(globalThis, "caches");
+  const originalLocation = Object.getOwnPropertyDescriptor(globalThis, "location");
+  let length = null, filePresent = true, markerPresent = true;
+  const failBodyRead = () => { throw new Error("Status read a cached body"); };
+  const response = { headers: { get: () => length }, blob: failBodyRead, arrayBuffer: failBodyRead, text: failBodyRead,
+    get body() { return failBodyRead(); } };
+  const cache = { async match(key) { return key.url.includes("/.piano-models/verified/")
+    ? markerPresent ? response : undefined : filePresent ? response : undefined; } };
+  Object.defineProperty(globalThis, "caches", { configurable: true, value: { open: async () => cache } });
+  Object.defineProperty(globalThis, "location", { configurable: true, value: { origin: "http://localhost" } });
+  const file = { model: "aria", name: "model.bin", revision: "revision", url: "http://localhost/revision/model.bin",
+    bytes: 14, sha256: "0".repeat(64) };
+  try {
+    const store = new ModelStore();
+    assert.equal(await store.status([file]), "downloaded");
+    length = "14";
+    assert.equal(await store.status([file]), "downloaded");
+    length = "13";
+    assert.equal(await store.status([file]), "partially downloaded");
+    length = "invalid";
+    assert.equal(await store.status([file]), "partially downloaded");
+    length = null; markerPresent = false;
+    assert.equal(await store.status([file]), "partially downloaded");
+    filePresent = false;
+    assert.equal(await store.status([file]), "not downloaded");
+  } finally {
     if (originalCaches) Object.defineProperty(globalThis, "caches", originalCaches); else Reflect.deleteProperty(globalThis, "caches");
     if (originalLocation) Object.defineProperty(globalThis, "location", originalLocation); else Reflect.deleteProperty(globalThis, "location");
   }

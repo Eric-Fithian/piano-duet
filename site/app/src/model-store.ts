@@ -12,7 +12,8 @@ export class ModelStore {
       validateFile(file);
       const response = await cache.match(fileKey(file));
       if (!response) return "missing";
-      return (await response.blob()).size === file.bytes && Boolean(await cache.match(markerKey(file))) ? "verified" : "incomplete";
+      const length = response.headers.get("content-length");
+      return (length === null || Number(length) === file.bytes) && Boolean(await cache.match(markerKey(file))) ? "verified" : "incomplete";
     }));
     return present.every((state) => state === "verified") ? "downloaded"
       : present.some((state) => state !== "missing") ? "partially downloaded" : "not downloaded";
@@ -24,6 +25,26 @@ export class ModelStore {
       validateFile(file);
       await Promise.all([cache.delete(fileKey(file)), cache.delete(markerKey(file))]);
     }));
+  }
+
+  async verifyStored(file: ModelFile, onProgress: (progress: DownloadProgress) => void, signal?: AbortSignal): Promise<void> {
+    validateFile(file);
+    const cache = await this.cache;
+    const response = await cache.match(fileKey(file));
+    if (!response) throw new Error(`${file.name} is not downloaded`);
+    let valid: boolean;
+    try {
+      valid = await verify(response.body, file, (received) => onProgress({
+        model: file.model, file: file.name, received, total: file.bytes,
+      }), signal);
+    } catch (error) {
+      if (error instanceof Error && error.message === `${file.name} is larger than its manifest`) await cache.delete(markerKey(file));
+      throw error;
+    }
+    if (!valid) {
+      await cache.delete(markerKey(file));
+      throw new Error(`Cached ${file.name} failed its integrity check. Re-download it to try again.`);
+    }
   }
 
   async get(file: ModelFile, onProgress: (progress: DownloadProgress) => void,

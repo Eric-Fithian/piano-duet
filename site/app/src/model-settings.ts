@@ -1,6 +1,6 @@
 import { MODEL_CATALOG } from "./model-catalog";
 import { ModelStore } from "./model-store";
-import { withModelWriteLock } from "./model-lock";
+import { acquireModelLock, withModelWriteLock } from "./model-lock";
 import { PIANO_SAMPLES, SAMPLE_REVISION } from "./piano-samples";
 import { testModel } from "./model-self-test";
 import type { AssetId, DownloadProgress, InferenceBackend, InferenceBackendRecord, ModelFile, ModelId } from "./inference";
@@ -29,7 +29,7 @@ const size = (bytes: number) => bytes >= 1_000_000_000 ? `${(bytes / 1_000_000_0
 const reason = (error: unknown) => error instanceof Error ? error.message : String(error);
 
 export function setupModelSettings(root: HTMLDetailsElement, backend: InferenceBackend,
-  options: { entries?: Entry[]; store?: Pick<ModelStore, "get" | "status" | "delete">; test?: typeof testModel } = {}): { backend: (model: ModelId, record: InferenceBackendRecord) => void; progress: (value: DownloadProgress) => void } {
+  options: { entries?: Entry[]; store?: Pick<ModelStore, "get" | "status" | "delete" | "verifyStored">; test?: typeof testModel } = {}): { backend: (model: ModelId, record: InferenceBackendRecord) => void; progress: (value: DownloadProgress) => void } {
   const store = options.store ?? new ModelStore();
   const items = options.entries ?? entries;
   const runTest = options.test ?? testModel;
@@ -108,16 +108,30 @@ export function setupModelSettings(root: HTMLDetailsElement, backend: InferenceB
     const started = performance.now();
     try {
       if (action === "test") {
-        row.result.textContent = "Testing…";
-        const result = await runTest(entry.id, backend, store, controller.signal, (progress) => {
-          row.progress.hidden = false;
-          row.progress.max = progress.total ?? 1;
-          row.progress.value = progress.received;
-          row.status.textContent = `Downloading ${progress.total ? Math.floor(100 * progress.received / progress.total) + "%" : "…"}`;
-        }, (record) => { if (entry.id !== "piano-samples") reportBackend(entry.id, record); });
-        if (!result.passed) throw new Error(result.text);
-        results.set(entry.id, result); row.result.textContent = result.text;
-        if (result.backend && entry.id !== "piano-samples") reportBackend(entry.id, result.backend);
+        const release = await acquireModelLock(entry.id, controller.signal);
+        try {
+          row.result.textContent = "Verifying files…";
+          const total = entry.files.reduce((sum, file) => sum + file.bytes, 0);
+          let verified = 0;
+          row.progress.hidden = false; row.progress.max = total; row.progress.value = 0;
+          for (const file of entry.files) {
+            await store.verifyStored(file, (progress) => {
+              row.progress.value = verified + progress.received;
+              row.status.textContent = `Verifying ${Math.floor(100 * row.progress.value / total)}%`;
+            }, controller.signal);
+            verified += file.bytes;
+          }
+          row.progress.hidden = true; row.result.textContent = "Testing…";
+          const result = await runTest(entry.id, backend, store, controller.signal, (progress) => {
+            row.progress.hidden = false;
+            row.progress.max = progress.total ?? 1;
+            row.progress.value = progress.received;
+            row.status.textContent = `Downloading ${progress.total ? Math.floor(100 * progress.received / progress.total) + "%" : "…"}`;
+          }, (record) => { if (entry.id !== "piano-samples") reportBackend(entry.id, record); });
+          if (!result.passed) throw new Error(result.text);
+          results.set(entry.id, result); row.result.textContent = result.text;
+          if (result.backend && entry.id !== "piano-samples") reportBackend(entry.id, result.backend);
+        } finally { release(); }
       } else {
         await withModelWriteLock(entry.id, async () => {
           if (action === "delete" || action === "redownload") await store.delete(entry.files);

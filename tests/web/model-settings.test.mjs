@@ -44,6 +44,15 @@ for (const [name, engine] of [["Chromium", chromium], ["WebKit", webkit]]) {
       assert.equal(downloads, 3);
       await row.getByRole("button", { name: "Test", exact: true }).click();
       await row.locator(".model-result").getByText("Passed · fixture").waitFor();
+      await page.evaluate(async () => {
+        const key = new URL("/.piano-models/aria/fixture-revision/a21e5c2f98f6b674aeeba3d88362cf618da2d78ae6f9a07ff9cac7f2907e283f", location.origin);
+        await (await caches.open("piano-duet-models")).put(key, new Response("x".repeat(21)));
+      });
+      await row.getByRole("button", { name: "Test", exact: true }).click();
+      await row.locator(".model-result").getByText("failed its integrity check", { exact: false }).waitFor();
+      await row.locator(".model-status").getByText("Partial", { exact: true }).waitFor();
+      await row.getByRole("button", { name: "Re-download" }).click();
+      await row.locator(".model-status").getByText("Downloaded", { exact: true }).waitFor();
       await page.evaluate(() => window.failFixtureTest());
       await row.getByRole("button", { name: "Test", exact: true }).click();
       await row.locator(".model-result").getByText("Blob loading failed", { exact: false }).waitFor();
