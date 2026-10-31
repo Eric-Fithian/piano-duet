@@ -103,7 +103,7 @@ try {
   await page.goto(`http://127.0.0.1:${site.port}/`);
   await page.waitForFunction(() => document.querySelector("#practiceTitle")?.textContent === "C major scale", null, { timeout: 30000 });
   await page.locator("#modeMenuButton").click();
-    await page.locator("#duetMode").click();
+  await page.locator("#duetMode").click();
   await page.locator("#openSettings").click();
   await page.locator("#length").evaluate((input) => { input.value = "2"; input.dispatchEvent(new Event("input", { bubbles: true })); });
   assert.equal(await page.locator("#length").inputValue(), "2", await diagnostic("Duet reply length did not change to two seconds"));
@@ -240,7 +240,7 @@ try {
     await diagnostic(`Duet attempts were not saved with enough notes: ${JSON.stringify(again.recent.slice(0, 2))}`));
   await waitForListening("Variations mode switch");
   await page.locator("#modeMenuButton").click();
-    await page.locator("#learningMode").click();
+  await page.locator("#learningMode").click();
   await waitForListening("Variations idea");
   await play([60, 64, 67], 0.7, 0.45);
   process.stderr.write(`Waiting for Variations idea at ${Math.round(performance.now() - started)} ms\n`);

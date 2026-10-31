@@ -62,12 +62,13 @@ export default defineConfig({
         replace('  <script src="/notation-assets/vexflow.js" defer></script>\n', "");
         replace('  <script type="module" src="/static/app.mjs"></script>', '  <script type="module" src="/src/main.ts"></script>');
         replace('href="/static/credits.html"', 'href="/docs/credits/"');
-        replace('id="openYoutube" class=', 'id="openYoutube" hidden class=');
+        replace('id="openYoutube" type=', 'id="openYoutube" hidden type=');
+        replace('<button id="openYoutube"', '<button id="importAudio" type="button">Audio file</button><button id="recordAudio" type="button">Record audio</button><button id="openYoutube"');
         replace('      <h3>Listening</h3>', `      <h3>Account and sync</h3><section id="accountSync" aria-label="Account and sync"></section>
       <details class="history-import"><summary>Import history from the Mac app</summary><p>Quit the Mac app before selecting its .local/learner.sqlite3 file, so all history is saved in the file.</p><label class="secondary">Choose history file <input id="historyFile" type="file" accept=".sqlite3,.sqlite,.db"></label><progress id="historyImportProgress" aria-label="Importing history" hidden></progress><p id="historyImportStatus" aria-live="polite"></p></details>
       <h3>Listening</h3>`);
         replace('        <div class="song-table" role="table" aria-label="Your songs">',
-          `        <div class="recording-import" aria-label="Recording import"><button id="importAudio" class="secondary" type="button">Import audio</button><button id="recordAudio" class="secondary" type="button">Record audio</button><p id="recordingImportStatus" aria-live="polite"></p></div>
+          `        <p id="recordingImportStatus" aria-live="polite"></p>
         <dialog id="recordingDialog" class="settings-dialog" aria-labelledby="recordingTitle"><div class="dialog-heading"><h2 id="recordingTitle">Import a recording</h2><button id="recordingClose" class="quiet-button" type="button">Done</button></div>
         <form id="recordingForm" class="controls youtube-form"><label id="recordingFileLabel">Audio file <input id="recordingFile" type="file" accept="audio/*"></label>
         <button id="recordingToggle" class="secondary" type="button" hidden>Start recording</button><p id="recordingSelection" aria-live="polite"></p>

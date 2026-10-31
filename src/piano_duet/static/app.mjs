@@ -28,6 +28,7 @@ const SCORE_VIEWS = {
 };
 const sheet = new ScoreView($('sheetMusic'));
 $('scoreControlsSlot').append(sheet.controls);
+sheet.controlsToggle.setAttribute('aria-controls', 'scoreOptions');
 $('scoreOptions').append(...[...sheet.controls.children].filter(node => node !== sheet.controlsToggle), sheet.menu, sheet.resumeButton);
 $('scoreOptions').addEventListener('pointerdown', event => event.stopPropagation());
 $('listenSlot').append($('hudListen'), $('drillListen'));
@@ -101,7 +102,6 @@ let songPhrase = null;
 let previewing = null;
 let listening = false;
 let playbackScale = 1;
-let pendingImport = null;
 const songStream = new ReadingStream({
   threshold: () => $('threshold').value,
   onChange: () => songReady(),
@@ -260,15 +260,12 @@ export async function loadLibrary() {
 function showLibrary() {
   renderLibrary(library, $('librarySearch').value, {
     onOpen: id => openSong(id).catch(fail),
-    onImport: item => { pendingImport = item; $('libraryFile').click(); },
     onDelete: item => deleteSong(item).catch(fail),
   });
 }
 
 async function importSong(file) {
   const params = new URLSearchParams({filename: file.name});
-  if (pendingImport) { params.set('title', pendingImport.title); params.set('artist', pendingImport.artist); }
-  pendingImport = null;
   const response = await localFetch(`/api/library/import?${params}`, {
     method: 'POST', headers: {'Content-Type': 'application/octet-stream', 'X-Duet-Client': '1'}, body: await file.arrayBuffer(),
   });
@@ -1015,6 +1012,7 @@ function buttons() {
   $('start').setAttribute('aria-pressed', Boolean(microphone));
   $('micState').textContent = microphone ? 'Mic on' : 'Mic ready';
   $('drillProgress').hidden = mode !== 'drills';
+  $('drillBest').hidden = mode !== 'drills';
   const following = mode === 'reading' || mode === 'library';
   $('start').classList.toggle('no-key', Boolean(microphone) && !following);
   $('micLabel').textContent = previewing ? 'Stop preview' : microphone ? (following ? 'Stop' : 'Mic off')
@@ -1039,9 +1037,11 @@ function buttons() {
   for (const id of ['revealPractice', 'practiceBeat', 'hudBeat', 'drillBeat']) $(id).disabled = readingFinishing || !ready || busy || detector.active || !practice.task;
   for (const id of ['hearPractice', 'hudListen', 'drillListen']) $(id).disabled = readingFinishing || !ready || (busy && !listening) || detector.active || !practice.task;
   if (listening) $('hearPractice').textContent = 'Stop playback';
+  $('hudListen').textContent = listening ? 'Stop' : 'Listen';
   $('hudListen').classList.toggle('playing', listening);
   $('hudListen').setAttribute('aria-label', listening ? 'Stop playback' : 'Hear this score (halves its XP)');
   $('hudListen').title = $('hudListen').getAttribute('aria-label');
+  $('drillListen').textContent = listening ? 'Stop' : 'Listen';
   $('drillListen').classList.toggle('playing', listening);
   $('drillListen').setAttribute('aria-label', listening ? 'Stop playback' : 'Hear it played');
   $('drillListen').title = $('drillListen').getAttribute('aria-label');
@@ -1573,7 +1573,9 @@ function draw() {
 
 $('start').addEventListener('click', () => (microphone || previewing ? stop() : startMicrophone()).catch(fail));
 $('librarySearch').addEventListener('input', showLibrary);
+$('chooseScore').addEventListener('click', () => $('libraryFile').click());
 $('libraryFile').addEventListener('change', () => {
+  $('importMenu').open = false;
   const [file] = $('libraryFile').files;
   $('libraryFile').value = '';
   if (file) importSong(file).catch(fail);
@@ -1586,6 +1588,7 @@ $('libraryPanel').addEventListener('drop', event => {
   for (const file of event.dataTransfer.files) importSong(file).catch(fail);
 });
 $('songBack').addEventListener('click', () => closeSong().catch(fail));
+$('importMenu').addEventListener('click', event => { if (event.target.closest('button')) $('importMenu').open = false; });
 $('openYoutube').addEventListener('click', () => { $('youtubeError').hidden = true; $('youtubeProgress').hidden = true; $('youtubeDialog').showModal(); });
 $('youtubeForm').addEventListener('submit', event => importYoutube(event).catch(error => youtubeError(error.message)));
 $('songEdit').addEventListener('click', () => openEditor().catch(fail));

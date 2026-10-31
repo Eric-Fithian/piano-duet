@@ -32,7 +32,7 @@
       <a class="brand" href="/" aria-label="Piano Duet home"><img class="brand-light" src="/static/brand/wordmark-horizontal-header-light.svg" alt=""><img class="brand-dark" src="/static/brand/wordmark-horizontal-header-dark.svg" alt=""></a>
       <button id="modeMenuButton" class="mode-menu-button" aria-expanded="false" aria-controls="modeMenu"><span id="currentMode">Reading</span> ▾</button>
       <span class="stage-summary">Stage <span id="hudStageNumber">1</span>/24</span>
-      <span id="drillProgress" class="drill-progress" hidden>New drill</span>
+      <span id="drillProgress" class="drill-progress" hidden>New drill</span><span id="drillBest" class="drill-best" hidden>Best tempo —</span>
       <div class="header-actions">
         <button id="openProfile" class="level-badge" aria-haspopup="dialog" aria-label="Progress"><span class="level-diamond" aria-hidden="true">♪</span><span class="level-meta"><span><span class="level-caption">Level <span id="levelNumber">1</span></span><span id="levelXp" class="level-xp"></span></span><span class="xp-track"><i id="levelFill"></i></span></span></button>
         <button id="openSettings" class="settings-button" aria-haspopup="dialog">Settings</button>
@@ -40,12 +40,12 @@
       </div>
     </header>
       <nav id="modeMenu" class="mode-switch" role="group" aria-label="Playing mode"><button id="readingMode" aria-pressed="true">Reading</button><button id="drillsMode" aria-pressed="false">Drills</button><button id="libraryMode" aria-pressed="false">Library</button><button id="practiceMode" hidden aria-pressed="false">Practice</button><button id="duetMode" hidden aria-pressed="false">Duet</button><button id="learningMode" hidden aria-pressed="false">Variations</button></nav>
-    <div id="scoreOptions" class="score-options" aria-label="Score controls"></div>
+    <div id="scoreOptions" class="score-options" role="group" aria-label="Score controls"></div>
     <main>
       <h1 class="sr-only">Your piano practice</h1>
       <p id="modeDescription" class="mode-description" hidden>Personal practice, shaped by what you play.</p>
       <section id="libraryPanel" class="library" aria-label="Library" hidden>
-        <header class="library-head"><h2 class="rule-heading">Library</h2><input id="librarySearch" type="search" placeholder="Search songs" aria-label="Search songs"><button id="openYoutube" class="secondary" aria-haspopup="dialog">From YouTube</button><label class="primary import-button">Import<input id="libraryFile" type="file" accept=".mid,.midi,.musicxml,.xml,.mxl"></label></header>
+        <header class="library-head"><h2 class="rule-heading">Library</h2><input id="librarySearch" type="search" placeholder="Search songs" aria-label="Search songs"><details id="importMenu" class="import-menu"><summary>Import</summary><div class="import-choices"><button id="chooseScore" type="button">Score file</button><input id="libraryFile" type="file" accept=".mid,.midi,.musicxml,.xml,.mxl" hidden><button id="openYoutube" type="button" aria-haspopup="dialog">From YouTube</button></div></details></header>
         <div class="song-table" role="table" aria-label="Your songs">
           <div class="song-row song-columns" role="row"><span>#</span><span>Title</span><span>Plays</span><span>Recent</span><span>Best</span><span>Covered</span><span>Last played</span><span>Length</span><span></span></div>
           <div id="songRows"></div>
@@ -82,7 +82,7 @@
         <section id="drillPanel" class="drill-panel" aria-label="Drill" hidden>
           <div class="drill-bar">
             <button id="drillToggle" class="drill-title" aria-expanded="false" aria-controls="drillOptions" title="Change drill"><strong id="drillTitle">Drills</strong><small id="drillCue"></small><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg></button>
-            <span id="drillTempoDisplay" class="drill-tempo-display">♩ —</span><span id="drillBest" class="drill-best">Best tempo —</span>
+            <span id="drillTempoDisplay" class="drill-tempo-display">♩ —</span>
             <button id="drillMore" class="drill-more-button" aria-expanded="false" aria-controls="drillExtra">More</button>
             <div id="drillExtra" class="drill-extra">
             <button id="drillLevel" class="drill-level" aria-haspopup="dialog" title="Drill levels"><b id="drillLevelNumber">New drill</b><span class="xp-track"><i id="drillLevelFill"></i></span></button>

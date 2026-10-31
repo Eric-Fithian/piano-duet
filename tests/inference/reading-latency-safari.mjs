@@ -22,7 +22,7 @@ try {
       await driver.wait(() => driver.executeScript('return !!document.querySelector("#start") && !document.querySelector("#start").disabled'), 60000);
       if (await driver.executeScript('return document.querySelector("#readingMode").getAttribute("aria-pressed") === "true"')) {
         await driver.findElement(By.css("#modeMenuButton")).click();
-      await driver.findElement(By.css("#practiceMode")).click();
+        await driver.findElement(By.css("#practiceMode")).click();
         await driver.wait(() => driver.executeScript('return document.querySelector("#practiceMode").getAttribute("aria-pressed") === "true" && !document.querySelector("#start").disabled'), 60000);
       }
       await driver.executeScript("window.__latency.tasks = []");

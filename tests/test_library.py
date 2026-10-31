@@ -1,5 +1,6 @@
 import json
 import struct
+from html.parser import HTMLParser
 from uuid import uuid4
 
 import numpy as np
@@ -281,3 +282,26 @@ def test_a_grace_note_is_kept_on_the_beat_of_the_note_it_ornaments():
     assert (grace["pitch"], grace["start"], grace["staff"]) == (78, main["start"], "treble")
     assert grace["duration"] > 0 and not any(note.get("grace") for note in song["notes"] if note is not grace)
     assert [note["pitch"] for note in song["notes"] if not note.get("grace")] == [48, 72, 79]
+
+
+def test_mac_import_menu_contains_only_supported_actions(client):  # noqa: F811
+    class ImportMenu(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.in_menu = False
+            self.controls = []
+
+        def handle_starttag(self, tag, attrs):
+            attrs = dict(attrs)
+            if tag == "details" and attrs.get("id") == "importMenu":
+                self.in_menu = True
+            if self.in_menu and tag in ("button", "input"):
+                self.controls.append(attrs.get("id"))
+
+        def handle_endtag(self, tag):
+            if tag == "details" and self.in_menu:
+                self.in_menu = False
+
+    menu = ImportMenu()
+    menu.feed(client.get("/").text)
+    assert menu.controls == ["chooseScore", "libraryFile", "openYoutube"]

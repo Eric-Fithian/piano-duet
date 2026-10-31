@@ -92,7 +92,7 @@ try {
       throw new Error(`${error}: ${JSON.stringify({ state, errors })}`);
     });
   await page.locator("#modeMenuButton").click();
-    await page.locator("#drillsMode").click();
+  await page.locator("#drillsMode").click();
   await page.waitForFunction(() => window.__drillTest.task?.drill?.drill === "five_finger" && !document.querySelector("#start").disabled);
   await page.locator("#start").click();
   await page.waitForFunction(() => window.__drillTest.audio && window.__drillTest.destination);

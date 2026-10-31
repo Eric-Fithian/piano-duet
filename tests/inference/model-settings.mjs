@@ -29,6 +29,7 @@ try {
   }
   await page.locator("#openSettings").click();
   await page.locator("#modelSettings > summary").click();
+  await page.locator(".model-actions-disclosure > summary").click();
   await page.getByRole("button", { name: "Test all" }).click();
   await page.waitForFunction(() => !document.querySelector(".model-confirm").hidden
     || !document.querySelector("[data-action=cancel-all]").hidden, null, { timeout: 120000 });

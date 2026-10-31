@@ -37,12 +37,14 @@ export function setupModelSettings(root: HTMLDetailsElement, backend: InferenceB
   const results = new Map<AssetId, Result>();
   const controllers = new Map<AssetId, AbortController>();
   let bulkActive = false, bulkCancelled = false;
-  const rows = new Map<AssetId, { section: HTMLDetailsElement; status: HTMLElement; backend: HTMLElement; result: HTMLElement; progress: HTMLProgressElement; cancel: HTMLButtonElement }>();
-  root.innerHTML = `<summary>Models</summary><p>Models run entirely on this device. Each model is downloaded from Hugging Face the first time a feature needs it and stored in this browser. If the browser clears it, it downloads again. No audio leaves this device. Piano samples come from GitHub.</p><p id="modelStorage" role="status"></p><div class="model-actions"><button class="secondary" type="button" data-action="persist">Keep storage on this device</button><button class="secondary" type="button" data-action="download-all">Download all models used by the app · ${size(items.filter((entry) => entry.used).flatMap((entry) => entry.files).reduce((sum, file) => sum + file.bytes, 0))}</button><button class="secondary" type="button" data-action="test-all">Test all</button><button class="secondary" type="button" data-action="copy">Copy diagnostics</button><button class="text-button" type="button" data-action="cancel-all" hidden>Cancel all</button></div><p class="model-message" role="status" aria-live="polite"></p><div class="model-actions model-confirm" hidden><button class="secondary" type="button" data-action="confirm-test-all">Download and test</button><button class="text-button" type="button" data-action="cancel-test-all">Cancel</button></div><div class="model-list"></div>`;
+  const rows = new Map<AssetId, { section: HTMLDetailsElement; quick: HTMLButtonElement; status: HTMLElement; backend: HTMLElement; result: HTMLElement; progress: HTMLProgressElement; cancel: HTMLButtonElement }>();
+  root.innerHTML = `<summary>Models</summary><p>Models run entirely on this device. Each model is downloaded from Hugging Face the first time a feature needs it and stored in this browser. If the browser clears it, it downloads again. No audio leaves this device. Piano samples come from GitHub.</p><p id="modelStorage" role="status"></p><details class="model-actions-disclosure"><summary>Model actions</summary><div class="model-actions"><button class="secondary" type="button" data-action="persist">Keep storage on this device</button><button class="secondary" type="button" data-action="download-all">Download all models used by the app · ${size(items.filter((entry) => entry.used).flatMap((entry) => entry.files).reduce((sum, file) => sum + file.bytes, 0))}</button><button class="secondary" type="button" data-action="test-all">Test all</button><button class="secondary" type="button" data-action="copy">Copy diagnostics</button><button class="text-button" type="button" data-action="cancel-all" hidden>Cancel all</button></div></details><p class="model-message" role="status" aria-live="polite"></p><div class="model-actions model-confirm" hidden><button class="secondary" type="button" data-action="confirm-test-all">Download and test</button><button class="text-button" type="button" data-action="cancel-test-all">Cancel</button></div><div class="model-list"></div>`;
   const storage = root.querySelector<HTMLElement>("#modelStorage")!;
   const message = root.querySelector<HTMLElement>(".model-message")!;
   const list = root.querySelector<HTMLElement>(".model-list")!;
   for (const entry of items) {
+    const item = document.createElement("div");
+    item.className = "model-item";
     const section = document.createElement("details");
     section.className = "model-entry";
     const repos = [...new Set(entry.files.map((file) => file.model === "piano-samples"
@@ -57,9 +59,20 @@ export function setupModelSettings(root: HTMLDetailsElement, backend: InferenceB
     if (entry.id === "piano-samples") section.querySelector(".model-backend")!.textContent = "Uses the browser's audio decoder.";
     const links = section.querySelector(".model-links")!;
     repos.forEach((url, index) => { const a = document.createElement("a"); a.href = url; a.target = "_blank"; a.rel = "noopener noreferrer"; a.textContent = repos.length > 1 ? `Source ${index + 1}` : "Source at pinned revision"; links.append(a, " "); });
-    const row = { section, status: section.querySelector<HTMLElement>(".model-status")!, backend: section.querySelector<HTMLElement>(".model-backend")!,
+    const quick = document.createElement("button");
+    quick.type = "button"; quick.className = "secondary model-test"; quick.disabled = true; quick.textContent = "Checking…";
+    const row = { section, quick, status: section.querySelector<HTMLElement>(".model-status")!, backend: section.querySelector<HTMLElement>(".model-backend")!,
       result: section.querySelector<HTMLElement>(".model-result")!, progress: section.querySelector<HTMLProgressElement>("progress")!, cancel: section.querySelector<HTMLButtonElement>("[data-action=cancel]")! };
-    rows.set(entry.id, row); list.append(section);
+    rows.set(entry.id, row); item.append(section, quick); list.append(item);
+    quick.addEventListener("click", () => {
+      section.open = true;
+      quick.disabled = true;
+      void (async () => {
+        if (await store.status(entry.files) !== "downloaded") await perform(entry, "download");
+        await perform(entry, "test");
+      })().catch((error: unknown) => { row.result.textContent = results.get(entry.id)?.text ?? `Failed: ${reason(error)}`; })
+        .finally(() => { quick.disabled = false; });
+    });
     section.addEventListener("click", (event) => {
       const action = (event.target as HTMLElement).closest<HTMLButtonElement>("button")?.dataset.action;
       if (!action) return;
@@ -83,6 +96,9 @@ export function setupModelSettings(root: HTMLDetailsElement, backend: InferenceB
     const status = await store.status(entry.files);
     row.status.textContent = status === "downloaded" ? "Downloaded" : status === "partially downloaded" ? "Partial" : "Not downloaded";
     row.status.dataset.state = status;
+    row.quick.textContent = status === "downloaded" ? "Test" : `Download and test (${size(entry.files.reduce((sum, file) => sum + file.bytes, 0))})`;
+    row.quick.setAttribute("aria-label", `${row.quick.textContent} ${entry.name}`);
+    row.quick.disabled = controllers.has(entry.id);
     for (const button of row.section.querySelectorAll<HTMLButtonElement>(".model-actions button")) {
       const action = button.dataset.action;
       if (action === "cancel") continue;

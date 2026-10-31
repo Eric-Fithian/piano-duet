@@ -33,12 +33,16 @@ async function checkLayout(page, label) {
     const header = document.querySelector('.app-header');
     const headerBounds = header.getBoundingClientRect();
     if (headerBounds.height !== 48) problems.push(`header height ${headerBounds.height}`);
-    const slots = [...header.querySelectorAll('#modeMenuButton, .stage-summary, #openProfile, #openSettings, #scoreControlsSlot')]
+    const slots = [...header.querySelectorAll('#modeMenuButton, .stage-summary, #drillProgress, #drillBest, #openProfile, #openSettings, #scoreControlsSlot')]
       .filter(element => element.getBoundingClientRect().width && getComputedStyle(element).display !== 'none');
     for (const slot of slots) {
       const bounds = slot.getBoundingClientRect();
       if (bounds.top < headerBounds.top || bounds.bottom > headerBounds.bottom) problems.push(`topline row: ${slot.id || slot.className}`);
     }
+    const status = document.querySelector('#noteStatus').getBoundingClientRect();
+    if (status.height && status.height !== 18) problems.push(`status slot height ${status.height}`);
+    const best = document.querySelector('#drillBest');
+    if (best.getBoundingClientRect().width && best.scrollWidth > best.clientWidth) problems.push('Best tempo is truncated');
     const modal = document.querySelector('dialog[open]');
     const scope = modal || document;
     const elements = [...scope.querySelectorAll('button, select, input:not([type=hidden]), a[href], summary')].filter(element => {
@@ -53,12 +57,25 @@ async function checkLayout(page, label) {
       }
       return true;
     });
+    if (!modal) {
+      const targets = [...document.querySelectorAll('.app-header button, .transport button, #drillToggle, #drillMore, #drillDetails')];
+      for (const target of targets) {
+        const bounds = target.getBoundingClientRect();
+        if (bounds.width && bounds.height && (bounds.width < 44 || bounds.height < 44)) problems.push(`small target: ${target.id}`);
+      }
+      const listen = [...document.querySelectorAll('#listenSlot button')].find(button => button.getBoundingClientRect().width);
+      const start = document.querySelector('#start').getBoundingClientRect();
+      if (listen && start.width) {
+        const bounds = listen.getBoundingClientRect();
+        if (start.left - bounds.right < 12) problems.push('Listen is too close to Start');
+      }
+    }
     const score = document.querySelector('#sheetPanel').getBoundingClientRect();
     if (!modal && score.width && score.height) for (const element of elements) {
       if (element.closest('#sheetPanel')) continue;
       const bounds = element.getBoundingClientRect();
       if (Math.min(bounds.right, score.right) - Math.max(bounds.left, score.left) > 1 &&
-          Math.min(bounds.bottom, score.bottom) - Math.max(bounds.top, score.top) > 1) problems.push(`control over score: ${element.id || element.textContent.trim()}`);
+          Math.min(bounds.bottom, score.bottom) - Math.max(bounds.top, score.top) > 1) problems.push(`control over score: ${element.id || element.getAttribute('aria-label') || element.textContent.trim()}`);
     }
     for (const [index, element] of elements.entries()) {
       const rect = element.getBoundingClientRect(), name = element.id || element.textContent.trim().slice(0, 30);
@@ -136,6 +153,21 @@ for (const [engineName, engine] of [['chromium', chromium], ['webkit', webkit]])
     await page.locator('#start').click();
     await page.waitForFunction(() => document.querySelector('#start').getAttribute('aria-pressed') === 'true', null, {timeout: 10000});
     await checkLayout(page, `${engineName} playing`);
+    await page.locator('.score-scroller').evaluate(element => element.dispatchEvent(new WheelEvent('wheel', {deltaY: 10})));
+    await page.getByRole('button', {name: 'Resume following'}).waitFor({state: 'visible'});
+    await checkLayout(page, `${engineName} resume following`);
+    await page.getByRole('button', {name: 'Resume following'}).click();
+    await page.setViewportSize({width: 360, height: 800});
+    await checkLayout(page, `${engineName} playing at 360px`);
+    await page.setViewportSize({width: 375, height: 667});
+    const themeDuringTake = await page.locator('html').getAttribute('data-theme');
+    const nextSystemTheme = themeDuringTake === 'light' ? 'dark' : 'light';
+    await page.emulateMedia({colorScheme: nextSystemTheme});
+    assert.equal(await page.locator('html').getAttribute('data-theme'), themeDuringTake);
+    await page.locator('#openSettings').click();
+    assert.equal(await page.locator('#appearanceTheme').isDisabled(), true);
+    assert.equal(await page.locator('#nightPage').isDisabled(), true);
+    await page.locator('[data-close="settingsDialog"]').click();
     await page.setViewportSize({width: 667, height: 375});
     await page.waitForFunction(count => document.querySelector('.score-phrase').querySelectorAll('.score-system').length < count, portraitSystems, {timeout: 5000});
     assert.equal(await page.locator('#start').getAttribute('aria-pressed'), 'true');
@@ -144,6 +176,8 @@ for (const [engineName, engine] of [['chromium', chromium], ['webkit', webkit]])
     await page.waitForFunction(count => document.querySelector('.score-phrase').querySelectorAll('.score-system').length === count, portraitSystems, {timeout: 5000});
     assert.equal(await page.locator('#start').getAttribute('aria-pressed'), 'true');
     await page.locator('#start').click();
+    await page.waitForFunction(theme => document.documentElement.dataset.theme === theme, nextSystemTheme);
+    await page.emulateMedia({colorScheme: 'light'});
     async function capture(name) {
       await checkLayout(page, `${engineName} ${name}`);
       if (process.env.RESPONSIVE_SCREENSHOTS) {
@@ -173,6 +207,22 @@ for (const [engineName, engine] of [['chromium', chromium], ['webkit', webkit]])
       await page.locator('#modeMenuButton').click();
       await page.getByRole('button', {name: 'Score controls', exact: true}).click();
       await checkLayout(page, `${engineName} ${name}-score-controls`);
+      const fit = page.getByRole('button', {name: 'Fit score to page'});
+      assert.equal(await fit.isVisible(), true);
+      if (name === 'se-portrait') {
+        await page.getByRole('button', {name: 'Zoom out'}).click();
+        const zoom = await page.locator('.score-zoom').textContent();
+        assert.notEqual(zoom, 'Fit');
+        await page.reload();
+        await page.locator('#sheetMusic .score-system svg').first().waitFor({timeout: 30000});
+        await page.getByRole('button', {name: 'Score controls', exact: true}).click();
+        assert.equal(await page.locator('.score-zoom').textContent(), zoom);
+        await fit.click();
+        assert.equal(await fit.getAttribute('aria-pressed'), 'true');
+      }
+      await page.getByRole('button', {name: 'View options', exact: true}).click();
+      await checkLayout(page, `${engineName} ${name}-view-options`);
+      await page.getByRole('button', {name: 'View options', exact: true}).click();
       await page.getByRole('button', {name: 'Score controls', exact: true}).click();
     }
     await mode('drills');
@@ -195,6 +245,7 @@ for (const [engineName, engine] of [['chromium', chromium], ['webkit', webkit]])
     await mode('library');
     for (const {name, width, height} of viewports) {
       await page.setViewportSize({width, height}); await capture(`${name}-library`);
+      await page.locator('#importMenu > summary').click();
       await page.locator('#importAudio').click(); await capture(`${name}-recording`);
       await page.locator('#recordingClose').click();
       await page.locator('#openSettings').click(); await capture(`${name}-settings`);

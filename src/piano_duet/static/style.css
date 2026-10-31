@@ -13,12 +13,12 @@ button, select, input { font: inherit; }
 a { color: inherit; text-decoration: none; }
 button, a, summary, select, input { -webkit-tap-highlight-color: transparent; }
 :focus-visible { outline: 2px solid var(--folio-focus); outline-offset: 4px; }
-button { cursor: pointer; border: 1px solid transparent; border-radius: 8px; padding: 11px 16px; font-size: 13px; font-weight: 550; white-space: nowrap; transition: background .15s; }
+button { min-width:44px; min-height:44px; cursor: pointer; border: 1px solid transparent; border-radius: 8px; padding: 11px 16px; font-size: 13px; font-weight: 550; white-space: nowrap; transition: background .15s; }
 button:disabled { cursor: default; opacity: .4; }
-.primary { background: var(--peach); color: #15120a; }
-.primary:hover:not(:disabled) { background: #f7bd45; }
-.secondary, .stop { color: #dfe1e4; background: #1d2633; border-color: #39465a; }
-.secondary:hover:not(:disabled), .stop:hover:not(:disabled) { background: #273244; }
+.primary { background: var(--folio-action); color: var(--folio-onAction); }
+.primary:hover:not(:disabled) { filter: brightness(1.1); }
+.secondary, .stop { color: var(--text); background: var(--panel-2); border-color: var(--line); }
+.secondary:hover:not(:disabled), .stop:hover:not(:disabled) { background: var(--panel); }
 .quiet-button, .text-button { color: var(--text); background: transparent; }
 .quiet-button:hover:not(:disabled), .text-button:hover:not(:disabled) { color: var(--text); background: var(--panel-2); }
 .text-button { padding: 8px 10px; font-size: 12px; }
@@ -28,7 +28,7 @@ kbd { font: 10px inherit; opacity: .7; margin-left: 9px; border: 1px solid curre
 .dot { display: inline-block; flex-shrink: 0; height: 7px; width: 7px; border-radius: 50%; background: var(--green); }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 .credits { max-width:80ch; padding:28px 0; line-height:1.8; }
-.credits h1 { font:36px Georgia,serif; }
+.credits h1 { font:36px Fraunces,serif; }
 .credits p a { text-decoration:underline; text-underline-offset:3px; }
 .piano-app { height:100dvh; overflow:hidden; overscroll-behavior:none; }
 .piano-app .shell { height:100%; max-width:1600px; padding:0 max(24px,env(safe-area-inset-right)) 0 max(24px,env(safe-area-inset-left)); display:flex; flex-direction:column; }
@@ -38,16 +38,16 @@ kbd { font: 10px inherit; opacity: .7; margin-left: 9px; border: 1px solid curre
 .practice-focus { display:flex; flex-direction:column; gap:8px; }
 .practice-focus select { margin:0; }
 #pieceChoice { margin-top:8px; }
-.performance { flex:1; min-height:0; display:flex; flex-direction:column; background:#141a22; border:1px solid var(--line); border-radius:16px; overflow:hidden; }
-.eyebrow { letter-spacing:1.6px; font-size:10px; text-transform:uppercase; }
+.performance { flex:1; min-height:0; display:flex; flex-direction:column; overflow:hidden; }
+.eyebrow { font-size:10px; }
 .score-toolbar { display:flex; flex-shrink:0; align-items:center; justify-content:space-between; gap:8px; padding:6px 16px; border-top:1px solid var(--line); }
 #pageLabel { font-size:11px; color:var(--muted); min-width:40px; text-align:center; font-variant-numeric:tabular-nums; }
 #sheetPanel { display:flex; flex:1; min-height:0; position:relative; }
-.roll-wrap { flex:1; min-height:0; position:relative; border-block:1px solid var(--line); background:#10151d; }
+.roll-wrap { flex:1; min-height:0; position:relative; border-block:1px solid var(--line); background:var(--panel); }
 canvas { width:100%; height:100%; display:block; }
 #emptyRoll { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; pointer-events:none; text-align:center; padding:20px; }
-.empty-symbol { font:45px Georgia; color:#afb4bc; margin-bottom:15px; }
-#emptyRoll p { font:22px Georgia; color:#cfd2d7; margin:0 0 13px; }
+.empty-symbol { font:45px Atkinson,sans-serif; color:#afb4bc; margin-bottom:15px; }
+#emptyRoll p { font:22px Atkinson,sans-serif; color:#cfd2d7; margin:0 0 13px; }
 #emptyRoll>span:last-child { font-size:12px; color:var(--muted); }
 .roll-footer { display:flex; flex-shrink:0; align-items:center; gap:15px; padding:7px 18px; min-height:30px; }
 .legend { display:flex; gap:18px; font-size:10px; color:#b6bbc3; }
@@ -62,31 +62,31 @@ canvas { width:100%; height:100%; display:block; }
 .microphone-button[aria-pressed=true]:hover { background:#243143; }
 .status-label { display:flex; align-items:center; gap:9px; font-size:12px; line-height:1.5; }
 .input-meter { display:flex; align-items:center; gap:9px; }
-.error { color:#ffb4a8; background:#3a1b1a; border:1px solid #a0463f; border-radius:10px; padding:14px 18px; font-size:13px; line-height:1.6; }
+.error { color:var(--folio-errorText); background:var(--panel); border:1px solid var(--folio-errorText); border-radius:4px; padding:14px 18px; font-size:13px; line-height:1.6; }
 #error { position:absolute; z-index:6; bottom:90px; left:12px; right:12px; margin:0; }
 #scoreError { position:absolute; z-index:2; inset:12px 12px auto; margin:0; }
 .session-info { font-size:11px; color:var(--muted); margin-bottom:20px; }
 .session-actions { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:20px; }
 label { font-size: 15px; color: var(--text); }
-select { margin-top: 9px; width: 100%; padding: 11px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--text); font-size: 15px; }
-.setting-help { font-size: 12px; line-height: 1.7; color: var(--muted); margin: 10px 0 22px; }
+select { min-width:44px; min-height:44px; margin-top: 9px; width: 100%; padding: 11px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--text); font-size: 15px; }
+.setting-help { font-size: 14px; line-height: 1.7; color: var(--muted); margin: 10px 0 22px; }
 .slider-label { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.slider-label output { font-size: 12px; color: #c0c4cc; }
-input[type=range] { width: 100%; accent-color: var(--folio-action); height: 5px; margin: 17px 0 8px; cursor: pointer; }
+.slider-label output { font-size: 12px; color: var(--muted); }
+input[type=range] { width: 100%; accent-color: var(--folio-action); height: 44px; margin: 0; cursor: pointer; }
 input[type=range]:disabled { opacity: .4; cursor: default; }
-.range-ends { display: flex; justify-content: space-between; font-size: 11px; color: #abb0ba; margin: 5px 0 0; }
+.range-ends { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin: 5px 0 0; }
 .spaced { margin-top: 24px; }
 .check-setting { display: flex; align-items: center; gap: 10px; cursor: pointer; }
 .check-setting input { accent-color: var(--folio-action); width: 17px; height: 17px; margin: 0; }
 details { margin-top: 22px; border-top: 1px solid var(--line); padding-top: 16px; }
-summary { font-size: 12px; color: var(--text); cursor: pointer; line-height: 1.6; }
+summary { min-height:44px; font-size: 12px; color: var(--text); cursor: pointer; line-height: 1.6; }
 details[open]>summary { margin-bottom: 12px; }
 dialog { padding: 0; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; max-height: calc(100dvh - 48px); box-shadow: 0 25px 100px #0008; overscroll-behavior: contain; overflow-y: auto; }
 dialog::backdrop { background: #05080cc4; backdrop-filter: blur(5px); }
 .settings-dialog { width: 440px; max-width: calc(100vw - 32px); }
 .profile-dialog { width: 1060px; max-width: calc(100vw - 32px); }
 .dialog-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 18px 24px; border-bottom: 1px solid var(--line); background: var(--panel); }
-.dialog-heading h2 { font: 26px Georgia,serif; margin: 0; }
+.dialog-heading h2 { font: 26px Fraunces,serif; margin: 0; }
 .controls { padding: 24px; }
 .controls h3 { margin: 0 0 20px; font-size: 15px; font-weight: 600; }
 .panel-heading.second { border-top: 1px solid var(--line); padding-top: 24px; margin-top: 26px; }
@@ -97,7 +97,6 @@ dialog::backdrop { background: #05080cc4; backdrop-filter: blur(5px); }
   .piano-app .shell { padding-inline:max(12px,env(safe-area-inset-left)); }
   .session-setup { padding-bottom:10px; }
   .mode-description { padding:10px 14px; font-size:12px; }
-  .performance { border-radius:12px; }
   .status-label { font-size:10px; }.input-meter { gap:5px; }
   kbd { display:none; }
   .score-toolbar { padding:3px 8px; }
@@ -118,3 +117,10 @@ dialog::backdrop { background: #05080cc4; backdrop-filter: blur(5px); }
 
 .appearance-settings { margin-bottom: 24px; }
 .appearance-settings .check-setting { margin-top: 16px; min-height: 44px; }
+
+.dialog-heading button { min-height:44px; border:1px solid var(--line); border-radius:4px; }
+.controls a.text-button { display:inline-flex; align-items:center; min-height:44px; }
+
+#settingsDialog[open] { display:flex; flex-direction:column; overflow:hidden; }
+#settingsDialog > .dialog-heading { flex:none; }
+#settingsDialog > .controls { min-height:0; overflow-y:auto; overscroll-behavior:contain; }

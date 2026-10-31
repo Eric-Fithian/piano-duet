@@ -1,4 +1,4 @@
-.piano-app .shell { max-width:none; padding:0; }
+.piano-app .shell { max-width:none; padding:env(safe-area-inset-top) 0 0; }
 .piano-app .app-header { flex:none; height:48px; display:flex; flex-wrap:nowrap; align-items:center; gap:4px; padding:0 max(8px, env(safe-area-inset-right)) 0 max(8px, env(safe-area-inset-left)); border-bottom:1px solid var(--line); position:relative; }
 .brand { display:block; flex:none; width:150px; margin-right:12px; }
 .brand img { display:block; width:100%; height:auto; }
@@ -21,7 +21,8 @@
 #scoreControlsSlot .score-controls { position:static; display:block; padding:0; border:0; background:transparent; color:var(--text); opacity:1; }
 #scoreControlsSlot .score-controls-toggle { display:block; width:44px; height:44px; font-size:20px; border:1px solid var(--line); border-radius:4px; background:transparent; }
 .score-options { display:none; flex:none; align-items:center; flex-wrap:wrap; gap:6px; padding:6px 8px; background:var(--bg); border-bottom:1px solid var(--line); }
-.shell:has(.score-controls.expanded) .score-options { display:flex; }
+.shell:has(.score-controls.expanded) .score-options, .shell:has(.score-resume:not([hidden])) .score-options { display:flex; }
+.shell:not(:has(.score-controls.expanded)) .score-options > :not(.score-resume) { display:none; }
 .score-options > button { min-width:44px; min-height:44px; color:var(--text); background:var(--panel); border:1px solid var(--line); border-radius:4px; }
 .score-options .score-zoom { min-width:48px; text-align:center; font-variant-numeric:tabular-nums; }
 .score-options .score-menu { position:static; display:flex; flex:1 1 100%; flex-wrap:wrap; gap:8px; padding:8px; border:1px solid var(--line); border-radius:4px; background:var(--panel); color:var(--text); box-shadow:none; }
@@ -29,7 +30,7 @@
 .score-options .score-menu-choices { background:var(--panel-2); }
 .score-options .score-menu-choices button { min-height:44px; color:var(--text); }
 .score-options .score-menu-choices button[aria-checked=true] { background:var(--folio-action); color:var(--folio-onAction); }
-.score-options .score-resume { position:static; transform:none; box-shadow:none; }
+.score-options .score-resume { position:static; transform:none; box-shadow:none; background:var(--folio-action); color:var(--folio-onAction); border-color:var(--folio-action); }
 .performance { border:0; border-radius:0; background:var(--paper); }
 .reading-hud { flex:none; display:flex; align-items:center; gap:10px; min-height:32px; padding:2px 10px; color:var(--text); background:var(--bg); border-bottom:1px solid var(--line); }
 .hud-stage { display:flex; align-items:center; gap:8px; min-width:0; }
@@ -79,6 +80,7 @@
 .piano-app[data-mode=drills] .level-badge { display:none; }
 .drill-bar { flex-wrap:wrap; background:var(--bg); }
 .drill-tempo-display, .drill-best { flex:none; white-space:nowrap; font-size:13px; }
+.drill-best { margin-left:4px; }
 #drillDetails, .drill-more-button { display:inline-flex; align-items:center; justify-content:center; min-width:44px; min-height:44px; padding:0 6px; color:var(--text); background:var(--panel); border:1px solid var(--line); border-radius:4px; }
 .drill-more-button { font-size:0; }
 .drill-more-button::after { content:'⋯'; font-size:18px; }
@@ -86,10 +88,34 @@
 .drill-more-button[aria-expanded=true] + .drill-extra { display:flex; }
 .drill-extra button { min-height:44px; }
 .drill-ladder-track { display:none; }
+.library { flex:1; min-height:0; overflow:auto; background:var(--bg); border:0; border-radius:0; padding:16px; }
+.library-head { display:flex; flex-wrap:wrap; gap:8px; }
+.library-head .rule-heading { flex:1 0 100%; margin:0 0 4px; }
+.rule-heading { font:600 19px Fraunces,serif; letter-spacing:normal; text-transform:none; }
+.rule-heading::after { display:none; }
+.library-head #librarySearch { flex:1; min-width:0; min-height:44px; width:auto; background:var(--panel); border:1px solid var(--line); border-radius:4px; color:var(--text); font-size:15px; }
+.import-menu { flex:none; position:relative; margin:0; padding:0; border:0; }
+.import-menu > summary { display:flex; align-items:center; min-height:44px; padding:8px 18px; color:var(--folio-onAction); background:var(--folio-action); border:1px solid var(--folio-action); border-radius:4px; font-size:14px; font-weight:700; list-style:none; }
+.import-menu > summary::-webkit-details-marker { display:none; }
+.import-choices { position:absolute; z-index:8; top:100%; right:0; display:grid; min-width:160px; padding:5px; background:var(--panel); border:1px solid var(--line); }
+.import-menu:not([open]) .import-choices { display:none; }
+.import-choices button, .import-choices label { display:flex; align-items:center; min-height:44px; padding:8px 12px; color:var(--text); background:transparent; border:0; text-align:left; font-size:14px; cursor:pointer; }
+.import-choices input { display:none; }
+.song-row:not(.song-columns) { border-bottom:1px solid var(--line); border-radius:0; color:var(--text); padding-inline:0; }
+#songRows:not(:empty) { border-top:1px solid var(--line); }
+button.song-name { width:100%; min-height:44px; padding:0; color:var(--text); background:transparent; border:0; text-align:left; }
+.song-name strong { color:var(--text); }
+.song-name small, .song-empty { color:var(--muted); }
+.catalog { display:block; }
+.catalog-row { position:relative; display:block; padding:16px 40px 16px 0; background:transparent; border:0; border-bottom:1px solid var(--line); border-radius:0; color:var(--text); }
+.catalog-row:hover { background:var(--panel-2); }
+.catalog-link { display:inline-block; margin-top:8px; color:var(--text); text-decoration:underline; text-underline-offset:3px; }
+.catalog-arrow { position:absolute; right:4px; top:50%; transform:translateY(-50%); font-size:20px; }
+
 @media(max-height:500px) and (orientation:landscape) {
   .piano-app .app-header { padding-right:290px; }
   .transport { min-height:18px; padding:0 8px; }
-  .transport-actions { position:absolute; top:-48px; right:8px; height:48px; grid-template-columns:auto auto auto; }
+  .transport-actions { position:fixed; z-index:3; top:env(safe-area-inset-top); right:max(8px,env(safe-area-inset-right)); height:48px; grid-template-columns:auto auto auto; }
   .note-status { height:18px; }
   .space-key { min-width:80px; }
   .piano-app[data-mode=library]:not(.song-open) .app-header { padding-right:8px; }
@@ -97,3 +123,9 @@
 .meter-bar { position:relative; height:5px; background:var(--panel-2); }
 .meter-bar i { position:absolute; inset:0 auto 0 0; background:var(--folio-progress); }
 .meter-bar em { position:absolute; top:-3px; bottom:-3px; width:2px; background:var(--text); }
+
+@media(max-width:900px) {
+  .song-row:not(.song-columns) { position:relative; }
+  .song-row:not(.song-columns) .song-name { padding-right:58px; }
+  .song-row:not(.song-columns) .song-name::after { content:'Open ›'; position:absolute; right:52px; top:50%; transform:translateY(-50%); color:var(--text); }
+}
