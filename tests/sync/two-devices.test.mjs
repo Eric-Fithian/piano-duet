@@ -106,7 +106,11 @@ test('two signed-in devices rebuild the same progress after practising offline',
     await pages[0].getByText('Up to date', {exact: true}).waitFor({timeout: 30000});
     for (const page of pages) {
       await page.locator('#settingsDialog').evaluate((dialog) => dialog.close());
+      await page.locator('#modeMenuButton').click();
+      await page.locator('#readingMode').click();
+      await page.waitForFunction(() => document.body.dataset.mode === 'reading');
       await page.locator('#openProfile').click();
+      await page.locator('#allProgress').click();
       await page.waitForFunction(() => document.querySelector('#profileSummary')?.textContent.includes('8 included attempts'), null, {timeout: 30000});
     }
     const profiles = await Promise.all(pages.map((page) => page.evaluate(async (path) => {
