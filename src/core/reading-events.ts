@@ -42,12 +42,15 @@ export function attemptsFromEvents(events: ReadingLogEvent[]): ProfileAttempt[] 
       if (prompt.family === "reading") {
         if (typeof prompt.id !== "string" || !prompt.id || !Array.isArray(prompt.target)
             || !Array.isArray(assessment.observations)) throw new Error("Invalid reading attempt event");
-        object(prompt.reading, "Reading prompt");
+        if (prompt.reading !== undefined) object(prompt.reading, "Reading prompt");
       }
-      attempts.push({ ...payload, id: event.id, created_at: Date.parse(event.createdAt) / 1000, excluded: false } as unknown as ProfileAttempt);
+      const { legacyCreatedAt, ...inputs } = payload;
+      if (legacyCreatedAt !== undefined && (typeof legacyCreatedAt !== "number" || !Number.isFinite(legacyCreatedAt))) throw new Error("Invalid history timestamp");
+      attempts.push({ ...inputs, id: event.id, created_at: legacyCreatedAt ?? Date.parse(event.createdAt) / 1000, excluded: false } as unknown as ProfileAttempt);
     }
   }
   for (const attempt of attempts) attempt.excluded = excluded.get(String(attempt.id)) ?? false;
+  attempts.sort((a, b) => a.created_at - b.created_at);
   return attempts;
 }
 

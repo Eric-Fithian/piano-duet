@@ -15,6 +15,8 @@ In the Mac reference app, every completed transcription produces an attempt: the
 
 Your history stays in `.local/learner.sqlite3` inside the install folder (`~/.piano-duet` by default). **Progress → Export history** downloads it as JSON, and deleting the folder deletes it.
 
+To bring Mac app history into the browser, first quit the Mac app so its database is fully saved. In the browser, open **Progress → All piano skills → Import history from the Mac app** and select `.local/learner.sqlite3` from the install folder. The file is read on your device and merged into browser storage; importing the same file again adds no duplicates. Keep the Mac database until you have checked your progress and songs in the browser.
+
 ## The local server
 
 The server listens only on `127.0.0.1`, so other machines on your network can't reach it, and it refuses state-changing requests that don't come from its own page.

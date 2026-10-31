@@ -119,7 +119,7 @@ export class LocalService {
     }
     if (method === "GET" && url.pathname === "/api/library") {
       const { songs, plays } = libraryFromEvents(await this.store.list());
-      const summaries = await Promise.all([...songs.values()].map((song) => songSummary(song, plays.get(song.id) ?? [])));
+      const summaries = await Promise.all([...songs.values()].sort((a, b) => a.created_at - b.created_at).map((song) => songSummary(song, plays.get(song.id) ?? [])));
       const imported = new Set(summaries.map((song) => song.title.toLowerCase()));
       return Response.json({ songs: summaries, catalog: LIBRARY_CATALOG.filter((item) => !imported.has(item.title.toLowerCase())) });
     }
@@ -335,6 +335,13 @@ export class LocalService {
     const past = [...attempts].reverse().find((item) => !item.excluded && item.context.source === "microphone"
       && (item as ProgressAttempt & { mode: string }).mode === "practice" && item.prompt.reading)?.prompt as unknown as FoundationCandidate | undefined;
     const seen = new Set([...this.tasks.values()].filter((entry) => entry.task.family === "reading").map((entry) => readingFingerprint(entry.task as ReadingTask)));
+    for (const event of await this.store.list()) {
+      if (event.kind !== "setting" || !event.payload || typeof event.payload !== "object" || Array.isArray(event.payload)) continue;
+      const payload = event.payload as { type?: unknown; task?: unknown };
+      if (payload.type === "mac-task" && payload.task && typeof payload.task === "object" && (payload.task as { family?: unknown }).family === "reading") {
+        seen.add(readingFingerprint(payload.task as ReadingTask));
+      }
+    }
     for (const attempt of attempts) if (attempt.prompt.family === "reading") seen.add(readingFingerprint(attempt.prompt as unknown as ReadingScore));
     let context: { notes: ReadingScore["target"]; end: number } | null = null;
     if (previous) {
@@ -503,7 +510,7 @@ export class LocalService {
 function readingFingerprint(task: Pick<ReadingScore, "target" | "reading"> | FoundationCandidate): string {
   const notes = task.target, starts = [...new Set(notes.map((note) => note.start))].sort((a, b) => a - b);
   const beat = starts.length > 1 ? Math.min(...starts.slice(1).map((start, index) => start - starts[index])) : 1;
-  return JSON.stringify([task.reading.introduce != null, notes.map((note) => [note.pitch, roundDecimal((note.start - notes[0].start) / beat, 3), roundDecimal(note.duration / beat, 3)])]);
+  return JSON.stringify([task.reading?.introduce != null, notes.map((note) => [note.pitch, roundDecimal((note.start - notes[0].start) / beat, 3), roundDecimal(note.duration / beat, 3)])]);
 }
 
 function validReadingRequest(request: { task: string; attempt: string; groups: HeardNote[][]; interruptions: number[]; threshold: number }): boolean {
