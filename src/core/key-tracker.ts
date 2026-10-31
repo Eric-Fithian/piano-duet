@@ -19,18 +19,7 @@ export class KeyTracker {
   private current: number | null = null;
 
   observe(notes: KeyNote[]) {
-    if (!notes.length) throw new Error("Key detection requires at least one played note");
-    const histogram = Array<number>(12).fill(0);
-    for (const note of notes) histogram[note.pitch % 12] += Math.sqrt(Math.min(note.duration, 1.5)) * (0.5 + note.velocity / 254);
-    const total = histogram.reduce((sum, value) => sum + value, 0);
-    if (!(total > 0)) throw new Error("Key detection requires positive note durations");
-    const normalized = histogram.map((value) => value / total), center = mean(normalized);
-    const centered = normalized.map((value) => value - center), norm = Math.sqrt(centered.reduce((sum, value) => sum + value * value, 0));
-    const scores = KEYS.map((key, index) => {
-      const correlation = norm > 1e-8 ? NORMALIZED[index].reduce((sum, value, pitch) => sum + value * centered[pitch], 0) / norm : 0;
-      const coverage = key.pitch_classes.reduce((sum, pitch) => sum + normalized[pitch], 0);
-      return 0.6 * correlation + 0.8 * coverage;
-    });
+    const scores = keyScores(notes);
     const chosen = scores.reduce((best, value, index) => value > scores[best] ? index : best, 0);
     const previous = this.current;
     this.current = chosen;
@@ -39,4 +28,29 @@ export class KeyTracker {
     return { ...KEYS[chosen], tentative: notes.length < 6 || scores[chosen] - alternative < 0.08,
       changed, previous: changed ? KEYS[previous].name : null };
   }
+}
+
+function keyScores(notes: KeyNote[]): number[] {
+  if (!notes.length) throw new Error("Key detection requires at least one played note");
+  const histogram = Array<number>(12).fill(0);
+  for (const note of notes) histogram[note.pitch % 12] += Math.sqrt(Math.min(note.duration, 1.5)) * (0.5 + note.velocity / 254);
+  const total = histogram.reduce((sum, value) => sum + value, 0);
+  if (!(total > 0)) throw new Error("Key detection requires positive note durations");
+  const normalized = histogram.map((value) => value / total), center = mean(normalized);
+  const centered = normalized.map((value) => value - center), norm = Math.sqrt(centered.reduce((sum, value) => sum + value * value, 0));
+  return KEYS.map((key, index) => {
+    const correlation = norm > 1e-8 ? NORMALIZED[index].reduce((sum, value, pitch) => sum + value * centered[pitch], 0) / norm : 0;
+    const coverage = key.pitch_classes.reduce((sum, pitch) => sum + normalized[pitch], 0);
+    return 0.6 * correlation + 0.8 * coverage;
+  });
+}
+
+export function signatureMode(fifths: number, notes: (KeyNote & { start: number })[]): KeyMode {
+  if (!notes.length) throw new Error("Key detection requires at least one played note");
+  const major = (fifths * 7 % 12 + 12) % 12, minor = (major + 9) % 12;
+  const last = notes.reduce((maximum, note) => Math.max(maximum, note.start), -Infinity);
+  const bass = notes.reduce((minimum, note) => note.start >= last - 1e-6 ? Math.min(minimum, note.pitch) : minimum, Infinity) % 12;
+  if (bass === major || bass === minor) return bass === major ? "major" : "minor";
+  const scores = keyScores(notes);
+  return scores[major] >= scores[12 + minor] ? "major" : "minor";
 }

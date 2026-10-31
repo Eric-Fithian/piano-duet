@@ -115,5 +115,5 @@ export function parseMusicXml(data: Uint8Array) {
   keys.sort((a, b) => a[0] - b[0] || a[1] - b[1] || String(a[2]).localeCompare(String(b[2])));
   tempos.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
   return { notes: output, bpm: tempos.length ? roundEven(tempos[0][1]) : 72, meters,
-    key: keys.length ? [keys[0][1], keys[0][2]] : null, title, composer, pickup, measures };
+    key: keys.length ? [keys[0][1], keys[0][2]] as [number, string | null] : null, title, composer, pickup, measures };
 }
