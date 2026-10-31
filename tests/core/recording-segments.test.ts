@@ -64,7 +64,7 @@ result = TransKun.transcribe(Assembler(), torch.zeros((8 * 44100, 1)))
 notes = [note.model_dump() for note in to_notes(result, 8)]
 print(json.dumps({"hashes": hashes, "paths": paths, "velocity": velocity.flatten().tolist(), "timing": timing.flatten().tolist(),
     "events": [vars(event) for event in events], "last": last, "segments": segment_data, "positions": positions, "notes": notes}))
-`], { encoding: "utf8", maxBuffer: 10_000_000 });
+`], { encoding: "utf8", timeout: 300_000, maxBuffer: 10_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const expected: { hashes: string[]; paths: RecordingInterval[][]; velocity: number[]; timing: number[]; events: RecordingEvent[];
     last: number[]; segments: RecordingEvent[][]; positions: number[][]; notes: { pitch: number; start: number; duration: number; velocity: number }[] } = JSON.parse(reference.stdout);

@@ -18,7 +18,7 @@ for item in steps:
     item["values"] = [staff_step(pitch, item["key"]) for pitch in item["pitches"]]
 scores = [record_composition(stage, 0)["score"]["target"] for stage in STAGES]
 print(json.dumps({"steps": steps, "scores": scores, "attacks": [reading_attacks(score) for score in scores]}))
-`], { encoding: "utf8", maxBuffer: 20_000_000 });
+`], { encoding: "utf8", timeout: 300_000, maxBuffer: 20_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const expected: { steps: { key: MusicalKey; pitches: number[]; values: number[] }[];
     scores: { start: number }[][]; attacks: { start: number; indices: number[] }[][] } = JSON.parse(reference.stdout);

@@ -87,18 +87,29 @@
 .drill-tempo-display, .drill-best { flex:none; white-space:nowrap; font-size:13px; }
 .drill-best { margin-left:4px; }
 #drillDetails, .drill-more-button { display:inline-flex; align-items:center; justify-content:center; min-width:44px; min-height:44px; padding:0 6px; color:var(--text); background:var(--panel); border:1px solid var(--line); border-radius:4px; }
-.drill-more-button { font-size:0; }
-.drill-more-button::after { content:'⋯'; font-size:18px; }
-.drill-extra { display:none; position:static; flex:1 0 100%; max-width:none; padding:8px; background:var(--panel); border:1px solid var(--line); border-radius:4px; box-shadow:none; flex-wrap:wrap; }
+.drill-tempo-display { display:none; }
+.drill-best:empty { display:none; }
+.drill-more-button { gap:6px; padding:0 12px; font-size:15px; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.drill-more-button::after { content:''; width:7px; height:7px; margin-top:-4px; border:solid currentColor; border-width:0 2px 2px 0; transform:rotate(45deg); }
+.drill-more-button[aria-expanded=true]::after { margin-top:4px; transform:rotate(-135deg); }
+.drill-extra { display:none; position:static; flex:1 0 100%; max-width:none; gap:8px; padding:8px 0; background:transparent; border:0; border-radius:0; box-shadow:none; flex-wrap:wrap; align-items:center; }
 .drill-more-button[aria-expanded=true] + .drill-extra { display:flex; }
 .drill-extra button { min-height:44px; }
+.drill-extra .drill-level, .drill-extra .drill-session { width:auto; flex-direction:row; padding:0 14px; color:var(--text); font-size:15px; }
+.drill-tool { display:inline-flex; align-items:center; gap:6px; padding:0 14px; font-size:15px; }
+.drill-tool svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+.drill-extra .hud-tempo { display:inline-flex; align-items:center; gap:4px; min-height:44px; padding:0 4px; color:var(--text); border:1px solid var(--line); border-radius:4px; }
+.drill-extra .hud-tempo small { color:var(--muted); font-size:13px; }
+.drill-extra .hud-tempo b { font-size:17px; font-variant-numeric:tabular-nums; }
+.drill-extra .hud-tempo button { color:var(--text); background:transparent; border:0; font-size:20px; }
+.drill-extra button:disabled { opacity:.45; }
 .drill-ladder-track { display:none; }
 .library { flex:1; min-height:0; overflow:auto; background:var(--bg); border:0; border-radius:0; padding:16px; }
 .library-head { display:flex; flex-wrap:wrap; gap:8px; }
 .library-head .rule-heading { flex:1 0 100%; margin:0 0 4px; }
 .rule-heading { font:600 19px Fraunces,serif; letter-spacing:normal; text-transform:none; }
 .rule-heading::after { display:none; }
-.library-head #librarySearch { flex:1; min-width:0; min-height:44px; width:auto; background:var(--panel); border:1px solid var(--line); border-radius:4px; color:var(--text); font-size:15px; }
+.library-head #librarySearch { flex:1; min-width:0; height:44px; min-height:44px; box-sizing:border-box; padding:0 12px; width:auto; background:var(--panel); border:1px solid var(--line); border-radius:4px; color:var(--text); font-size:15px; }
 .import-menu { flex:none; position:relative; margin:0; padding:0; border:0; }
 .import-menu > summary { display:flex; align-items:center; min-height:44px; padding:8px 18px; color:var(--folio-onAction); background:var(--folio-action); border:1px solid var(--folio-action); border-radius:4px; font-size:14px; font-weight:700; list-style:none; }
 .import-menu > summary::-webkit-details-marker { display:none; }
@@ -106,16 +117,21 @@
 .import-menu:not([open]) .import-choices { display:none; }
 .import-choices button, .import-choices label { display:flex; align-items:center; min-height:44px; padding:8px 12px; color:var(--text); background:transparent; border:0; text-align:left; font-size:14px; cursor:pointer; }
 .import-choices input { display:none; }
+.import-choices { min-width:200px; padding:4px; border-radius:4px; box-shadow:0 8px 24px color-mix(in srgb, var(--folio-ink) 18%, transparent); }
+.import-choices button:hover, .import-choices label:hover { background:var(--panel-2); }
+@media (pointer:fine) { .import-choices button, .import-choices label { min-height:36px; padding:6px 12px; } }
+input:focus-visible, select:focus-visible, textarea:focus-visible { outline-offset:0; border-color:var(--folio-focus); }
 .song-row:not(.song-columns) { border-bottom:1px solid var(--line); border-radius:0; color:var(--text); padding-inline:0; }
 #songRows:not(:empty) { border-top:1px solid var(--line); }
 button.song-name { width:100%; min-height:44px; padding:0; color:var(--text); background:transparent; border:0; text-align:left; }
 .song-name strong { color:var(--text); }
 .song-name small, .song-empty { color:var(--muted); }
 .catalog { display:block; }
-.catalog-row { position:relative; display:block; padding:16px 40px 16px 0; background:transparent; border:0; border-bottom:1px solid var(--line); border-radius:0; color:var(--text); }
+.catalog-row { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:56px; padding:8px 4px; background:transparent; border:0; border-bottom:1px solid var(--line); border-radius:0; color:var(--text); text-decoration:none; }
 .catalog-row:hover { background:var(--panel-2); }
-.catalog-link { display:inline-block; margin-top:8px; color:var(--text); text-decoration:underline; text-underline-offset:3px; }
-.catalog-arrow { position:absolute; right:4px; top:50%; transform:translateY(-50%); font-size:20px; }
+.catalog-link { flex:none; color:var(--folio-action); font-weight:600; text-decoration:underline; text-underline-offset:3px; }
+[data-theme=dark] .catalog-link { color:var(--text); }
+.song-columns[hidden] { display:none; }
 
 @media(max-height:500px) and (orientation:landscape) {
   .piano-app .app-header { padding-right:290px; }
@@ -134,3 +150,6 @@ button.song-name { width:100%; min-height:44px; padding:0; color:var(--text); ba
   .song-row:not(.song-columns) .song-name { padding-right:58px; }
   .song-row:not(.song-columns) .song-name::after { content:'Open ›'; position:absolute; right:52px; top:50%; transform:translateY(-50%); color:var(--text); }
 }
+.drill-options { background:var(--bg); border-bottom:1px solid var(--line); }
+.drill-bar .drill-title { flex:0 1 520px; min-width:0; }
+.drill-bar .drill-title + .drill-tempo-display + #drillDetails { margin-left:auto; }

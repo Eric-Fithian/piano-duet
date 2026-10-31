@@ -29,7 +29,7 @@ for stage in STAGES:
         assessment, notes = assess_reading(task, groups, context)
         cases.append({"task": task, "groups": groups, "context": context, "expected": {"assessment": assessment, "notes": notes}})
 print(json.dumps(cases))
-`], { encoding: "utf8", maxBuffer: 50_000_000 });
+`], { encoding: "utf8", timeout: 300_000, maxBuffer: 50_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const cases: { task: ReadingScore; groups: HeardNote[][]; context: ReadingAssessmentContext; expected: unknown }[] = JSON.parse(reference.stdout);
   for (const item of cases) {

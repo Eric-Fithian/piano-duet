@@ -22,7 +22,7 @@ voice = '''<score-partwise><movement-title>Two voices</movement-title><identific
   <forward><duration>8</duration></forward></measure></part></score-partwise>'''
 sources = [MUSICXML, two_parts, voice]
 print(json.dumps([{'xml': source, 'parsed': parse_musicxml(source.encode())} for source in sources]))
-`], { encoding: "utf8", maxBuffer: 10_000_000 });
+`], { encoding: "utf8", timeout: 300_000, maxBuffer: 10_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const cases: { xml: string; parsed: unknown }[] = JSON.parse(reference.stdout);
   for (const item of cases) assert.deepEqual(parseMusicXml(new TextEncoder().encode(item.xml)), item.parsed);

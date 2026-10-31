@@ -21,7 +21,7 @@ for stage in STAGES:
         shifts, figured, altered = plan_score(stage, active, meter, RecordingRandom(23, events))
         cases.append({"stage": stage, "active": active, "meter": meter, "events": events, "shifts": {key: sorted(value) for key, value in shifts.items()}, "figured": sorted(figured), "altered": sorted(altered)})
 print(json.dumps(cases))
-`], { encoding: "utf8", maxBuffer: 20_000_000 });
+`], { encoding: "utf8", timeout: 300_000, maxBuffer: 20_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const cases: { stage: PlanStage; active: string[]; meter: string; events: ReplayEvent[]; shifts: Record<string, number[]>; figured: number[]; altered: number[] }[] = JSON.parse(reference.stdout);
   for (const item of cases) {

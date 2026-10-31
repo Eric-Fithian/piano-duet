@@ -83,15 +83,15 @@
           <div class="drill-bar">
             <button id="drillToggle" class="drill-title" aria-expanded="false" aria-controls="drillOptions" title="Change drill"><strong id="drillTitle">Drills</strong><small id="drillCue"></small><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg></button>
             <span id="drillTempoDisplay" class="drill-tempo-display">♩ —</span>
-            <button id="drillMore" class="drill-more-button" aria-expanded="false" aria-controls="drillExtra">More</button>
+            <button id="drillMore" class="drill-more-button" aria-expanded="false" aria-controls="drillExtra" aria-label="Tempo and tools">♩ —</button>
             <div id="drillExtra" class="drill-extra">
-            <button id="drillLevel" class="drill-level" aria-haspopup="dialog" title="Drill levels"><b id="drillLevelNumber">New drill</b><span class="xp-track"><i id="drillLevelFill"></i></span></button>
+            <button id="drillLevel" class="secondary drill-level" aria-haspopup="dialog"><b id="drillLevelNumber" hidden>New drill</b><span class="xp-track" hidden><i id="drillLevelFill"></i></span>Levels</button>
             <span id="drillTempoControl" class="hud-tempo" role="group" aria-label="Drill tempo"><button id="drillSlower" aria-label="Slower" aria-keyshortcuts="ArrowLeft">−</button><span><small>♩</small><b id="drillTempo">—</b><small id="drillSubdivision"></small></span><button id="drillFaster" aria-label="Faster" aria-keyshortcuts="ArrowRight">+</button></span>
             <button id="drillListen" class="secondary listen-button" aria-label="Hear it played" title="Hear it played">Listen</button>
-            <button id="drillBeat" class="icon-button" aria-label="Hear the beat" title="Hear the beat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 21h8l-2.5-17h-3zM12 14l5-8"/></svg></button>
+            <button id="drillBeat" class="secondary drill-tool" aria-label="Hear the beat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 21h8l-2.5-17h-3zM12 14l5-8"/></svg>Beat</button>
             <button id="drillLast" class="quiet-button drill-last" aria-controls="drillResults" hidden></button>
-            <button id="drillNext" class="icon-button" aria-label="Next drill" title="Next drill"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l8 6-8 6zM17 6v12"/></svg></button>
-            <button id="drillSession" class="quiet-button drill-session" aria-haspopup="dialog">Session</button>
+            <button id="drillNext" class="secondary drill-tool" aria-label="Next drill"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l8 6-8 6zM17 6v12"/></svg>Next drill</button>
+            <button id="drillSession" class="secondary drill-session" aria-haspopup="dialog">Session</button>
             <button id="drillDetails" class="secondary" aria-haspopup="dialog" aria-label="Instructions and tips" title="Instructions and tips">Help</button>
             </div>
             <span class="xp-track drill-ladder-track" aria-hidden="true"><i id="drillLadderFill"></i></span>
@@ -106,7 +106,7 @@
               <label><span>Start</span><select id="drillInversion"></select></label>
               <label><span>Practice</span><select id="drillPractice"></select></label>
               <label class="always"><span>Each take</span><select id="drillFlow"><option value="build">Build: same drill each take</option><option value="mix">Mix: re-roll Random each take</option></select></label>
-              <button id="drillAuto" class="quiet-button">Choose for me</button>
+              <button id="drillAuto" class="secondary">Choose for me</button>
             </div>
             <p id="drillMilestone" class="drill-milestone" aria-live="polite"></p>
             <p id="drillSummary" class="drill-summary"></p>

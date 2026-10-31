@@ -36,7 +36,7 @@ for context in contexts:
         if index == 0: chance = phrase.chord_chance([67, 69])
     cases.append({"context": context, "steps": steps, "notes": notes, "chance": chance, "events": events, "calls": model.calls})
 print(json.dumps(cases))
-`], { encoding: "utf8", maxBuffer: 10_000_000 });
+`], { encoding: "utf8", timeout: 300_000, maxBuffer: 10_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const cases: { context: PhraseContext | null; steps: [number, [number, number][], [number, number][]][]; notes: [number, number][];
     chance: number; events: { method: string; args: [number[]]; kwargs: { weights: number[] }; value: number[] }[];

@@ -38,7 +38,7 @@ for drill, spec in DRILLS.items():
                             task['id'] = 'synthetic-task'
                             cases.append([config, rung, progress, task])
 print(json.dumps(cases))
-`], { encoding: "utf8", maxBuffer: 100_000_000 });
+`], { encoding: "utf8", timeout: 300_000, maxBuffer: 100_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const cases: [DrillSelection, number, DrillStanding | null, unknown][] = JSON.parse(reference.stdout);
   assert.ok(cases.length >= 400);

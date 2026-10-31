@@ -36,7 +36,7 @@ with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.S
         data = export.json()
         header = export.headers['content-disposition']
 print(json.dumps({'piece': piece, 'export': data, 'header': header}))
-`], { input: JSON.stringify({ id: attemptId, payload }), encoding: "utf8", maxBuffer: 10_000_000 });
+`], { input: JSON.stringify({ id: attemptId, payload }), encoding: "utf8", timeout: 300_000, maxBuffer: 10_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const expected = JSON.parse(reference.stdout);
   const events: ReadingLogEvent[] = [{ id: attemptId, deviceId: "device", clock: 1, createdAt: "2024-01-01T00:00:00.000Z", kind: "attempt", payload }];

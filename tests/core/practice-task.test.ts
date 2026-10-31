@@ -58,7 +58,7 @@ with patch('piano_duet.practice.uuid4', return_value='task'):
   task = next_task(Store(copy.deepcopy(profile), [piece], []), 'guided', RecordingRandom(0, events))
 cases.append({'profile':profile,'focus':'guided','pieces':[piece],'attempts':[],'events':events,'task':task})
 print(json.dumps(cases))
-`], { encoding: "utf8", maxBuffer: 30_000_000 });
+`], { encoding: "utf8", timeout: 300_000, maxBuffer: 30_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const cases: { profile: Parameters<typeof generatePracticeTask>[0]; focus: Parameters<typeof generatePracticeTask>[1];
     pieces: Parameters<typeof generatePracticeTask>[5]; attempts: Parameters<typeof generatePracticeTask>[6]; events: ReplayEvent[];

@@ -37,7 +37,7 @@ for stage in STAGES:
                 previous = scale.index(line.pool[0])
                 history = [line.anchor] if line.anchor is not None else []
 print(json.dumps(cases))
-`], { encoding: "utf8", maxBuffer: 50_000_000 });
+`], { encoding: "utf8", timeout: 300_000, maxBuffer: 50_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const cases: { stage: LineStage; hands: Record<string, ReadingHand>; key: MusicalKey; meter: string; staff: string; bar: number;
     scale: number[]; previous: number | null; history: number[]; shift: boolean; figure: boolean; accidental: boolean;

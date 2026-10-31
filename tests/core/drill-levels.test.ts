@@ -23,7 +23,7 @@ for size in (5, 40, 200, 800):
         }
     histories.append(history)
 print(json.dumps({"catalog": catalog(), "histories": histories, "levels": [drill_levels(history) for history in histories]}))
-`], { encoding: "utf8", maxBuffer: 10_000_000 });
+`], { encoding: "utf8", timeout: 300_000, maxBuffer: 10_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const data: { catalog: unknown; histories: Record<string, DrillLevelEntry>[]; levels: unknown[] } = JSON.parse(reference.stdout);
   assert.deepEqual(DRILL_CATALOG, data.catalog);

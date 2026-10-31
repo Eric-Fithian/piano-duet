@@ -33,7 +33,7 @@ attempts.append({"id": "demo", "created_at": 1702000000, "mode": "duet", "exclud
     "prompt": {"family": "creating", "title": "Idea", "target": []}, "context": {"source": "microphone"}, "assessment": {"evidence": []}, "notes": [{"pitch": 60}]})
 histories = [attempts[:size] for size in (0, 1, 6, 12, 18, len(attempts))]
 print(json.dumps({"histories": histories, "expected": [build_profile(history, now=1703000000) for history in histories]}))
-`], { encoding: "utf8", maxBuffer: 50_000_000 });
+`], { encoding: "utf8", timeout: 300_000, maxBuffer: 50_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const data: { histories: ProfileAttempt[][]; expected: unknown[] } = JSON.parse(reference.stdout);
   assert.deepEqual(data.histories.map((attempts) => learnerProfile(attempts, 1703000000)), data.expected);

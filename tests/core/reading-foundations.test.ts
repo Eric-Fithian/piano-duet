@@ -27,7 +27,7 @@ for stage in (1, 2):
             score = reading_candidate(progress, RecordingRandom(seed, events), RecordingPhrase, teach=teach, context=context)
             cases.append({"progress": progress, "events": events, "context": context, "teach": teach, "score": score})
 print(json.dumps(cases))
-`], { encoding: "utf8", maxBuffer: 30_000_000 });
+`], { encoding: "utf8", timeout: 300_000, maxBuffer: 30_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const cases: { progress: Parameters<typeof readingFoundation>[0]; events: ReplayEvent[]; context: unknown; teach: boolean; score: FoundationCandidate }[] = JSON.parse(reference.stdout);
   assert.equal(cases.length, 48);

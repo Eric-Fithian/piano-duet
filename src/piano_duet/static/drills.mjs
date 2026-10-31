@@ -271,6 +271,7 @@ export class DrillPicker {
     const drill = task.drill;
     $('drillTempo').textContent = drill.bpm;
     $('drillTempoDisplay').textContent = `♩ ${drill.bpm}`;
+    $('drillMore').textContent = `♩ ${drill.bpm}`;
     $('drillSubdivision').textContent = SUBDIVISION[drill.per_beat];
     const level = this.levels[drill.drill];
     $('drillLevelNumber').textContent = level.level || 'New drill';
@@ -285,13 +286,12 @@ export class DrillPicker {
     const ladder = this.catalog.drills[drill.drill].ladder;
     const working = ladder[drill.working];
     const best = drill.best === null ? null : ladder[drill.best];
-    $('drillBest').textContent = `Best tempo ${best ? best.bpm : '—'}`;
+    $('drillBest').textContent = best ? `Best tempo ♩ ${best.bpm}` : '';
     const notes = [best ? `Your steady tempo ♩ ${best.bpm} in ${SUBDIVISION[best.per_beat]}` : 'Play at any tempo you can hold steadily',
       drill.rung === drill.working ? 'this is the suggestion' : `suggested ${tempoLabel(working.per_beat, working.bpm)}`];
     if (reached) notes.push(`meets ${reached}`);
     if (next) notes.push(`next: ${next.label} at ${tempoLabel(next.per_beat, next.bpm)}`);
     $('drillMilestone').textContent = notes.join(' · ');
-    $('drillTempoControl').title = notes.join(' · ');
     $('drillTitle').textContent = task.title;
     const choices = this.read();
     const shuffled = FIELDS.filter(field => choices[field] === RANDOM

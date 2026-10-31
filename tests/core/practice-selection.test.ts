@@ -40,7 +40,7 @@ from piano_duet.practice import choose_focus, select_key
 case = json.load(sys.stdin)
 with patch('piano_duet.practice.time.time', return_value=case['now']):
     print(json.dumps({'focuses': [choose_focus(p) for p in case['histories']], 'keys': [select_key(s) for s in case['keys']]}))
-`], { input: JSON.stringify({ histories, keys, now }), encoding: "utf8", maxBuffer: 10_000_000 });
+`], { input: JSON.stringify({ histories, keys, now }), encoding: "utf8", timeout: 300_000, maxBuffer: 10_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const expected = JSON.parse(reference.stdout);
   assert.deepEqual(histories.map((profile) => choosePracticeFocus(profile, now)), expected.focuses);

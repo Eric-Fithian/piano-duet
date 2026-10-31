@@ -34,7 +34,7 @@ with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.S
             outcomes.append({'task': task, 'events': events, 'saved': client.get(f'/api/attempts/{attempt}').json()})
         summary = client.get('/api/drills').json()
 print(json.dumps({'outcomes': outcomes, 'summary': summary}))
-`], { encoding: "utf8", maxBuffer: 10_000_000 });
+`], { encoding: "utf8", timeout: 300_000, maxBuffer: 10_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const expected = JSON.parse(reference.stdout);
   const events: ReadingLogEvent[] = [];

@@ -34,7 +34,7 @@ weights = [(0, 2.0), (1, 7.0), (2, 0.2), (3, 0.4), (4, 3.0), (5, 1.0)]
 scores = mx.array([logits[i] for i, _ in weights], dtype=mx.float32) / 0.95 + mx.log(mx.array([w for _, w in weights], dtype=mx.float32))
 scores = mx.where(scores >= mx.max(scores) + math.log(0.035), scores, -float("inf"))
 print(json.dumps({"pitchTokens": pitch_tokens, "durationTokens": duration_tokens, "maxDurationMs": tokenizer.max_dur_ms, "cases": cases, "logits": logits, "weights": weights, "probabilities": mx.softmax(scores).tolist()}))
-`], { encoding: "utf8", maxBuffer: 10_000_000 });
+`], { encoding: "utf8", timeout: 300_000, maxBuffer: 10_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const data: { pitchTokens: [number, number[]][]; durationTokens: [number, number][]; maxDurationMs: number;
     cases: { pitches: [number, number][]; durations: [number, number][]; masks: [number, number][][] }[];

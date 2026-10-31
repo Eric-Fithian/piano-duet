@@ -12,7 +12,7 @@ rng = np.random.default_rng(42)
 inputs = [np.array([1], dtype=np.float32), np.array([1, -1], dtype=np.float32)]
 inputs += [rng.uniform(-1, 1, length).astype(np.float32) for length in (160, 501, 16000)]
 print(json.dumps([{'input': samples.tolist(), 'output': resample_poly(samples, 44100, 16000).tolist()} for samples in inputs]))
-`], { encoding: "utf8", maxBuffer: 10_000_000 });
+`], { encoding: "utf8", timeout: 300_000, maxBuffer: 10_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const cases: { input: number[]; output: number[] }[] = JSON.parse(reference.stdout);
   for (const item of cases) {
@@ -31,7 +31,7 @@ import numpy as np
 from scipy.signal import resample_poly
 samples = (np.sin(np.arange(4096, dtype=np.float32) / 7) * .7).astype(np.float32)
 print(json.dumps({'input': samples.tolist(), 'outputs': {str(rate): resample_poly(samples, 44100, rate).tolist() for rate in (22050, 32000, 48000)}}))
-`], { encoding: "utf8", maxBuffer: 10_000_000 });
+`], { encoding: "utf8", timeout: 300_000, maxBuffer: 10_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const fixture: { input: number[]; outputs: Record<string, number[]> } = JSON.parse(reference.stdout);
   for (const [rate, expected] of Object.entries(fixture.outputs)) {

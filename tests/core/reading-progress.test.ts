@@ -30,7 +30,7 @@ intro["assessment"] = dict(intro["assessment"], evidence=[])
 attempts.append(intro)
 histories = [attempts[:size] for size in (0, 1, 4, 8, 16, len(attempts))]
 print(json.dumps({"histories": histories, "expected": [reading_progress(history) for history in histories]}))
-`], { encoding: "utf8", maxBuffer: 50_000_000 });
+`], { encoding: "utf8", timeout: 300_000, maxBuffer: 50_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const data: { histories: ProgressAttempt[][]; expected: unknown[] } = JSON.parse(reference.stdout);
   assert.deepEqual(data.histories.map(readingProgress), data.expected);

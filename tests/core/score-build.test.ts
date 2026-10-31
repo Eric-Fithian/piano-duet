@@ -26,7 +26,7 @@ for index in range(100):
               'key': key, 'title': None, 'composer': None, 'pickup': (0, .5, 1)[index % 3]}
     cases.append({'parsed': parsed, 'song': build_song(parsed, None, None, 'synthetic.musicxml')})
 print(json.dumps({'sources': sources, 'cases': cases}))
-`], { encoding: "utf8", maxBuffer: 10_000_000 });
+`], { encoding: "utf8", timeout: 300_000, maxBuffer: 10_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const data: { sources: { filename: string; data: string; parsed: ParsedScore; song: unknown }[];
     cases: { parsed: ParsedScore; song: unknown }[] } = JSON.parse(reference.stdout);
@@ -57,7 +57,7 @@ for index in range(40):
     cases.append({'parsed': parsed, 'song': build_song(parsed, 't', None, 'audio', transcribed=True),
                   'played': [note.model_dump() for note in played], 'tempo': performance_tempo(played, parsed)})
 print(json.dumps(cases))
-`], { encoding: "utf8", maxBuffer: 10_000_000 });
+`], { encoding: "utf8", timeout: 300_000, maxBuffer: 10_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const cases: { parsed: ParsedScore; song: unknown; played: { start: number }[]; tempo: number }[] = JSON.parse(reference.stdout);
   for (const item of cases) {

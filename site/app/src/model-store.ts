@@ -64,7 +64,11 @@ export class ModelStore {
       if (!recorded) await cache.put(marker, new Response("verified"));
       return new Response(blob, { headers: cached.headers, status: cached.status });
     }
-    const response = await fetch(file.url, { signal, mode: "cors" });
+    const host = new URL(file.url).host;
+    const response = await fetch(file.url, { signal, mode: "cors" }).catch((error: unknown) => {
+      if (signal?.aborted) throw error;
+      throw new Error(`Could not reach ${host} to download ${file.name}. Check your connection, or allow ${host} in any content blocker or tracking protection, then try again.`, { cause: error });
+    });
     if (!response.ok || !response.body) throw new Error(`Could not download ${file.name}: HTTP ${response.status}`);
     const [storage, checking] = response.body.tee();
     let complete = false;

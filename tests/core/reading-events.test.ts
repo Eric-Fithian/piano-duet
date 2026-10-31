@@ -36,7 +36,7 @@ events += [
     {"id": "song", "deviceId": "a", "clock": 13, "createdAt": created, "kind": "song", "payload": {"title": "Study"}},
 ]
 print(json.dumps({"events": events, "expected": reading_progress(attempts)}))
-`], { encoding: "utf8", maxBuffer: 20_000_000 });
+`], { encoding: "utf8", timeout: 300_000, maxBuffer: 20_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const data: { events: ReadingLogEvent[]; expected: unknown } = JSON.parse(reference.stdout);
   assert.deepEqual(readingProgressFromEvents([...data.events].reverse()), data.expected);

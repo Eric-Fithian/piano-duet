@@ -25,7 +25,7 @@ with zipfile.ZipFile(output, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
     archive.writestr('score.musicxml', MUSICXML)
 data = output.getvalue()
 print(json.dumps({'archive': base64.b64encode(data).decode(), 'score': parse_score('score.mxl', data)}))
-`], { encoding: "utf8", maxBuffer: 10_000_000 });
+`], { encoding: "utf8", timeout: 300_000, maxBuffer: 10_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const python = JSON.parse(reference.stdout);
   assert.deepEqual(parseMxl(Buffer.from(python.archive, "base64")), python.score);

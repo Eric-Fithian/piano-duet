@@ -54,6 +54,7 @@ jobs:
   core:
     name: TypeScript core and Python parity
     runs-on: macos-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -186,6 +187,30 @@ jobs:
       - name: Remove temporary model browser profile
         if: always()
         run: rm -rf .cache/browser-inference/model-profile
+
+  visual-audit:
+    name: Visual audit
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npm ci --prefix site
+      - run: npx playwright install chromium firefox webkit
+      # WebKit joins once the music writer model loads there; today Reading cannot start in WebKit.
+      - run: node tests/web/visual/run.mjs visual-audit
+        env:
+          ENGINES: chromium,firefox
+        timeout-minutes: 20
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: visual-audit
+          path: visual-audit
+          retention-days: 14
 
   sync:
     name: Local accounts and sync

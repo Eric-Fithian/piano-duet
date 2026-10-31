@@ -12,12 +12,12 @@ const sampleFiles: ModelFile[] = PIANO_SAMPLES.map((sample) => ({ model: "piano-
   revision: SAMPLE_REVISION, url: `https://raw.githubusercontent.com/nbrosowsky/tonejs-instruments/${SAMPLE_REVISION}/samples/piano/${sample.file}`,
   bytes: sample.bytes, sha256: sample.sha256 }));
 const definitions: Omit<Entry, "files">[] = [
-  { id: "aria", name: "Aria", use: "Generates Reading and Drills material, plus Duet replies and Variations (turned off).", credit: "Apache 2.0 · EleutherAI Aria", used: true },
-  { id: "live-transcription", name: "Live note recognition", use: "Recognizes notes as you play in Reading and Library, and in Practice (turned off).", credit: "CC BY 4.0 · Qiuqiang Kong and collaborators", used: true },
-  { id: "phrase-transcription", name: "Phrase transcription", use: "Recognizes phrases for Practice, Duet and Variations (turned off).", credit: "CC BY 4.0 · Qiuqiang Kong and collaborators; ONNX conversion by stelee", used: false },
-  { id: "recording-transcription", name: "Recording transcription", use: "Finds notes in Drills takes and Library recordings.", credit: "MIT · Transkun by Yujia Yan", used: true },
-  { id: "midi-to-score", name: "Score model", use: "Writes sheet music for Library recording imports.", credit: "CC BY-NC-SA 4.0 · Score model by Eric Fithian", used: true },
-  { id: "piano-samples", name: "Piano samples", use: "Plays piano sounds throughout the app.", credit: "CC BY 3.0 · tonejs-instruments by Nicholaus P. Brosowsky", used: true },
+  { id: "piano-samples", name: "Piano sound", use: "Plays the piano whenever you press Listen.", credit: "Piano samples · CC BY 3.0 · tonejs-instruments by Nicholaus P. Brosowsky", used: true },
+  { id: "live-transcription", name: "Note listener", use: "Hears the notes you play, as you play them, in Reading and Library songs.", credit: "Live note recognition · CC BY 4.0 · Qiuqiang Kong and collaborators", used: true },
+  { id: "recording-transcription", name: "Take checker", use: "Checks your Drills takes and finds the notes in imported recordings.", credit: "Recording transcription · MIT · Transkun by Yujia Yan", used: true },
+  { id: "aria", name: "Music writer", use: "Composes new practice music for Reading and Drills.", credit: "Aria · Apache 2.0 · EleutherAI", used: true },
+  { id: "midi-to-score", name: "Sheet-music writer", use: "Turns imported recordings and YouTube audio into sheet music. Only needed for Library imports.", credit: "Score model · CC BY-NC-SA 4.0 · Eric Fithian", used: true },
+  { id: "phrase-transcription", name: "Phrase transcription", use: "Only used by modes that are turned off.", credit: "CC BY 4.0 · Qiuqiang Kong and collaborators; ONNX conversion by stelee", used: false },
 ];
 const entries: Entry[] = definitions.map((entry) => {
   const files = entry.id === "piano-samples" ? sampleFiles : MODEL_CATALOG[entry.id];
@@ -31,14 +31,14 @@ const reason = (error: unknown) => error instanceof Error ? error.message : Stri
 export function setupModelSettings(root: HTMLDetailsElement, backend: InferenceBackend,
   options: { entries?: Entry[]; store?: Pick<ModelStore, "get" | "status" | "delete" | "verifyStored">; test?: typeof testModel } = {}): { backend: (model: ModelId, record: InferenceBackendRecord) => void; progress: (value: DownloadProgress) => void } {
   const store = options.store ?? new ModelStore();
-  const items = options.entries ?? entries;
+  const items = (options.entries ?? entries).filter((entry) => entry.used);
   const runTest = options.test ?? testModel;
   const backends = new Map<ModelId, InferenceBackendRecord>();
   const results = new Map<AssetId, Result>();
   const controllers = new Map<AssetId, AbortController>();
   let bulkActive = false, bulkCancelled = false;
   const rows = new Map<AssetId, { section: HTMLDetailsElement; quick: HTMLButtonElement; status: HTMLElement; backend: HTMLElement; result: HTMLElement; progress: HTMLProgressElement; cancel: HTMLButtonElement }>();
-  root.innerHTML = `<summary>Models</summary><p>Models run entirely on this device. Each model is downloaded from Hugging Face the first time a feature needs it and stored in this browser. If the browser clears it, it downloads again. No audio leaves this device. Piano samples come from GitHub.</p><p id="modelStorage" role="status"></p><details class="model-actions-disclosure"><summary>Model actions</summary><div class="model-actions"><button class="secondary" type="button" data-action="persist">Keep storage on this device</button><button class="secondary" type="button" data-action="download-all">Download all models used by the app · ${size(items.filter((entry) => entry.used).flatMap((entry) => entry.files).reduce((sum, file) => sum + file.bytes, 0))}</button><button class="secondary" type="button" data-action="test-all">Test all</button><button class="secondary" type="button" data-action="copy">Copy diagnostics</button><button class="text-button" type="button" data-action="cancel-all" hidden>Cancel all</button></div></details><p class="model-message" role="status" aria-live="polite"></p><div class="model-actions model-confirm" hidden><button class="secondary" type="button" data-action="confirm-test-all">Download and test</button><button class="text-button" type="button" data-action="cancel-test-all">Cancel</button></div><div class="model-list"></div>`;
+  root.innerHTML = `<summary>Models</summary><p>Each part of the app that listens, checks or writes music uses its own small model, so there is one entry per job. A model downloads only the first time you use the feature that needs it, stays in this browser and runs entirely on this device. No audio leaves this device.</p><p id="modelStorage" role="status"></p><details class="model-actions-disclosure"><summary>Model actions</summary><div class="model-actions"><button class="secondary" type="button" data-action="persist">Keep storage on this device</button><button class="secondary" type="button" data-action="download-all">Download all models used by the app · ${size(items.filter((entry) => entry.used).flatMap((entry) => entry.files).reduce((sum, file) => sum + file.bytes, 0))}</button><button class="secondary" type="button" data-action="test-all">Test all</button><button class="secondary" type="button" data-action="copy">Copy diagnostics</button><button class="text-button" type="button" data-action="cancel-all" hidden>Cancel all</button></div></details><p class="model-message" role="status" aria-live="polite"></p><div class="model-actions model-confirm" hidden><button class="secondary" type="button" data-action="confirm-test-all">Download and test</button><button class="text-button" type="button" data-action="cancel-test-all">Cancel</button></div><div class="model-list"></div>`;
   const storage = root.querySelector<HTMLElement>("#modelStorage")!;
   const message = root.querySelector<HTMLElement>(".model-message")!;
   const list = root.querySelector<HTMLElement>(".model-list")!;

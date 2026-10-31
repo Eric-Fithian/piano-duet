@@ -24,7 +24,7 @@ for level in range(1, 6):
             limits.record(pitch, onset)
         cases.append({'level': level, 'beat': beat, 'gap': limits.gap, 'floor': limits.duration_floor, 'records': records})
 print(json.dumps(cases))
-`], { encoding: "utf8", maxBuffer: 10_000_000 });
+`], { encoding: "utf8", timeout: 300_000, maxBuffer: 10_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const cases: { level: number; beat: number; gap: number; floor: number; records: { earliest: number; windows: (number | null)[][][]; pitch: number; onset: number }[] }[] = JSON.parse(reference.stdout);
   for (const item of cases) {

@@ -30,7 +30,7 @@ notes = [Note(pitch=(60,64,67)[i%3] + (12 if (i//3)%4 == 0 else 0), start=.2+(i/
 model = Model()
 result, progress = analyze_phrase(SimpleNamespace(tokenizer=tokenizer, model=model, note_ids=ids), notes, .96, Event(), lambda detail, value: None)
 print(json.dumps({'input': [n.model_dump() for n in notes], 'notes': [n.model_dump() for n in result], 'analysis': progress, 'calls': model.calls}))
-`], { encoding: "utf8", maxBuffer: 5_000_000 });
+`], { encoding: "utf8", timeout: 300_000, maxBuffer: 5_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const expected: { input: ContextNote[]; notes: ContextNote[]; analysis: VariationDetail[]; calls: { tokens: number[]; reset: boolean }[] } = JSON.parse(reference.stdout);
   const calls: { tokens: number[]; reset: boolean }[] = [];

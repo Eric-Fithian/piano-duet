@@ -20,7 +20,7 @@ for seed in range(20):
     cases.append({"frames": frames, "tracks": tracks, "score": score.flatten().tolist(), "skip": skip.flatten().tolist(),
         "starts": starts, "paths": viterbiBackward(score, skip, starts)})
 print(json.dumps(cases))
-`], { encoding: "utf8", maxBuffer: 2_000_000 });
+`], { encoding: "utf8", timeout: 300_000, maxBuffer: 2_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const cases: { frames: number; tracks: number; score: number[]; skip: number[]; starts: number[]; paths: [number, number][][] }[] = JSON.parse(reference.stdout);
   for (const item of cases) assert.deepEqual(decodeRecordingIntervals(Float32Array.from(item.score), Float32Array.from(item.skip),

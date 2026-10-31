@@ -22,9 +22,9 @@ button:disabled { cursor: default; opacity: .4; }
 .quiet-button, .text-button { color: var(--text); background: transparent; }
 .quiet-button:hover:not(:disabled), .text-button:hover:not(:disabled) { color: var(--text); background: var(--panel-2); }
 .text-button { padding: 8px 10px; font-size: 12px; }
-kbd { font: 10px inherit; opacity: .7; margin-left: 9px; border: 1px solid currentColor; border-radius: 3px; padding: 1px 4px; }
+kbd { font: 12px inherit; opacity: .7; margin-left: 9px; border: 1px solid currentColor; border-radius: 3px; padding: 1px 4px; }
 .shell { max-width: 1180px; margin: auto; padding: 0 36px; }
-.local { font-size: 11px; color: #b2b7c0; display: flex; gap: 8px; align-items: center; margin-right: 12px; }
+.local { font-size: 12px; color: var(--muted); display: flex; gap: 8px; align-items: center; margin-right: 12px; }
 .dot { display: inline-block; flex-shrink: 0; height: 7px; width: 7px; border-radius: 50%; background: var(--green); }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 .credits { max-width:80ch; padding:28px 0; line-height:1.8; }
@@ -39,33 +39,33 @@ kbd { font: 10px inherit; opacity: .7; margin-left: 9px; border: 1px solid curre
 .practice-focus select { margin:0; }
 #pieceChoice { margin-top:8px; }
 .performance { flex:1; min-height:0; display:flex; flex-direction:column; overflow:hidden; }
-.eyebrow { font-size:10px; }
+.eyebrow { font-size:12px; }
 .score-toolbar { display:flex; flex-shrink:0; align-items:center; justify-content:space-between; gap:8px; padding:6px 16px; border-top:1px solid var(--line); }
-#pageLabel { font-size:11px; color:var(--muted); min-width:40px; text-align:center; font-variant-numeric:tabular-nums; }
+#pageLabel { font-size:12px; color:var(--muted); min-width:40px; text-align:center; font-variant-numeric:tabular-nums; }
 #sheetPanel { display:flex; flex:1; min-height:0; position:relative; }
 .roll-wrap { flex:1; min-height:0; position:relative; border-block:1px solid var(--line); background:var(--panel); }
 canvas { width:100%; height:100%; display:block; }
 #emptyRoll { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; pointer-events:none; text-align:center; padding:20px; }
-.empty-symbol { font:45px Atkinson,sans-serif; color:#afb4bc; margin-bottom:15px; }
-#emptyRoll p { font:22px Atkinson,sans-serif; color:#cfd2d7; margin:0 0 13px; }
+.empty-symbol { font:45px Atkinson,sans-serif; color:var(--muted); margin-bottom:15px; }
+#emptyRoll p { font:22px Atkinson,sans-serif; color:var(--text); margin:0 0 13px; }
 #emptyRoll>span:last-child { font-size:12px; color:var(--muted); }
 .roll-footer { display:flex; flex-shrink:0; align-items:center; gap:15px; padding:7px 18px; min-height:30px; }
-.legend { display:flex; gap:18px; font-size:10px; color:#b6bbc3; }
+.legend { display:flex; gap:18px; font-size:12px; color:var(--muted); }
 .legend>span { display:flex; align-items:center; gap:7px; }
 .swatch { display:inline-block; width:6px; height:6px; border-radius:2px; }
 .you { background:var(--peach); }.partner { background:var(--blue); }
-#timing { font-size:10px; color:var(--muted); text-align:right; margin-left:auto; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#timing { font-size:12px; color:var(--muted); text-align:right; margin-left:auto; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 #demo { margin-left:auto; padding:3px 8px; }
 .microphone-button { display:inline-flex; align-items:center; justify-content:center; gap:9px; }
 .microphone-button svg { width:18px; height:22px; fill:none; stroke:currentColor; stroke-width:1.7; stroke-linecap:round; }
-.microphone-button[aria-pressed=true] { color:#d6d9dd; background:transparent; border-color:#3a4a63; }
-.microphone-button[aria-pressed=true]:hover { background:#243143; }
+.microphone-button[aria-pressed=true] { color:var(--text); background:transparent; border-color:var(--line); }
+.microphone-button[aria-pressed=true]:hover { background:var(--panel-2); }
 .status-label { display:flex; align-items:center; gap:9px; font-size:12px; line-height:1.5; }
 .input-meter { display:flex; align-items:center; gap:9px; }
 .error { color:var(--folio-errorText); background:var(--panel); border:1px solid var(--folio-errorText); border-radius:4px; padding:14px 18px; font-size:13px; line-height:1.6; }
 #error { position:absolute; z-index:6; bottom:90px; left:12px; right:12px; margin:0; }
 #scoreError { position:absolute; z-index:2; inset:12px 12px auto; margin:0; }
-.session-info { font-size:11px; color:var(--muted); margin-bottom:20px; }
+.session-info { font-size:12px; color:var(--muted); margin-bottom:20px; }
 .session-actions { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:20px; }
 label { font-size: 15px; color: var(--text); }
 select { min-width:44px; min-height:44px; margin-top: 9px; width: 100%; padding: 11px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--text); font-size: 15px; }
@@ -74,7 +74,7 @@ select { min-width:44px; min-height:44px; margin-top: 9px; width: 100%; padding:
 .slider-label output { font-size: 12px; color: var(--muted); }
 input[type=range] { width: 100%; accent-color: var(--folio-action); height: 44px; margin: 0; cursor: pointer; }
 input[type=range]:disabled { opacity: .4; cursor: default; }
-.range-ends { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin: 5px 0 0; }
+.range-ends { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin: 5px 0 0; }
 .spaced { margin-top: 24px; }
 .check-setting { display: flex; align-items: center; gap: 10px; cursor: pointer; }
 .check-setting input { accent-color: var(--folio-action); width: 17px; height: 17px; margin: 0; }
@@ -97,11 +97,11 @@ dialog::backdrop { background: #05080cc4; backdrop-filter: blur(5px); }
   .piano-app .shell { padding-inline:max(12px,env(safe-area-inset-left)); }
   .session-setup { padding-bottom:10px; }
   .mode-description { padding:10px 14px; font-size:12px; }
-  .status-label { font-size:10px; }.input-meter { gap:5px; }
+  .status-label { font-size:12px; }.input-meter { gap:5px; }
   kbd { display:none; }
   .score-toolbar { padding:3px 8px; }
   .roll-footer { padding:5px 12px; min-height:26px; }
-  #timing { font-size:9px; }
+  #timing { font-size:12px; }
   .dialog-heading { padding:16px 18px; }.controls { padding:20px; }
   dialog { max-height:calc(100dvh - 24px); }
   .settings-dialog,.profile-dialog { max-width:calc(100vw - 16px); }
