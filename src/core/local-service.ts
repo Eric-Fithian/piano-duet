@@ -100,10 +100,32 @@ export class LocalService {
     if (method === "GET" && url.pathname === "/api/profile") {
       return Response.json(learnerProfile(attemptsFromEvents(await this.store.list()), this.now()));
     }
-    if (method === "GET" && url.pathname === "/api/pieces") {
+    if (method === "GET" && url.pathname === "/api/profile/export") {
       const events = await this.store.list();
-      const pieces = events.filter((event) => event.kind === "song" && isPiece(event.payload)).map((event) => (event.payload as { piece: unknown }).piece);
-      return Response.json(pieces);
+      return Response.json({ format: 1, attempts: attemptsFromEvents(events), pieces: piecesFromEvents(events) },
+        { headers: { "Content-Disposition": 'attachment; filename="piano-learning-history.json"' } });
+    }
+    if (method === "GET" && url.pathname === "/api/pieces") {
+      return Response.json(piecesFromEvents(await this.store.list()));
+    }
+    if (method === "POST" && url.pathname === "/api/pieces") {
+      if (typeof options.body !== "string") return Response.json({ detail: "A piece needs JSON" }, { status: 400 });
+      const request = JSON.parse(options.body) as { attempt?: unknown; title?: unknown };
+      if (!validUuid(request.attempt) || typeof request.title !== "string" || !request.title.length || request.title.length > 80) {
+        return Response.json({ detail: "Invalid piece details" }, { status: 422 });
+      }
+      const title = request.title.trim();
+      if (!title) return Response.json({ detail: "Give the piece a name" }, { status: 400 });
+      const attempt = attemptsFromEvents(await this.store.list()).find((item) => item.id === request.attempt);
+      if (!attempt || !attempt.notes.length) return Response.json({ detail: "No recognized performance to save" }, { status: 404 });
+      if (!this.store.append) return Response.json({ detail: "Saving pieces is not available yet" }, { status: 501 });
+      const notes = attempt.notes as { pitch: number; start: number; duration: number; velocity: number }[];
+      const origin = Math.min(...notes.map((note) => note.start));
+      const piece = { id: crypto.randomUUID(), title, challenge: 1, notes: notes.map((note) => ({ pitch: note.pitch,
+        start: note.start - origin, duration: note.duration, velocity: note.velocity })),
+        key: new KeyTracker().observe(notes), bpm: null };
+      await this.store.append("song", { type: "piece", piece }, piece.id);
+      return Response.json(piece);
     }
     if (method === "GET" && url.pathname === "/api/library") {
       const { songs, plays } = libraryFromEvents(await this.store.list());
@@ -544,4 +566,8 @@ function validSongPlay(value: unknown): value is { id: string; attacks: [number,
 function isPiece(value: unknown): boolean {
   return value !== null && typeof value === "object" && !Array.isArray(value)
     && (value as Record<string, unknown>).type === "piece" && "piece" in value;
+}
+
+function piecesFromEvents(events: ReadingLogEvent[]): unknown[] {
+  return events.filter((event) => event.kind === "song" && isPiece(event.payload)).map((event) => (event.payload as { piece: unknown }).piece);
 }
