@@ -136,7 +136,19 @@ for (const [engineName, engine] of [['chromium', chromium], ['webkit', webkit]])
         return system && Math.abs(system.getBoundingClientRect().width - scroller.clientWidth) < 40;
       }, null, {timeout: 10000});
     }
-    const portraitSystems = await page.locator('.score-phrase').first().locator('.score-system').count();
+    // The first paint may reflow after music fonts load, so count only once engraving settles.
+    const portraitSystems = await page.evaluate(async () => {
+      await document.fonts.ready;
+      const deadline = performance.now() + 10000;
+      let previous = -1, stableSince = 0;
+      while (performance.now() < deadline) {
+        const count = document.querySelector('.score-phrase')?.querySelectorAll('.score-system').length ?? 0;
+        if (count !== previous) { previous = count; stableSince = performance.now(); }
+        if (count > 0 && performance.now() - stableSince >= 200) return count;
+        await new Promise(requestAnimationFrame);
+      }
+      throw new Error('Portrait score did not settle within 10 seconds');
+    });
     assert.equal(portraitSystems, 2);
     await page.locator('#hudListen').click();
     await page.waitForFunction(() => document.querySelector('#hudListen').classList.contains('playing'));
