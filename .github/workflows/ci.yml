@@ -128,7 +128,7 @@ jobs:
           restore-keys: browser-recording-model-
       - run: node tests/inference/download-models.mjs recording-transcription midi-to-score phrase-transcription aria
       - run: node tests/inference/expand-score-fixture.mjs
-      - run: node tests/inference/verify-score-browser.mjs webgpu
+      - run: node tests/inference/verify-score-browser.mjs wasm
         timeout-minutes: 10
         env:
           PIANO_SCORE_MODEL_DIR: .cache/ci-models/midi-to-score
