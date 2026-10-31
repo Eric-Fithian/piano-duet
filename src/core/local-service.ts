@@ -2,7 +2,7 @@ import { learnerProfile } from "./learner-profile.ts";
 import { generatePracticeTask, practiceSequence } from "./practice-task.ts";
 import type { GeneratedPracticeTask, PracticePiece } from "./practice-task.ts";
 import { assessPractice } from "./practice-assessment.ts";
-import type { PracticeNote, PracticePrompt, PracticeQuality } from "./practice-assessment.ts";
+import type { PracticePrompt } from "./practice-assessment.ts";
 import { choosePracticeFocus } from "./practice-selection.ts";
 import type { SelectionProfile } from "./practice-selection.ts";
 import { attemptsFromEvents } from "./reading-events.ts";
@@ -42,6 +42,9 @@ import { ScoreError } from "./score-midi.ts";
 import { editSong, revertSong, songAttacks, songStats, songSummary, songVersion } from "./library.ts";
 import type { Song, SongNote } from "./library.ts";
 import { libraryFromEvents } from "./library-events.ts";
+import { DuetService } from "./duet-service.ts";
+import type { LocalPhraseTranscriber, LocalDuetGenerator } from "./duet-service.ts";
+export type { LocalPhraseTranscriber, LocalDuetGenerator } from "./duet-service.ts";
 
 export type LocalJsonValue = null | boolean | number | string | LocalJsonValue[] | { [key: string]: LocalJsonValue };
 export interface LocalEventStore {
@@ -53,9 +56,6 @@ export interface LocalTranscriber {
 }
 export interface LocalRecordingTranscriber {
   run(input: { audio: Float32Array; sampleRate: 16000 }, signal?: AbortSignal): Promise<{ notes: (DrillNote & { duration: number })[] }>;
-}
-export interface LocalPhraseTranscriber {
-  run(input: { audio: Float32Array; sampleRate: 16000; threshold: number }, signal?: AbortSignal): Promise<{ notes: PracticeNote[]; quality: PracticeQuality }>;
 }
 export interface LocalRecordingImporter {
   run(data: ArrayBuffer, signal?: AbortSignal): Promise<{ musicXml: string; notes: { start: number }[] }>;
@@ -76,13 +76,15 @@ export class LocalService {
   private readonly phrase: PhraseFactory;
   private readonly recording?: LocalRecordingTranscriber;
   private readonly recordingImporter?: LocalRecordingImporter;
+  private readonly duetService: DuetService;
   private readonly phraseTranscriber?: LocalPhraseTranscriber;
   private readonly tasks = new Map<string, { task: PracticeTask; completed: boolean }>();
   private completionBusy = false;
 
   constructor(store: LocalEventStore, transcriber?: LocalTranscriber, now: () => number = () => Date.now() / 1000, assets?: LocalAssets,
     rng: ComposerRandom & FoundationRandom = new RandomSource(), phrase: PhraseFactory = () => { throw new Error("Aria is not available yet"); },
-    recording?: LocalRecordingTranscriber, recordingImporter?: LocalRecordingImporter, phraseTranscriber?: LocalPhraseTranscriber) {
+    recording?: LocalRecordingTranscriber, recordingImporter?: LocalRecordingImporter, phraseTranscriber?: LocalPhraseTranscriber,
+    duetGenerator?: LocalDuetGenerator) {
     this.store = store;
     this.transcriber = transcriber;
     this.now = now;
@@ -92,6 +94,8 @@ export class LocalService {
     this.recording = recording;
     this.recordingImporter = recordingImporter;
     this.phraseTranscriber = phraseTranscriber;
+    this.duetService = new DuetService(store, phraseTranscriber, duetGenerator, () => this.responseBusy || this.readingBusy,
+      (busy) => { this.responseBusy = busy; });
   }
 
   async fetch(path: string, options: RequestInit = {}): Promise<Response> {
@@ -294,6 +298,7 @@ export class LocalService {
     if (method === "POST" && url.pathname === "/api/reading/complete") return this.completeReading(options);
     if (method === "POST" && url.pathname === "/api/respond" && url.searchParams.get("mode") === "drills") return this.respondDrill(url, options);
     if (method === "POST" && url.pathname === "/api/respond" && url.searchParams.get("mode") === "practice") return this.respondPractice(url, options);
+    if (method === "POST" && url.pathname === "/api/respond" && (url.searchParams.get("mode") ?? "duet") === "duet") return this.duetService.respond(url, options);
     return Response.json({ detail: `Local service does not yet implement ${method} ${url.pathname}` }, { status: 501 });
   }
 

@@ -117,8 +117,9 @@ jobs:
             .cache/ci-models/recording-transcription
             .cache/ci-models/midi-to-score
             .cache/ci-models/phrase-transcription
+            .cache/ci-models/aria
           key: browser-recording-model-${{ hashFiles('site/app/src/model-catalog.ts', 'tests/inference/download-models.mjs') }}
-      - run: node tests/inference/download-models.mjs recording-transcription midi-to-score phrase-transcription
+      - run: node tests/inference/download-models.mjs recording-transcription midi-to-score phrase-transcription aria
       - run: node tests/inference/expand-score-fixture.mjs
       - run: node tests/inference/verify-score-browser.mjs webgpu
         timeout-minutes: 3
@@ -146,6 +147,12 @@ jobs:
         env:
           PIANO_RECORDING_MODEL_DIR: .cache/ci-models/recording-transcription
           PIANO_BROWSER_CHANNEL: chrome
+      - run: node tests/inference/duet-microphone.mjs
+        timeout-minutes: 4
+        env:
+          PIANO_PHRASE_MODEL: .cache/ci-models/phrase-transcription/piano_crnn.onnx
+          PIANO_PHRASE_SPLIT_DIR: .cache/ci-models/phrase-transcription
+          PIANO_ARIA_MODEL_DIR: .cache/ci-models/aria
 
   site:
     name: Website
