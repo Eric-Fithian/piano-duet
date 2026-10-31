@@ -114,6 +114,7 @@ export class ScoreView {
     this.phrases = [];
     this.pending = new Set();
     this.timer = null;
+    this.revision = 0;
     this.onRender = () => {};
     this.onError = error => { throw error; };
     this.paused = false;
@@ -152,6 +153,7 @@ export class ScoreView {
       this.refollow(true);
     });
     this.observer.observe(this.scroller);
+    document.fonts.addEventListener('loading', () => this.relayout());
   }
 
   relayout() {
@@ -272,6 +274,7 @@ export class ScoreView {
   }
 
   clear() {
+    this.revision++;
     clearTimeout(this.timer);
     this.timer = null;
     this.pending.clear();
@@ -311,7 +314,10 @@ export class ScoreView {
   schedule(phrase) {
     this.pending.add(phrase);
     if (this.timer) return;
-    this.timer = setTimeout(() => {
+    const revision = this.revision;
+    this.timer = setTimeout(async () => {
+      await document.fonts.ready;
+      if (revision !== this.revision) return;
       this.timer = null;
       const pending = [...this.pending];
       this.pending.clear();

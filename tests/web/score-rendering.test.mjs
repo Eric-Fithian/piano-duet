@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {mkdtemp, rm} from 'node:fs/promises';
+import {mkdtemp, readFile, rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join, resolve} from 'node:path';
 import {after, before, test} from 'node:test';
@@ -68,6 +68,33 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) {
       });
       assert.deepEqual(colors, {day: {correct: 'rgb(23, 79, 43)', wrong: 'rgb(168, 62, 31)'},
         night: {correct: 'rgb(157, 213, 176)', wrong: 'rgb(195, 110, 72)'}});
+      const font = await readFile('src/piano_duet/static/fonts/atkinson-hyperlegible-next-latin.woff2');
+      let releaseFont;
+      const fontGate = new Promise(resolve => { releaseFont = resolve; });
+      await page.route('**/score-font-*.woff2', async route => {
+        await fontGate;
+        await route.fulfill({body: font, contentType: 'font/woff2'});
+      });
+      const previous = await page.locator('#scoreFixture .score-system svg').first().elementHandle();
+      await page.evaluate(() => {
+        const face = new FontFace('Score delayed font', 'url(/score-font-delay.woff2)');
+        document.fonts.add(face);
+        window.delayedFont = face.load();
+        window.scoreFixture.view.schedule(window.scoreFixture.phrase);
+      });
+      await page.waitForTimeout(150);
+      assert.equal(await previous.evaluate(element => element.isConnected), true);
+      releaseFont();
+      await page.waitForFunction(element => !element.isConnected, previous, {timeout: 10000});
+      await page.evaluate(() => window.delayedFont);
+      await page.waitForFunction(() => !window.scoreFixture.view.timer, null, {timeout: 10000});
+      const beforeFontChange = await page.locator('#scoreFixture .score-system svg').first().elementHandle();
+      await page.evaluate(async () => {
+        const face = new FontFace('Score later font', 'url(/score-font-later.woff2)');
+        document.fonts.add(face);
+        await document.fonts.load('16px "Score later font"');
+      });
+      await page.waitForFunction(element => !element.isConnected, beforeFontChange, {timeout: 10000});
     } finally {
       await context.close();
       await rm(profile, {recursive: true, force: true});
