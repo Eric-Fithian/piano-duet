@@ -45,6 +45,8 @@ import { libraryFromEvents } from "./library-events.ts";
 import { DuetService } from "./duet-service.ts";
 import type { LocalPhraseTranscriber, LocalDuetGenerator } from "./duet-service.ts";
 export type { LocalPhraseTranscriber, LocalDuetGenerator } from "./duet-service.ts";
+import { VariationService } from "./variation-service.ts";
+import type { LocalVariationAnalyzer } from "./variation-service.ts";
 
 export type LocalJsonValue = null | boolean | number | string | LocalJsonValue[] | { [key: string]: LocalJsonValue };
 export interface LocalEventStore {
@@ -78,13 +80,14 @@ export class LocalService {
   private readonly recording?: LocalRecordingTranscriber;
   private readonly recordingImporter?: LocalRecordingImporter;
   private readonly duetService: DuetService;
+  private readonly variationService: VariationService;
   private readonly tasks = new Map<string, { task: PracticeTask; completed: boolean }>();
   private completionBusy = false;
 
   constructor(store: LocalEventStore, transcriber?: LocalTranscriber, now: () => number = () => Date.now() / 1000, assets?: LocalAssets,
     rng: ComposerRandom & FoundationRandom = new RandomSource(), phrase: PhraseFactory = () => { throw new Error("Aria is not available yet"); },
     recording?: LocalRecordingTranscriber, recordingImporter?: LocalRecordingImporter, phraseTranscriber?: LocalPhraseTranscriber,
-    duetGenerator?: LocalDuetGenerator) {
+    duetGenerator?: LocalDuetGenerator, variationAnalyzer?: LocalVariationAnalyzer) {
     this.store = store;
     this.transcriber = transcriber;
     this.phraseTranscriber = phraseTranscriber;
@@ -95,6 +98,8 @@ export class LocalService {
     this.recording = recording;
     this.recordingImporter = recordingImporter;
     this.duetService = new DuetService(store, phraseTranscriber, duetGenerator, () => this.responseBusy || this.readingBusy,
+      (busy) => { this.responseBusy = busy; });
+    this.variationService = new VariationService(store, phraseTranscriber, variationAnalyzer, () => this.responseBusy || this.readingBusy,
       (busy) => { this.responseBusy = busy; });
   }
 
@@ -299,6 +304,7 @@ export class LocalService {
     if (method === "POST" && url.pathname === "/api/reading/complete") return this.completeReading(options);
     if (method === "POST" && url.pathname === "/api/respond" && url.searchParams.get("mode") === "drills") return this.respondDrill(url, options);
     if (method === "POST" && url.pathname === "/api/respond" && (url.searchParams.get("mode") ?? "duet") === "duet") return this.duetService.respond(url, options);
+    if (method === "POST" && url.pathname === "/api/respond" && url.searchParams.get("mode") === "learning") return this.variationService.respond(url, options);
     return Response.json({ detail: `Local service does not yet implement ${method} ${url.pathname}` }, { status: 501 });
   }
 
