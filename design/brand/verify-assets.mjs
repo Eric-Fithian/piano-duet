@@ -9,6 +9,12 @@ const require=createRequire(resolve('site/package.json'));
 const sharp=require('sharp');
 const {DOMParser}=require('@xmldom/xmldom');
 const dir='design/brand/assets';
+const distributed=['favicon.svg','favicon.ico','apple-touch-icon.png','icon-192.png','icon-512.png','icon-maskable-192.png','icon-maskable-512.png','icon-monochrome-512.png','og-image.png'];
+for(const destination of ['src/piano_duet/static/brand','site/public/brand']){
+  for(const name of distributed)assert.deepEqual(await readFile(`${destination}/${name}`),await readFile(`${dir}/${name}`),`${destination}/${name} is stale`);
+  assert.deepEqual(await readFile(`${destination}/manifest.webmanifest`),await readFile('design/brand/manifest.webmanifest'),`${destination} manifest is stale`);
+}
+for(const [source,destination] of [['favicon.svg','site/public/favicon.svg'],['favicon.ico','site/public/favicon.ico'],['apple-touch-icon.png','site/public/apple-touch-icon.png'],['og-image.png','site/public/og.png'],['mark.svg','site/src/assets/logo.svg'],['mark-dark.svg','site/src/assets/logo-dark.svg']])assert.deepEqual(await readFile(destination),await readFile(`${dir}/${source}`),`${destination} is stale`);
 const source=await readFile('design/brand/master/two-voice.svg','utf8');
 const doc=new DOMParser().parseFromString(source,'image/svg+xml');
 const heads=[...Array.from(doc.getElementsByTagName('ellipse'))];

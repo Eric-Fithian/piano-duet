@@ -1,12 +1,15 @@
 import { defineConfig } from "vite";
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
+import { extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const headers = {
   "Cross-Origin-Opener-Policy": "same-origin",
   "Cross-Origin-Embedder-Policy": "require-corp",
 };
+const brandDir = fileURLToPath(new URL("../src/piano_duet/static/brand/", import.meta.url));
+const brandTypes: Record<string, string> = { ".svg": "image/svg+xml", ".ico": "image/x-icon", ".png": "image/png", ".webmanifest": "application/manifest+json" };
 
 export default defineConfig({
   root: "app",
@@ -73,6 +76,26 @@ export default defineConfig({
         <div class="song-table" role="table" aria-label="Your songs">`);
         return html;
       },
+    },
+  }, {
+    name: "brand-assets",
+    configureServer(server) {
+      server.middlewares.use((request, response, next) => {
+        const path = request.url?.split("?")[0];
+        if (!path?.startsWith("/static/brand/")) return next();
+        const name = path.slice("/static/brand/".length);
+        if (!readdirSync(brandDir).includes(name)) { response.writeHead(404).end(); return; }
+        const type = brandTypes[extname(name)];
+        if (!type) throw new Error(`Unknown brand asset type: ${name}`);
+        response.setHeader("Content-Type", type);
+        response.end(readFileSync(join(brandDir, name)));
+      });
+    },
+    generateBundle() {
+      for (const name of readdirSync(brandDir)) {
+        if (!brandTypes[extname(name)]) throw new Error(`Unknown brand asset type: ${name}`);
+        this.emitFile({ type: "asset", fileName: `static/brand/${name}`, source: readFileSync(join(brandDir, name)) });
+      }
     },
   }, {
     name: "offline-app-shell",

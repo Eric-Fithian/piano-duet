@@ -1,54 +1,57 @@
-/* The app's own palette: a dark stage, gold accent, and the four colours of the mark. */
+@import './brand-tokens.css';
+
+@font-face {
+  font-family: 'Atkinson Hyperlegible Next';
+  src: url('../../../design/brand/fonts/atkinson-hyperlegible-next-latin.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+}
+@font-face {
+  font-family: Fraunces;
+  src: url('../../../design/brand/fonts/fraunces-latin.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+}
+
 :root {
-  --sl-color-accent-low: #3a2a06;
-  --sl-color-accent: #f1aa1c;
-  --sl-color-accent-high: #ffd27a;
-  --sl-color-white: #ffffff;
-  --sl-color-gray-1: #e1e3e6;
-  --sl-color-gray-2: #c2c7ce;
-  --sl-color-gray-3: #a2a6ae;
-  --sl-color-gray-4: #5d6676;
-  --sl-color-gray-5: #273140;
-  --sl-color-gray-6: #121821;
-  --sl-color-black: #0b0f15;
-  --duet-red: #ef5a4c;
-  --duet-yellow: #f5c93d;
-  --duet-green: #45d483;
-  --duet-cyan: #38c6e8;
-  --duet-paper: #f6f3e9;
+  --sl-font: 'Atkinson Hyperlegible Next', sans-serif;
+  --sl-color-accent-low: var(--brand-raised);
+  --sl-color-accent: var(--brand-mark);
+  --sl-color-accent-high: var(--brand-text);
+  --sl-color-white: var(--brand-text);
+  --sl-color-gray-1: var(--brand-text);
+  --sl-color-gray-2: var(--brand-muted);
+  --sl-color-gray-3: var(--brand-border);
+  --sl-color-gray-4: var(--brand-border);
+  --sl-color-gray-5: var(--brand-raised);
+  --sl-color-gray-6: var(--brand-surface);
+  --sl-color-gray-7: var(--brand-bg);
+  --sl-color-black: var(--brand-bg);
+  font-variant-numeric: lining-nums tabular-nums;
 }
 
-:root[data-theme='light'] {
-  --sl-color-accent-low: #fbe8c2;
-  --sl-color-accent: #9a6400;
-  --sl-color-accent-high: #4d3100;
-  --sl-color-white: #0b0f15;
-  --sl-color-gray-1: #18202b;
-  --sl-color-gray-2: #273140;
-  --sl-color-gray-3: #4b5565;
-  --sl-color-gray-4: #8a93a3;
-  --sl-color-gray-5: #d7dbe1;
-  --sl-color-gray-6: #eef0f3;
-  --sl-color-gray-7: #f7f8fa;
-  --sl-color-black: #ffffff;
+.site-title, .sl-markdown-content :is(h1, h2, h3, h4), .hero h1 {
+  font-family: Fraunces, Georgia, serif;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
 }
-
-.site-title { letter-spacing: 0.25em; text-transform: uppercase; font-weight: 650; }
-
+.site-title img { max-height: 2.5rem; }
 .hero .tagline { max-width: 44ch; }
+:root:not([data-theme='light']) .hero img { content: url('../assets/logo-dark.svg'); }
 
 .screenshot {
-  border-radius: 12px;
-  border: 1px solid var(--sl-color-gray-5);
-  box-shadow: 0 24px 60px -20px rgb(0 0 0 / 0.55);
+  border: 1px solid var(--brand-border);
+  border-radius: 4px;
   width: 100%;
   height: auto;
 }
 
 .rainbow {
-  height: 4px;
-  border-radius: 2px;
-  background: linear-gradient(90deg, var(--duet-red) 0 25%, var(--duet-yellow) 25% 50%, var(--duet-green) 50% 75%, var(--duet-cyan) 75%);
+  height: 1px;
+  background: var(--brand-border);
   margin-block: 2.5rem 1.5rem;
 }
 
@@ -62,24 +65,24 @@
 }
 .pipeline li {
   counter-increment: step;
-  border: 1px solid var(--sl-color-gray-5);
-  border-radius: 10px;
+  border: 1px solid var(--brand-border);
+  border-radius: 4px;
   padding: 0.9rem 1rem;
   margin: 0;
-  background: var(--sl-color-gray-6);
+  background: var(--brand-surface);
   font-size: var(--sl-text-sm);
 }
 .pipeline li::before {
   content: counter(step, decimal-leading-zero);
   display: block;
   font-weight: 700;
-  color: var(--sl-color-accent);
+  color: var(--brand-text);
   margin-bottom: 0.25rem;
 }
-.pipeline strong { display: block; color: var(--sl-color-white); }
-
-:root:not([data-theme='light']) .sl-link-button.primary {
-  background: var(--sl-color-accent);
-  border-color: var(--sl-color-accent);
-  color: #15120a;
+.pipeline strong { display: block; color: var(--brand-text); }
+.sl-link-button { border-radius: 4px; }
+.sl-link-button.primary {
+  background: var(--brand-action);
+  border-color: var(--brand-border);
+  color: var(--brand-onAction);
 }

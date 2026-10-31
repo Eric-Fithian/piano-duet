@@ -1,11 +1,12 @@
 <p align="center">
-  <img src="site/src/assets/logo.svg" width="72" height="72" alt="">
+  <img src="design/brand/assets/mark.svg" width="88" height="88" alt="">
 </p>
 
 <h1 align="center">Piano Duet</h1>
 
 <p align="center">
-  Learn on your own piano with listening, sheet music and feedback on your device.
+  Real music. Fresh every time.<br>
+  Practice on your own piano with listening, sheet music and feedback on your device.
   <br>
   <a href="https://piano-duet.vercel.app"><strong>Website</strong></a> ·
   <a href="https://piano-duet.vercel.app/docs/start/install/">Install</a> ·
@@ -15,8 +16,8 @@
 
 <p align="center">
   <a href="https://github.com/Eric-Fithian/piano-duet/actions/workflows/ci.yml"><img src="https://github.com/Eric-Fithian/piano-duet/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-f1aa1c" alt="MIT license"></a>
-  <img src="https://img.shields.io/badge/macOS-14%2B%20·%20Apple%20Silicon-38c6e8" alt="macOS 14+ on Apple Silicon">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-286b4c" alt="MIT license"></a>
+  <img src="https://img.shields.io/badge/macOS-14%2B%20·%20Apple%20Silicon-286b4c" alt="macOS 14+ on Apple Silicon">
 </p>
 
 ![Reading mode: a four-bar score with played notes in green, a late note in red, and the cursor on the next note.](site/src/assets/screenshots/reading.png)
@@ -44,7 +45,7 @@ The installer sets up [uv](https://docs.astral.sh/uv/), downloads the app and it
 
 ## Develop
 
-The browser rebuild is in progress. Its local event log, model cache and inference foundation can be developed with:
+The browser app reuses the Mac app's interface and runs its event log, model cache and inference on the device. Develop it with:
 
 ```sh
 git clone https://github.com/Eric-Fithian/piano-duet.git && cd piano-duet
@@ -53,7 +54,7 @@ npm ci --prefix site
 npm run dev   # app at http://127.0.0.1:5173, docs at /docs
 ```
 
-The browser practice modes and published model catalog are not ready yet. The existing Python application remains the working reference:
+The Python application remains the reference implementation:
 
 ```sh
 make setup   # dependencies and models

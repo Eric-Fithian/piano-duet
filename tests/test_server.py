@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 from threading import Event
 from types import SimpleNamespace
 from uuid import uuid4
@@ -56,6 +57,21 @@ def test_stream_and_release_busy(client):
         "done",
     ]
     assert not client.get("/api/status").json()["busy"]
+
+
+def test_brand_manifest_and_icons_are_served_from_signed_off_assets(client):
+    manifest = client.get("/static/brand/manifest.webmanifest")
+    assert manifest.status_code == 200
+    assert manifest.json()["start_url"] == "/"
+    assert {icon["purpose"] for icon in manifest.json()["icons"]} == {
+        "any", "maskable", "monochrome"
+    }
+    names = ["favicon.svg", "favicon.ico", "apple-touch-icon.png"]
+    names += [icon["src"].removeprefix("./") for icon in manifest.json()["icons"]]
+    for name in names:
+        response = client.get(f"/static/brand/{name}")
+        assert response.status_code == 200
+        assert response.content == (Path("design/brand/assets") / name).read_bytes()
 
 
 def test_cross_origin_audio_is_rejected(client):
