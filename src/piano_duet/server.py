@@ -797,6 +797,16 @@ def create_app(
         finally:
             app.state.reading_busy = False
 
+    @app.post("/api/reading/{task_id}/retry")
+    async def retry_reading(task_id: UUID):
+        previous = app.state.store.task(str(task_id))
+        if not previous or previous["family"] != "reading" or not previous["completed"]:
+            raise HTTPException(409, "Complete a reading score before trying again")
+        task = {**previous, "id": str(uuid4()), "context": {**previous["context"], "familiar": True}}
+        task.pop("completed")
+        app.state.store.add_task(task)
+        return task
+
     @app.post("/api/reading/complete")
     async def complete_reading(payload: ReadingRequest):
         task = app.state.store.task(str(payload.task))

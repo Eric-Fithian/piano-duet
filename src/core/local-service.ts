@@ -334,6 +334,17 @@ export class LocalService {
       return Response.json(task);
     }
     if (method === "POST" && url.pathname === "/api/reading/listen") return this.listen(url, options);
+    if (method === "POST" && parts.length === 4 && parts[0] === "api" && parts[1] === "reading" && parts[3] === "retry") {
+      const path = validatePathUuid(parts[2], "task_id");
+      if (path.errors.length) return Response.json({ detail: path.errors }, { status: 422 });
+      const entry = this.tasks.get(path.value!);
+      if (!entry || entry.task.family !== "reading" || !entry.completed) return Response.json({ detail: "Complete a reading score before trying again" }, { status: 409 });
+      const task = structuredClone(entry.task);
+      task.id = crypto.randomUUID();
+      task.context.familiar = true;
+      await this.saveTask(task);
+      return Response.json(task);
+    }
     if (method === "POST" && url.pathname === "/api/reading/complete") return this.completeReading(options);
     if (method === "POST" && url.pathname === "/api/respond" && url.searchParams.get("mode") === "drills") return this.respondDrill(url, options);
     if (method === "POST" && url.pathname === "/api/respond" && (url.searchParams.get("mode") ?? "duet") === "duet") return this.duetService.respond(url, options);

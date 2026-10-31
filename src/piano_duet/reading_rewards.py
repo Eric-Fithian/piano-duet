@@ -33,6 +33,8 @@ def longest_streak(observations):
 
 
 def score_xp(prompt, assessment, context):
+    if context.get("familiar"):
+        return {"items": [], "total": 0}
     # Attempts saved before the staged curriculum were foundation white-key reading.
     reading = prompt.get("reading", {})
     value = note_value(reading.get("stage_number", 1))

@@ -20,7 +20,7 @@ const SKILLS = [
 export interface ProgressAttempt extends CurriculumAttempt {
   id: number | string;
   created_at: number | string;
-  context: CurriculumAttempt["context"] & { hearings: number; reveals: number; hints: number; interaction?: string; introduction?: boolean };
+  context: CurriculumAttempt["context"] & { hearings: number; reveals: number; hints: number; interaction?: string; introduction?: boolean; familiar?: boolean };
   prompt: CurriculumAttempt["prompt"] & {
     target: (CurriculumAttempt["prompt"]["target"][number] & { staff?: string | null })[];
     reading: CurriculumAttempt["prompt"]["reading"] & { segments?: number[]; stage_number?: number; introduce?: number | null; rhythm_required?: boolean };
@@ -41,7 +41,7 @@ export function readingProgress(attempts: ProgressAttempt[]) {
     const { prompt, assessment, context } = attempt;
     if (context.interaction === "step_by_step") scoreXps.set(attempt.id, scoreXp(prompt, assessment, context).total);
     changes.push(...measureLandings(assessment.fluency ?? [], assessment.observations, context));
-    const introduction = prompt.reading?.introduce;
+    const introduction = context.familiar ? null : prompt.reading?.introduce;
     if (introduction != null) {
       const hand = introduced[prompt.reading.clef];
       if (!hand) throw new Error(`Unknown introduction clef ${prompt.reading.clef}`);

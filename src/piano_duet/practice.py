@@ -273,7 +273,7 @@ def next_task(
                 "title": "Find the notes with a guide"
                 if diagnostic
                 else "Give this chord some room",
-                "instruction": "Play the notes shown at a comfortable, steady pace. For a chord, play all its notes together, four times with space between attacks.",
+                "instruction": "Play the notes shown at a comfortable, steady pace. For a chord, play all its notes together, four times with space between each chord.",
                 "lesson": "Use the note names to find the keys before you begin. Start slowly. We are checking this particular pattern, without asking you to recall its notes.",
                 "target": (
                     [

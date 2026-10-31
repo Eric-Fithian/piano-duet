@@ -63,7 +63,7 @@ export function generatePracticeTask(profile: TaskProfile, focus: "guided" | Exc
     }
     Object.assign(task, { key, shape, challenge: 1, bpm: 50, even: shape === "scale", dynamics: null,
       title: diagnostic ? "Find the notes with a guide" : "Give this chord some room",
-      instruction: "Play the notes shown at a comfortable, steady pace. For a chord, play all its notes together, four times with space between attacks.",
+      instruction: "Play the notes shown at a comfortable, steady pace. For a chord, play all its notes together, four times with space between each chord.",
       lesson: "Use the note names to find the keys before you begin. Start slowly. We are checking this particular pattern, without asking you to recall its notes.",
       target: shape === "chord" ? Array.from({ length: 4 }, (_, attack) => pitches.map((pitch) => ({ pitch, start: attack * 2.4, duration: 1.2, velocity: 76 }))).flat() : practiceSequence(pitches, 50),
       cue: pitches.map((pitch) => pitchName(pitch, key)).join(shape === "chord" ? " + " : " → "),
