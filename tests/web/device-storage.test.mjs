@@ -88,8 +88,11 @@ for (const [name, engine] of [["Chromium", chromium], ["WebKit", webkit]]) {
       await page.waitForFunction(() => typeof window.createModelStore === "function");
       const descriptor = { model: "aria", name: "model.bin", revision: "revision-a",
         url: `http://127.0.0.1:${port}/model/revision-a/model.bin`, sha256: digest, bytes: bytes.length };
-      const first = await page.evaluate(async (file) => {
+      assert.equal(await page.evaluate(async (file) => {
         window.store = window.createModelStore();
+        return window.store.status([file]);
+      }, descriptor), "not downloaded");
+      const first = await page.evaluate(async (file) => {
         const progress = [];
         const response = await window.store.get(file, (value) => progress.push(value));
         return { text: await response.text(), progress };
@@ -97,10 +100,16 @@ for (const [name, engine] of [["Chromium", chromium], ["WebKit", webkit]]) {
       assert.equal(first.text, bytes.toString());
       assert.equal(first.progress.at(-1).received, bytes.length);
       assert.equal(downloads, 1);
+      assert.equal(await page.evaluate((file) => window.store.status([file]), descriptor), "downloaded");
+      assert.equal(await page.evaluate((file) => window.store.status([file, { ...file, sha256: "0".repeat(64) }]), descriptor), "partially downloaded");
+      await page.evaluate((file) => window.store.delete([file]), descriptor);
+      assert.equal(await page.evaluate((file) => window.store.status([file]), descriptor), "not downloaded");
+      await page.evaluate((file) => window.store.get(file, () => {}), descriptor);
+      assert.equal(downloads, 2);
       await context.setOffline(true);
       assert.equal(await page.evaluate(async (file) => (await window.store.get(file, () => {})).text(), descriptor), bytes.toString());
       await context.setOffline(false);
-      assert.equal(downloads, 1);
+      assert.equal(downloads, 2);
       await page.evaluate(async (file) => {
         const key = new URL(`/.piano-models/${file.model}/${file.revision}/${file.sha256}`, location.origin);
         await (await caches.open("piano-duet-models")).put(key, new Response("x".repeat(file.bytes)));
@@ -116,7 +125,7 @@ for (const [name, engine] of [["Chromium", chromium], ["WebKit", webkit]]) {
       }, descriptor);
       assert.ok(failure.includes("integrity check"));
       assert.equal(await page.evaluate(async (file) => (await window.store.get(file, () => {})).text(), descriptor), bytes.toString());
-      assert.equal(downloads, 2);
+      assert.equal(downloads, 3);
       await page.evaluate(async (file) => {
         const key = new URL(`/.piano-models/${file.model}/${file.revision}/${file.sha256}`, location.origin);
         await (await caches.open("piano-duet-models")).put(key, new Response("short"));
@@ -127,7 +136,7 @@ for (const [name, engine] of [["Chromium", chromium], ["WebKit", webkit]]) {
       }, descriptor);
       assert.ok(truncated.includes("integrity check"));
       assert.equal(await page.evaluate(async (file) => (await window.store.get(file, () => {})).text(), descriptor), bytes.toString());
-      assert.equal(downloads, 3);
+      assert.equal(downloads, 4);
     } finally {
       await context.close();
       await rm(profile, { recursive: true, force: true });

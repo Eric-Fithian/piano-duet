@@ -5,12 +5,31 @@ import type { DownloadProgress, ModelFile } from "./inference.ts";
 export class ModelStore {
   private cache = caches.open("piano-duet-models");
 
+  async status(files: ModelFile[]): Promise<"downloaded" | "partially downloaded" | "not downloaded"> {
+    if (!files.length) throw new Error("A model must have files");
+    const cache = await this.cache;
+    const present = await Promise.all(files.map(async (file) => {
+      validateFile(file);
+      const response = await cache.match(fileKey(file));
+      return response ? (await response.blob()).size === file.bytes && Boolean(await cache.match(markerKey(file))) : false;
+    }));
+    return present.every(Boolean) ? "downloaded" : present.some(Boolean) ? "partially downloaded" : "not downloaded";
+  }
+
+  async delete(files: ModelFile[]): Promise<void> {
+    const cache = await this.cache;
+    await Promise.all(files.map(async (file) => {
+      validateFile(file);
+      await Promise.all([cache.delete(fileKey(file)), cache.delete(markerKey(file))]);
+    }));
+  }
+
   async get(file: ModelFile, onProgress: (progress: DownloadProgress) => void,
     signal?: AbortSignal): Promise<Response> {
     validateFile(file);
     const cache = await this.cache;
-    const key = new Request(new URL(`/.piano-models/${encodeURIComponent(file.model)}/${encodeURIComponent(file.revision)}/${file.sha256}`, location.origin));
-    const marker = new Request(new URL(`/.piano-models/verified/${encodeURIComponent(file.url)}/${file.sha256}/${file.bytes}`, location.origin));
+    const key = fileKey(file);
+    const marker = markerKey(file);
     const cached = await cache.match(key);
     if (cached) {
       const [blob, recorded] = await Promise.all([cached.blob(), cache.match(marker)]);
@@ -45,6 +64,14 @@ export class ModelStore {
       if (!complete) await Promise.all([cache.delete(key), cache.delete(marker)]);
     }
   }
+}
+
+function fileKey(file: ModelFile): Request {
+  return new Request(new URL(`/.piano-models/${encodeURIComponent(file.model)}/${encodeURIComponent(file.revision)}/${file.sha256}`, location.origin));
+}
+
+function markerKey(file: ModelFile): Request {
+  return new Request(new URL(`/.piano-models/verified/${encodeURIComponent(file.url)}/${file.sha256}/${file.bytes}`, location.origin));
 }
 
 function validateFile(file: ModelFile): void {
