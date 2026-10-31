@@ -57,6 +57,14 @@ const sampleBytes = PIANO_SAMPLES.reduce((sum, sample) => sum + sample.bytes, 0)
 let reportSettingsProgress: (progress: DownloadProgress) => void = () => {};
 function report(progress: DownloadProgress): void {
   reportSettingsProgress(progress);
+  const youtube = document.querySelector<HTMLDialogElement>("#youtubeDialog");
+  const stop = document.querySelector<HTMLButtonElement>("#youtubeStop");
+  const youtubeStage = document.querySelector<HTMLElement>("#youtubeStage");
+  if (youtube?.open && stop && !stop.hidden && stop.disabled && youtubeStage
+      && (progress.model === "recording-transcription" || progress.model === "midi-to-score")) {
+    const percent = progress.total ? ` · ${Math.round(progress.received / progress.total * 100)}%` : "";
+    youtubeStage.textContent = `Preparing a transcription model${percent}`;
+  }
   indicator.hidden = false;
   if (progress.model === "piano-samples") {
     received.set(progress.file, progress.received);
