@@ -6,6 +6,7 @@ import { resolve } from "node:path";
 import { chromium } from "playwright";
 import { startServer } from "./server.mjs";
 import { startTestServer } from "../web/server.mjs";
+import { MODEL_CATALOG } from "../../site/app/src/model-catalog.ts";
 
 const staticBase = `/@fs${resolve("src/piano_duet/static")}`;
 const modelDirectory = process.env.PIANO_RECORDING_MODEL_DIR ?? ".cache/models/recording-transcription/onnx-fp32";
@@ -35,8 +36,10 @@ try {
   context = await browser.newContext({ permissions: ["microphone"] });
   const page = await context.newPage();
   page.on("pageerror", (error) => errors.push(String(error)));
+  page.on("console", (message) => process.stderr.write(`Page ${message.type()}: ${message.text()}\n`));
+  page.on("response", (response) => { if (response.status() >= 400) errors.push(`HTTP ${response.status()} ${response.url()}`); });
   await context.route("**/src/model-catalog.ts", (route) => route.fulfill({ contentType: "text/javascript",
-    body: `export const MODEL_CATALOG = ${JSON.stringify({ "recording-transcription": assets })};` }));
+    body: `export const MODEL_CATALOG = ${JSON.stringify({ ...MODEL_CATALOG, "recording-transcription": assets })};` }));
   await context.route("**/src/piano-samples.ts", (route) => route.fulfill({ contentType: "text/javascript",
     body: `export const SAMPLE_REVISION = "local-fixture"; export const PIANO_SAMPLES = ${JSON.stringify([entry])};` }));
   await context.route("https://raw.githubusercontent.com/**/local-fixture/samples/piano/C4.mp3", (route) => route.fulfill({ body: sample,
@@ -79,7 +82,14 @@ try {
     worker.postMessage(null);
   }));
   process.stderr.write(`Worker WebGPU: ${JSON.stringify(gpu)}\n`);
-  await page.waitForFunction(() => document.querySelector("#practiceTitle")?.textContent === "C major scale", null, { timeout: 30000 });
+  await page.waitForFunction(() => document.querySelector("#practiceTitle")?.textContent === "C major scale", null, { timeout: 30000 })
+    .catch(async (error) => {
+      const state = await page.evaluate(() => ({ title: document.querySelector("#practiceTitle")?.textContent,
+        status: document.querySelector("#status")?.textContent, error: document.querySelector("#error")?.textContent,
+        errorHidden: document.querySelector("#error")?.hidden, download: document.querySelector(".asset-download")?.textContent,
+        location: location.href, ready: document.readyState, isolated: crossOriginIsolated }));
+      throw new Error(`${error}: ${JSON.stringify({ state, errors })}`);
+    });
   await page.locator("#drillsMode").click();
   await page.waitForFunction(() => window.__drillTest.task?.drill?.drill === "five_finger" && !document.querySelector("#start").disabled);
   await page.locator("#start").click();
