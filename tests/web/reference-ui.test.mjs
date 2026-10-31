@@ -45,8 +45,8 @@ for (const [name, engine] of [['Chromium', chromium], ['WebKit', webkit]]) {
       assert.ok((await page.locator('#profileSummary').textContent()).includes('0 included attempts'));
       await page.locator('#profileDialog').evaluate(dialog => dialog.close());
       await page.locator('#libraryMode').click();
-      assert.equal(await page.locator('#recordingImportStatus').textContent(), 'Score writing for audio files and recordings is unavailable for now.');
-      assert.equal(await page.locator('.recording-import button:disabled').count(), 2);
+      assert.equal(await page.locator('#importAudio').isEnabled(), true);
+      assert.equal(await page.locator('#recordAudio').isEnabled(), true);
       const score = '<score-partwise><work><work-title>Browser test song</work-title></work><part id="P1"><measure number="1"><attributes><divisions>1</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes><note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note><note><pitch><step>E</step><octave>4</octave></pitch><duration>1</duration></note></measure></part></score-partwise>';
       await page.locator('#libraryFile').setInputFiles({name: 'test.musicxml', mimeType: 'application/xml', buffer: Buffer.from(score)});
       await page.getByText('Browser test song', {exact: true}).waitFor({timeout: 15000});

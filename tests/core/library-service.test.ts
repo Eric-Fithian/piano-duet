@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { LocalService } from "../../src/core/local-service.ts";
 import type { LocalEventStore, LocalJsonValue } from "../../src/core/local-service.ts";
@@ -77,6 +78,28 @@ print(json.dumps({'xml':base64.b64encode(MUSICXML.encode()).decode(), 'imported'
   assert.equal(malformed.status, 400);
   assert.ok((await malformed.json()).detail.startsWith("Could not import broken.musicxml: Invalid MusicXML:"));
   assert.equal((await service.fetch("/api/library/import?filename=empty.mid", { method: "POST", body: new Uint8Array() })).status, 400);
+});
+
+test("recording import requires rights and stores only the generated song", async () => {
+  const events: ReadingLogEvent[] = [], calls: ArrayBuffer[] = [];
+  const store: LocalEventStore = { async list() { return [...events]; }, async append(kind, payload: LocalJsonValue, id) {
+    const event = { id: id ?? crypto.randomUUID(), kind, payload, deviceId: "test-device", clock: events.length + 1, createdAt: new Date().toISOString() };
+    events.push(event); return event;
+  } };
+  const musicXml = readFileSync("tests/fixtures/score-writing/reference.musicxml", "utf8");
+  const importer = { async run(data: ArrayBuffer) { calls.push(data); return { musicXml,
+    notes: Array.from({ length: 13 }, (_, index) => ({ start: index * 0.5 })) }; } };
+  const service = new LocalService(store, undefined, undefined, undefined, undefined, undefined, undefined, importer);
+  const body = Uint8Array.of(1, 2, 3).buffer;
+  assert.equal((await service.fetch("/api/library/import-audio?filename=piece.wav", { method: "POST", body })).status, 400);
+  assert.equal(calls.length, 0);
+  const response = await service.fetch("/api/library/import-audio?filename=piece.wav&rights=1", { method: "POST", body });
+  assert.equal(response.status, 200);
+  assert.equal(calls.length, 1);
+  assert.equal(events.length, 1);
+  assert.equal(events[0].kind, "song");
+  assert.equal(JSON.stringify(events).includes("1,2,3"), false);
+  assert.equal((await (await service.fetch("/api/library")).json()).songs.length, 1);
 });
 
 function scrub(value: unknown): unknown {

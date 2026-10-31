@@ -195,7 +195,7 @@ function addReadingPhrase(task) {
     clef: task.reading.clef, meter: task.meter, bars: task.reading.bars, exact: true});
 }
 
-async function loadLibrary() {
+export async function loadLibrary() {
   library = await localRequest('/api/library');
   showLibrary();
 }

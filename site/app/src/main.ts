@@ -14,6 +14,8 @@ import type { DownloadProgress, InferenceSession } from "./inference";
 import { EventLog, requestPersistentStorage } from "./event-log";
 import { PIANO_SAMPLES } from "./piano-samples";
 import { SampleStore } from "./sample-store";
+import { BrowserRecordingImporter } from "./recording-import";
+import { recordingStage, setupRecordingUi } from "./recording-ui";
 import "./style.css";
 
 Object.assign(window, { VexFlow });
@@ -75,9 +77,15 @@ async function start(): Promise<void> {
     indicator.hidden = true;
     return new AriaPhrase(session, random, context as PhraseContext | null);
   };
-  setLocalService(new LocalService(log, transcriber, undefined, new SampleStore(report), random, phrase, recordingTranscriber));
+  const recordingAssets = MODEL_CATALOG["recording-transcription"], scoreAssets = MODEL_CATALOG["midi-to-score"];
+  if (!recordingAssets || !scoreAssets) throw new Error("Recording import models are missing from the catalog");
+  const importer = new BrowserRecordingImporter(recordingAssets, scoreAssets, report, (stage) => {
+    indicator.hidden = true; recordingStage(stage);
+  });
+  setLocalService(new LocalService(log, transcriber, undefined, new SampleStore(report), random, phrase, recordingTranscriber, importer));
   if (import.meta.env.PROD && "serviceWorker" in navigator) await navigator.serviceWorker.register("/service-worker.js");
-  await import("../../../src/piano_duet/static/app.mjs");
+  const app = await import("../../../src/piano_duet/static/app.mjs");
+  setupRecordingUi(importer, app.loadLibrary);
 }
 
 start().catch((error: unknown) => {

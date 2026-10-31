@@ -32,7 +32,7 @@ import type { DrillSelection } from "./drill-task.ts";
 import { assessDrill } from "./drill-assessment.ts";
 import type { DrillNote } from "./drill-timing.ts";
 import { KeyTracker } from "./key-tracker.ts";
-import { buildSong, parseScore } from "./score-build.ts";
+import { buildSong, parseScore, performanceTempo } from "./score-build.ts";
 import { ScoreError } from "./score-midi.ts";
 import { editSong, revertSong, songAttacks, songStats, songSummary, songVersion } from "./library.ts";
 import type { Song, SongNote } from "./library.ts";
@@ -49,6 +49,9 @@ export interface LocalTranscriber {
 export interface LocalRecordingTranscriber {
   run(input: { audio: Float32Array; sampleRate: 16000 }, signal?: AbortSignal): Promise<{ notes: (DrillNote & { duration: number })[] }>;
 }
+export interface LocalRecordingImporter {
+  run(data: ArrayBuffer, signal?: AbortSignal): Promise<{ musicXml: string; notes: { start: number }[] }>;
+}
 export interface LocalAssets { fetch(path: string, options?: RequestInit): Promise<Response> }
 type ReadingTask = ReadingScore & { id: string; family: "reading"; purpose: string; shape: string; cue: string; even: boolean; dynamics: null;
   context: { notation_visible: boolean; hearings: number; reveals: number; hints: number; familiar: boolean; interaction: string; introduction: boolean } };
@@ -64,12 +67,13 @@ export class LocalService {
   private readonly rng: ComposerRandom & FoundationRandom;
   private readonly phrase: PhraseFactory;
   private readonly recording?: LocalRecordingTranscriber;
+  private readonly recordingImporter?: LocalRecordingImporter;
   private readonly tasks = new Map<string, { task: PracticeTask; completed: boolean }>();
   private completionBusy = false;
 
   constructor(store: LocalEventStore, transcriber?: LocalTranscriber, now: () => number = () => Date.now() / 1000, assets?: LocalAssets,
     rng: ComposerRandom & FoundationRandom = new RandomSource(), phrase: PhraseFactory = () => { throw new Error("Aria is not available yet"); },
-    recording?: LocalRecordingTranscriber) {
+    recording?: LocalRecordingTranscriber, recordingImporter?: LocalRecordingImporter) {
     this.store = store;
     this.transcriber = transcriber;
     this.now = now;
@@ -77,6 +81,7 @@ export class LocalService {
     this.rng = rng;
     this.phrase = phrase;
     this.recording = recording;
+    this.recordingImporter = recordingImporter;
   }
 
   async fetch(path: string, options: RequestInit = {}): Promise<Response> {
@@ -105,6 +110,29 @@ export class LocalService {
       const summaries = await Promise.all([...songs.values()].map((song) => songSummary(song, plays.get(song.id) ?? [])));
       const imported = new Set(summaries.map((song) => song.title.toLowerCase()));
       return Response.json({ songs: summaries, catalog: LIBRARY_CATALOG.filter((item) => !imported.has(item.title.toLowerCase())) });
+    }
+    if (method === "POST" && url.pathname === "/api/library/import-audio") {
+      const filename = url.searchParams.get("filename"), rights = url.searchParams.get("rights");
+      if (!filename || filename.length > 200 || rights !== "1") return Response.json({ detail: "Confirm that you have the rights to transcribe this recording" }, { status: 400 });
+      if (!(options.body instanceof ArrayBuffer) || !options.body.byteLength || options.body.byteLength > 256_000_000) {
+        return Response.json({ detail: "Import an audio file under 256 MB" }, { status: 400 });
+      }
+      if (!this.recordingImporter || !this.store.append) return Response.json({ detail: "Recording import is not available" }, { status: 501 });
+      const { musicXml, notes } = await this.recordingImporter.run(options.body, options.signal ?? undefined);
+      const source = `${filename}.musicxml`;
+      let draft;
+      try {
+        const parsed = parseScore(source, new TextEncoder().encode(musicXml));
+        const title = filename.lastIndexOf(".") > 0 ? filename.slice(0, filename.lastIndexOf(".")) : filename;
+        draft = buildSong({ ...parsed, bpm: performanceTempo(notes, parsed) }, title, null, source, true);
+      }
+      catch (error) {
+        if (!(error instanceof ScoreError)) throw error;
+        return Response.json({ detail: `Could not write ${filename}: ${error.message}` }, { status: 400 });
+      }
+      const id = crypto.randomUUID(), song = { id, ...draft };
+      const event = await this.store.append("song", { action: "import", song } as unknown as LocalJsonValue, id);
+      return Response.json(await songSummary({ ...song, created_at: Date.parse(event.createdAt) / 1000 }, []));
     }
     if (method === "POST" && url.pathname === "/api/library/import") {
       const filename = url.searchParams.get("filename"), title = url.searchParams.get("title"), artist = url.searchParams.get("artist");

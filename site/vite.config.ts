@@ -40,7 +40,13 @@ export default defineConfig({
         replace('href="/static/credits.html"', 'href="/docs/credits/"');
         replace('id="openYoutube" class=', 'id="openYoutube" hidden class=');
         replace('        <div class="song-table" role="table" aria-label="Your songs">',
-          '        <div class="recording-import" aria-label="Recording import"><button class="secondary" type="button" disabled>Import audio</button><button class="secondary" type="button" disabled>Record audio</button><p id="recordingImportStatus">Score writing for audio files and recordings is unavailable for now.</p></div>\n        <div class="song-table" role="table" aria-label="Your songs">');
+          `        <div class="recording-import" aria-label="Recording import"><button id="importAudio" class="secondary" type="button">Import audio</button><button id="recordAudio" class="secondary" type="button">Record audio</button><p id="recordingImportStatus" aria-live="polite"></p></div>
+        <dialog id="recordingDialog" class="settings-dialog" aria-labelledby="recordingTitle"><div class="dialog-heading"><h2 id="recordingTitle">Import a recording</h2><button id="recordingClose" class="quiet-button" type="button">Done</button></div>
+        <form id="recordingForm" class="controls youtube-form"><label id="recordingFileLabel">Audio file <input id="recordingFile" type="file" accept="audio/*"></label>
+        <button id="recordingToggle" class="secondary" type="button" hidden>Start recording</button><p id="recordingSelection" aria-live="polite"></p>
+        <label class="youtube-rights"><input id="recordingRights" type="checkbox" required> I own this recording, or have permission from its rights holder to transcribe it, and will use the score only for my own practice.</label>
+        <button id="recordingGo" class="primary" type="submit">Write score</button><p id="recordingStage" aria-live="polite"></p><p id="recordingError" class="youtube-error" role="alert" hidden></p><p class="setting-help">Solo piano recordings work best.</p></form></dialog>
+        <div class="song-table" role="table" aria-label="Your songs">`);
         return html;
       },
     },
