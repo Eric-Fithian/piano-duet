@@ -10,6 +10,7 @@ const headers = {
 
 export default defineConfig({
   root: "app",
+  resolve: { dedupe: ["@xmldom/xmldom", "fflate"] },
   publicDir: false,
   build: { outDir: "../dist", emptyOutDir: true, assetsInlineLimit: 0 },
   optimizeDeps: { exclude: ["@sqlite.org/sqlite-wasm"],
