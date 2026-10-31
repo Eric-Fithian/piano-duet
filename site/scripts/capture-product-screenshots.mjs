@@ -64,6 +64,7 @@ try {
       const errors = [];
       page.on('pageerror', error => errors.push(error.message));
       await page.goto(`${base}/`, {waitUntil: 'domcontentloaded'});
+      await page.evaluate(() => document.fonts.ready);
       await page.locator('#sheetMusic svg').first().waitFor({timeout: 60000});
       await page.locator('#openSettings').click();
       await page.locator('#appearanceTheme').selectOption(theme === 'light' ? 'light' : 'dark');
