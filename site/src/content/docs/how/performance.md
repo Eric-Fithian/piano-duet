@@ -16,6 +16,7 @@ These are feasibility measurements, not timings for a finished browser app. They
 | Recording transcription | 54.2 s with one 12-thread worker; 42.1 s with three 4-thread workers; 40.7 s with four 3-thread workers; 40.0 s with six 2-thread workers | Three-minute fixture made by repeating one minute of real piano audio; FP32 ONNX on WASM, model already loaded, including frame preparation, interval decoding, attributes and stitching |
 | Recording onset parity | 960 of 960 notes matched | Same three-minute audio and 30 ms onset tolerance against the Python Transkun reference; maximum matched onset difference 19.8 ms, duration difference 22.9 ms and velocity difference 1 |
 | Python score writing | 10.6 s | The same 960-note performance, using the local medium MIDI2ScoreTransformer checkpoint on CPU, including cold model loading; 898 score notes produced |
+| Browser score-model prototype | 9.3 s | The 960-note performance tokenized by Python, using a local FP32 ONNX conversion of the public checkpoint on WebGPU; two overlapping chunks, model already loaded |
 
 The Aria comparison uses the app's actual allowed-token masks, weights, temperature and min-p cutoff. KL is in nats; probabilities removed by the cutoff are smoothed at `1e-12` so the comparison remains finite. Mean top-k overlap with the full-precision distribution was 0.9645 for ONNX and 0.9646 for MLX. The sampled contexts are generated exercises, not recorded performances; broader fixture coverage is still needed. The gate requires ONNX's mean and 95th-percentile KL to be no worse than MLX, and records regression caps at 1.1 times the MLX values.
 
@@ -26,6 +27,8 @@ The transcription fixture contains three sampled piano notes. The split graph's 
 The Reading comparison uses the existing app's `ReadingStream` and score renderer. A local test proxy provides the cross-origin isolation needed for threaded WASM, and swaps only the transcription call. The sampled note is rendered into a synthetic microphone; no physical microphone was used. The browser application, iOS shell, account sync, download sizes and memory usage are not yet validated.
 
 The recording measurements exclude model download and initialization, audio-file decoding, and browser score writing. The 40.7-second four-worker result leaves roughly 19 seconds for those remaining steps under the 60-second target; the Python score timing is not a browser timing. The worker pool preserves the reference decoder's dependence on the preceding segment, and the app selects four or three workers only when the browser reports enough memory and cores; other devices use one. These are single-run Mac measurements, not iPhone results. Quantization and parity on a broader range of recordings remain to be tested.
+
+The score-model prototype matched every greedy token in all 14 output streams against the public Python checkpoint for the same 960-note performance. The reference carries 64 generated tokens between the two chunks, so they were decoded in order. The 9.3-second measurement excludes model loading, performance tokenization and conversion of output tokens into a score; it is not an end-to-end import measurement. The checkpoint and converted files remain local until the author permits redistribution.
 
 Transkun's current WebGPU feature graph is not used for recordings: on the first padded 16-second window it chose different interval paths on 10 of 90 tracks, while browser WASM and Python ONNX CPU matched PyTorch. The spectrogram was close to the CPU reference, but the first convolution already differed substantially. ORT graph optimization set to `disabled` or `basic` did not remove the discrepancy. Further GPU investigation is needed before enabling that path.
 
@@ -47,5 +50,16 @@ node tests/inference/verify-recording-transcription.mjs path/to/mono-44100hz.wav
 ```
 
 With `npm run dev --prefix site` running in another terminal, `node tests/inference/verify-reading-composer.mjs first_notes` and `node tests/inference/verify-reading-composer.mjs pairs` exercise the browser composer with the local Aria model.
+
+For the unpublished score-model check, the Python reference setup creates the isolated `.cache/m2st` environment and downloads the public checkpoint for local use. With that setup complete and a local MIDI performance, run:
+
+```sh
+.cache/m2st/venv/bin/python -I src/piano_duet/score_onnx.py
+.cache/m2st/venv/bin/python -I tests/inference/score_onnx_parity.py
+.cache/m2st/venv/bin/python -I tests/inference/score_fixture.py path/to/performance.mid
+node tests/inference/verify-score-browser.mjs webgpu
+```
+
+The conversion remains in `.cache/m2st`; it is not published or included in the browser's model catalog.
 
 CI downloads the three published models at the catalog's pinned commits, verifies their sizes and SHA-256 hashes, and caches them between runs. It checks Aria's 60 masked choices against saved FP32 and MLX reference distributions, compares both live-transcription graphs with a synthetic-window reference, and checks Transkun's interval paths and attribute heads against the original checkpoint packaged with Transkun. The broader recorded-performance and device measurements above are local checks. The paired Reading test also needs the reference app running on port 8879 with a separate learner database under `.cache/browser-inference/`; `tests/inference/reading-latency.mjs` never uses the existing learner database.

@@ -19,6 +19,11 @@ const paths = {
   "/models/local-fixture/recording-features.onnx": ".cache/models/recording-transcription/onnx-fp32/features.onnx",
   "/models/local-fixture/recording-attributes.onnx": ".cache/models/recording-transcription/onnx-fp32/attributes.onnx",
   "/fixtures/recording.pcm": ".cache/browser-inference/recording.pcm",
+  "/models/score/encoder.onnx": ".cache/m2st/onnx-public/encoder.onnx",
+  "/models/score/decoder-first.onnx": ".cache/m2st/onnx-public/decoder-first.onnx",
+  "/models/score/decoder-context.onnx": ".cache/m2st/onnx-public/decoder-context.onnx",
+  "/models/score/decoder-step.onnx": ".cache/m2st/onnx-public/decoder-step.onnx",
+  "/fixtures/score-fixture.json": ".cache/m2st/score-fixture.json",
   "/fixtures/aria.json": ".cache/models/aria/onnx-int4-block64/parity.json",
 };
 
