@@ -69,10 +69,11 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) {
       assert.deepEqual(colors, {day: {correct: 'rgb(23, 79, 43)', wrong: 'rgb(168, 62, 31)'},
         night: {correct: 'rgb(157, 213, 176)', wrong: 'rgb(195, 110, 72)'}});
       const font = await readFile('src/piano_duet/static/fonts/atkinson-hyperlegible-next-latin.woff2');
-      let releaseFont;
+      let releaseFont, releaseLater;
       const fontGate = new Promise(resolve => { releaseFont = resolve; });
+      const laterGate = new Promise(resolve => { releaseLater = resolve; });
       await page.route('**/score-font-*.woff2', async route => {
-        await fontGate;
+        await (route.request().url().endsWith('score-font-later.woff2') ? laterGate : fontGate);
         await route.fulfill({body: font, contentType: 'font/woff2'});
       });
       const previous = await page.locator('#scoreFixture .score-system svg').first().elementHandle();
@@ -80,21 +81,49 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) {
         const face = new FontFace('Score delayed font', 'url(/score-font-delay.woff2)');
         document.fonts.add(face);
         window.delayedFont = face.load();
-        window.scoreFixture.view.schedule(window.scoreFixture.phrase);
       });
+      await page.waitForFunction(() => document.fonts.status === 'loading');
+      await page.evaluate(() => window.scoreFixture.view.schedule(window.scoreFixture.phrase));
       await page.waitForTimeout(150);
       assert.equal(await previous.evaluate(element => element.isConnected), true);
       releaseFont();
       await page.waitForFunction(element => !element.isConnected, previous, {timeout: 10000});
       await page.evaluate(() => window.delayedFont);
       await page.waitForFunction(() => !window.scoreFixture.view.timer, null, {timeout: 10000});
-      const beforeFontChange = await page.locator('#scoreFixture .score-system svg').first().elementHandle();
-      await page.evaluate(async () => {
-        const face = new FontFace('Score later font', 'url(/score-font-later.woff2)');
-        document.fonts.add(face);
-        await document.fonts.load('16px "Score later font"');
+      // WebKit does not reliably dispatch FontFaceSet events for programmatic font loads.
+      if (name === 'chromium') {
+        const beforeFontChange = await page.locator('#scoreFixture .score-system svg').first().elementHandle();
+        await page.evaluate(() => {
+          const face = new FontFace('Score later font', 'url(/score-font-later.woff2)');
+          document.fonts.add(face);
+          window.laterFont = document.fonts.load('16px "Score later font"');
+        });
+        await page.waitForFunction(() => document.fonts.status === 'loading');
+        releaseLater();
+        await page.evaluate(() => window.laterFont);
+        await page.waitForFunction(element => !element.isConnected, beforeFontChange, {timeout: 10000});
+      }
+      await page.evaluate(() => {
+        const {view, phrase} = window.scoreFixture;
+        const notes = Array.from({length: 16}, (_, index) => ({pitch: 60 + index % 5, start: index, duration: 1, staff: 'treble'}));
+        view.update(phrase, {notes});
       });
-      await page.waitForFunction(element => !element.isConnected, beforeFontChange, {timeout: 10000});
+      await page.waitForFunction(() => !window.scoreFixture.view.timer && window.scoreFixture.phrase.marks.filter(mark => mark.ids.length).length === 16);
+      for (const [width, height] of [[1440, 900], [393, 852], [852, 393], [820, 1180]]) {
+        const previousSystem = await page.locator('#scoreFixture .score-system svg').first().elementHandle();
+        await page.setViewportSize({width, height});
+        if (width !== 1440) await page.waitForFunction(element => !element.isConnected, previousSystem, {timeout: 10000});
+        const gaps = await page.evaluate(() => window.scoreFixture.phrase.systems.flatMap(system => {
+          const marks = system.marks.filter(mark => mark.ids.length).sort((a, b) => a.start - b.start);
+          return marks.slice(1).map((mark, index) => {
+            const before = marks[index].note.noteHeads[0];
+            const after = mark.note.noteHeads[0];
+            return (after.getAbsoluteX() - before.getAbsoluteX() - before.getWidth()) / 10;
+          });
+        }));
+        assert.ok(gaps.length && Math.min(...gaps) >= 0.5, `${width}: adjacent notehead gaps in staff spaces: ${gaps.join(', ')}`);
+        if (width === 393) assert.ok(await page.evaluate(() => window.scoreFixture.phrase.systems.length > 1));
+      }
     } finally {
       await context.close();
       await rm(profile, {recursive: true, force: true});

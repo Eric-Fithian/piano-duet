@@ -9,6 +9,7 @@ const STAFF_TOP = 60;
 const GRAND_GAP = 104;
 // Room above and below the staves that every system keeps, so lines of plain notes line up evenly.
 const CLEARANCE = 22;
+export const MIN_NOTE_GAP = 5;
 
 // Bars of each system, as [start, end) ranges: the fewest lines the width allows, with the bars shared out so the
 // lines are as evenly full as possible (no stub of a last line). A bar too wide for any line gets a line of its own.
@@ -105,7 +106,10 @@ function buildBars(model, doc, clefs, flats) {
     const voices = clefs.flatMap(clef => parts[clef].map(layer => layer.voice));
     const formatter = new Formatter();
     for (const clef of clefs) formatter.joinVoices(parts[clef].map(layer => layer.voice));
-    return {source: bar, parts, voices, formatter, minimum: formatter.preCalculateMinTotalWidth(voices) + 10};
+    const onsets = new Set(clefs.flatMap(clef => parts[clef].flatMap(layer => layer.notes.map(item => item.part.start)))).size;
+    // Dense bars need room between noteheads even when the formatter's minimum permits them to touch.
+    const clearance = 10 + Math.max(0, onsets - 2) * 24;
+    return {source: bar, parts, voices, formatter, minimum: formatter.preCalculateMinTotalWidth(voices) + clearance};
   });
 }
 
@@ -122,6 +126,11 @@ function staffGap(model, range) {
  * note. `width` is the line width in staff units; null lays every bar out on a single line at its natural width.
  */
 export function engrave(doc, host, {width = null, maxBars = null, barNumbers = 'systems'} = {}) {
+  return engraveSpaced(doc, host, {width, maxBars, barNumbers}, new Map(), 0);
+}
+
+function engraveSpaced(doc, host, options, extraSpace, attempt) {
+  const {width, maxBars, barNumbers} = options;
   const {Renderer, Stave, GhostNote, Beam, Fraction, StaveConnector, StaveTie} = window.VexFlow;
   const model = createScore(doc.notes, {bpm: doc.bpm, meter: doc.meter, exact: Boolean(doc.exact), bars: doc.bars || 0});
   const clefs = clefsOf(doc);
@@ -129,6 +138,7 @@ export function engrave(doc, host, {width = null, maxBars = null, barNumbers = '
   const signature = doc.key?.signature || 'C';
   const signatureWidth = (doc.key?.scale_names.filter(name => name.length > 1).length || 0) * 12;
   const bars = buildBars(model, doc, clefs, flats);
+  bars.forEach((bar, index) => { bar.minimum += extraSpace.get(index) || 0; });
   const opening = OPENING + signatureWidth;
   const ranges = width === null ? [[0, bars.length]]
     : planSystems(bars.map(bar => bar.minimum), width - 2 * MARGIN, {first: opening + TIME_SIGNATURE, rest: opening, maxBars});
@@ -215,7 +225,7 @@ export function engrave(doc, host, {width = null, maxBars = null, barNumbers = '
             label.textContent = String(finger);
             noteElement.append(label);
           }
-          const mark = {element: noteElement, start: item.part.start, end: item.part.end, system: systemIndex,
+          const mark = {element: noteElement, start: item.part.start, end: item.part.end, system: systemIndex, bar: barNumber,
             ids: item.part.notes.map(note => note.id), tiedIds: item.part.notes.filter(note => note.tied).map(note => note.id),
             note: item.note, staves, clef};
           systemMarks.push(mark);
@@ -256,6 +266,29 @@ export function engrave(doc, host, {width = null, maxBars = null, barNumbers = '
     delete system.ties;
     delete system.renderer;
     delete system.staves;
+  }
+  const deficits = new Map();
+  for (const system of systems) for (const clef of clefs) {
+    const columns = new Map();
+    for (const mark of system.marks.filter(item => item.clef === clef && item.ids.length)) {
+      const left = Math.min(...mark.note.noteHeads.map(head => head.getAbsoluteX()));
+      const right = Math.max(...mark.note.noteHeads.map(head => head.getAbsoluteX() + head.getWidth()));
+      const column = columns.get(mark.start);
+      columns.set(mark.start, {bar: mark.bar, left: Math.min(left, column?.left ?? Infinity), right: Math.max(right, column?.right ?? -Infinity)});
+    }
+    const ordered = [...columns.entries()].sort(([a], [b]) => a - b).map(([, column]) => column);
+    const counts = new Map();
+    for (const column of ordered) counts.set(column.bar, (counts.get(column.bar) || 0) + 1);
+    for (let index = 1; index < ordered.length; index++) {
+      const before = ordered[index - 1];
+      const deficit = MIN_NOTE_GAP - (ordered[index].left - before.right);
+      if (deficit > 0.01) deficits.set(before.bar, Math.max(deficits.get(before.bar) || 0, Math.max(20, Math.ceil(deficit * counts.get(before.bar) * 2))));
+    }
+  }
+  if (deficits.size) {
+    if (attempt >= 64) throw new Error('The score could not be spaced without overlapping noteheads.');
+    for (const [bar, extra] of deficits) extraSpace.set(bar, (extraSpace.get(bar) || 0) + extra);
+    return engraveSpaced(doc, host, options, extraSpace, attempt + 1);
   }
   const header = width === null && systems.length ? engraveHeader(host, systems[0], clefs, signature, opening, staffGap(model, ranges[0])) : null;
   return {systems, header, marks, model, ticksPerBeat: model.ticksPerBeat, endTick: Math.max(0, ...marks.map(mark => mark.end))};
