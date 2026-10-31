@@ -6,6 +6,8 @@ import "../../../src/piano_duet/static/game.css";
 import { setLocalService } from "../../../src/piano_duet/static/practice.mjs";
 import { LocalService } from "../../../src/core/local-service.ts";
 import { AriaPhrase } from "../../../src/core/aria-phrase.ts";
+import { generateDuet } from "../../../src/core/duet-decoder.ts";
+import type { ContextNote } from "../../../src/core/aria-tokenizer.ts";
 import type { PhraseContext } from "../../../src/core/aria-tokenizer.ts";
 import { RandomSource } from "../../../src/core/random.ts";
 import { BrowserInference } from "./browser-inference";
@@ -71,18 +73,40 @@ async function start(): Promise<void> {
   };
   const random = new RandomSource();
   let aria: Promise<InferenceSession<"aria">> | undefined;
-  const phrase = async (context: unknown) => {
-    aria ??= backend.createSession("aria", report).catch((error) => { aria = undefined; throw error; });
+  const openAria = async (signal?: AbortSignal) => {
+    aria ??= backend.createSession("aria", report, signal).catch((error) => { aria = undefined; throw error; });
     const session = await aria;
     indicator.hidden = true;
+    return session;
+  };
+  const phrase = async (context: unknown) => {
+    const session = await openAria();
     return new AriaPhrase(session, random, context as PhraseContext | null);
+  };
+  let phraseSession: Promise<InferenceSession<"phrase-transcription">> | undefined;
+  const phraseTranscriber = {
+    async run(input: { audio: Float32Array; sampleRate: 16000; threshold: number }, signal?: AbortSignal) {
+      phraseSession ??= backend.createSession("phrase-transcription", report, signal).catch((error) => { phraseSession = undefined; throw error; });
+      const session = await phraseSession;
+      indicator.hidden = true;
+      try { return await session.run(input, signal); }
+      catch (error) { if (signal?.aborted) phraseSession = undefined; throw error; }
+    },
+  };
+  const duetGenerator = {
+    async *generate(input: { notes: ContextNote[]; seconds: number; temperature: number; difficulty: number; tonic: number; pitchClasses: number[] }, signal?: AbortSignal) {
+      const session = await openAria(signal);
+      try { yield* generateDuet(session, random, input.notes, { ...input, signal }); }
+      finally { if (signal?.aborted) aria = undefined; }
+    },
   };
   const recordingAssets = MODEL_CATALOG["recording-transcription"], scoreAssets = MODEL_CATALOG["midi-to-score"];
   if (!recordingAssets || !scoreAssets) throw new Error("Recording import models are missing from the catalog");
   const importer = new BrowserRecordingImporter(recordingAssets, scoreAssets, report, (stage) => {
     indicator.hidden = true; recordingStage(stage);
   });
-  setLocalService(new LocalService(log, transcriber, undefined, new SampleStore(report), random, phrase, recordingTranscriber, importer));
+  setLocalService(new LocalService(log, transcriber, undefined, new SampleStore(report), random, phrase, recordingTranscriber, importer,
+    phraseTranscriber, duetGenerator));
   if (import.meta.env.PROD && "serviceWorker" in navigator) await navigator.serviceWorker.register("/service-worker.js");
   const app = await import("../../../src/piano_duet/static/app.mjs");
   setupRecordingUi(importer, app.loadLibrary);

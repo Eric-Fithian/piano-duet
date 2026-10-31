@@ -37,6 +37,9 @@ import { ScoreError } from "./score-midi.ts";
 import { editSong, revertSong, songAttacks, songStats, songSummary, songVersion } from "./library.ts";
 import type { Song, SongNote } from "./library.ts";
 import { libraryFromEvents } from "./library-events.ts";
+import { DuetService } from "./duet-service.ts";
+import type { LocalPhraseTranscriber, LocalDuetGenerator } from "./duet-service.ts";
+export type { LocalPhraseTranscriber, LocalDuetGenerator } from "./duet-service.ts";
 
 export type LocalJsonValue = null | boolean | number | string | LocalJsonValue[] | { [key: string]: LocalJsonValue };
 export interface LocalEventStore {
@@ -68,12 +71,14 @@ export class LocalService {
   private readonly phrase: PhraseFactory;
   private readonly recording?: LocalRecordingTranscriber;
   private readonly recordingImporter?: LocalRecordingImporter;
+  private readonly duetService: DuetService;
   private readonly tasks = new Map<string, { task: PracticeTask; completed: boolean }>();
   private completionBusy = false;
 
   constructor(store: LocalEventStore, transcriber?: LocalTranscriber, now: () => number = () => Date.now() / 1000, assets?: LocalAssets,
     rng: ComposerRandom & FoundationRandom = new RandomSource(), phrase: PhraseFactory = () => { throw new Error("Aria is not available yet"); },
-    recording?: LocalRecordingTranscriber, recordingImporter?: LocalRecordingImporter) {
+    recording?: LocalRecordingTranscriber, recordingImporter?: LocalRecordingImporter, phraseTranscriber?: LocalPhraseTranscriber,
+    duetGenerator?: LocalDuetGenerator) {
     this.store = store;
     this.transcriber = transcriber;
     this.now = now;
@@ -82,6 +87,8 @@ export class LocalService {
     this.phrase = phrase;
     this.recording = recording;
     this.recordingImporter = recordingImporter;
+    this.duetService = new DuetService(store, phraseTranscriber, duetGenerator, () => this.responseBusy || this.readingBusy,
+      (busy) => { this.responseBusy = busy; });
   }
 
   async fetch(path: string, options: RequestInit = {}): Promise<Response> {
@@ -246,6 +253,7 @@ export class LocalService {
     if (method === "POST" && url.pathname === "/api/reading/listen") return this.listen(url, options);
     if (method === "POST" && url.pathname === "/api/reading/complete") return this.completeReading(options);
     if (method === "POST" && url.pathname === "/api/respond" && url.searchParams.get("mode") === "drills") return this.respondDrill(url, options);
+    if (method === "POST" && url.pathname === "/api/respond" && (url.searchParams.get("mode") ?? "duet") === "duet") return this.duetService.respond(url, options);
     return Response.json({ detail: `Local service does not yet implement ${method} ${url.pathname}` }, { status: 501 });
   }
 
