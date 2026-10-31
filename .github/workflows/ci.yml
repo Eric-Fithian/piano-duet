@@ -151,7 +151,7 @@ jobs:
         env:
           PIANO_RECORDING_MODEL_DIR: .cache/ci-models/recording-transcription
           PIANO_BROWSER_CHANNEL: chrome
-      - run: node tests/inference/duet-microphone.mjs
+      - run: node tests/inference/creative-microphone.mjs
         timeout-minutes: 4
         env:
           PIANO_PHRASE_MODEL: .cache/ci-models/phrase-transcription/piano_crnn.onnx

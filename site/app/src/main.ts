@@ -7,6 +7,8 @@ import { setLocalService } from "../../../src/piano_duet/static/practice.mjs";
 import { LocalService } from "../../../src/core/local-service.ts";
 import { AriaPhrase } from "../../../src/core/aria-phrase.ts";
 import { generateDuet } from "../../../src/core/duet-decoder.ts";
+import { analyzeVariation } from "../../../src/core/variation-analysis.ts";
+import type { VariationDetail } from "../../../src/core/variation-analysis.ts";
 import type { ContextNote } from "../../../src/core/aria-tokenizer.ts";
 import type { PhraseContext } from "../../../src/core/aria-tokenizer.ts";
 import { RandomSource } from "../../../src/core/random.ts";
@@ -100,13 +102,20 @@ async function start(): Promise<void> {
       finally { if (signal?.aborted) aria = undefined; }
     },
   };
+  const variationAnalyzer = {
+    async run(notes: ContextNote[], threshold: number, signal?: AbortSignal, onNote?: (detail: VariationDetail, progress: number) => void) {
+      const session = await openAria(signal);
+      try { return await analyzeVariation(session, notes, threshold, signal, onNote); }
+      catch (error) { if (signal?.aborted) aria = undefined; throw error; }
+    },
+  };
   const recordingAssets = MODEL_CATALOG["recording-transcription"], scoreAssets = MODEL_CATALOG["midi-to-score"];
   if (!recordingAssets || !scoreAssets) throw new Error("Recording import models are missing from the catalog");
   const importer = new BrowserRecordingImporter(recordingAssets, scoreAssets, report, (stage) => {
     indicator.hidden = true; recordingStage(stage);
   });
   setLocalService(new LocalService(log, transcriber, undefined, new SampleStore(report), random, phrase, recordingTranscriber, importer,
-    phraseTranscriber, duetGenerator));
+    phraseTranscriber, duetGenerator, variationAnalyzer));
   if (import.meta.env.PROD && "serviceWorker" in navigator) await navigator.serviceWorker.register("/service-worker.js");
   const app = await import("../../../src/piano_duet/static/app.mjs");
   setupRecordingUi(importer, app.loadLibrary);
