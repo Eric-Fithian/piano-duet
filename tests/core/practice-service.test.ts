@@ -288,3 +288,60 @@ test("unfinished tasks and aids survive reload and completed tasks stay closed",
   assert.equal((await aid("hints")).status, 409);
   assert.equal((await (await service.fetch("/api/profile")).json()).included_attempts, 1);
 });
+
+test("repertoire creates a starter piece and remembers a performance after reload", async () => {
+  const reference = spawnSync("uv", ["run", "--frozen", "python", "-c", `
+import contextlib, io, json, tempfile
+from pathlib import Path
+from types import SimpleNamespace
+import numpy as np
+from fastapi.testclient import TestClient
+import piano_duet.server as server
+from piano_duet.notes import Note
+quality = {'usable':True,'onset_support':0.95,'supported_fraction':1,'note_support':[0.95]*8,'reason':'synthetic'}
+class Transcriber:
+    last_quality = quality
+    notes = []
+    def transcribe(self, audio, threshold, cancel, on_progress): return self.notes
+engine = SimpleNamespace(transcriber=Transcriber(), generator=SimpleNamespace(phrase=None))
+with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.StringIO()):
+    server.SAMPLES = server.NOTATION = Path(directory)
+    with TestClient(server.create_app(engine_factory=lambda: engine, profile_path=Path(directory) / 'learner.sqlite3')) as client:
+        headers = {'X-Duet-Client':'1'}
+        task = client.post('/api/practice/next', json={'focus':'repertoire'}, headers=headers).json()
+        engine.transcriber.notes = [Note.model_validate(note) for note in task['target']]
+        response = client.post('/api/respond', params={'mode':'practice','session':'9cfb60dc-a9f7-4e10-9b04-033934f96d9b','task':task['id']}, content=np.zeros(3200,dtype='<f4').tobytes(), headers=headers)
+        assert response.status_code == 200
+        again = client.post('/api/practice/next', json={'focus':'repertoire'}, headers=headers).json()
+        pieces = client.get('/api/pieces').json()
+print(json.dumps({'task':task,'again':again,'pieces':pieces}))
+`], { encoding: "utf8", maxBuffer: 10_000_000 });
+  assert.equal(reference.status, 0, reference.stderr);
+  const expected = JSON.parse(reference.stdout);
+  const events: ReadingLogEvent[] = [];
+  const store: LocalEventStore = { async list() { return [...events]; }, async append(kind, payload, id = crypto.randomUUID()) {
+    const event = { id, kind, payload, deviceId: "test-device", clock: events.length + 1, createdAt: "2024-01-01T00:00:00.000Z" };
+    events.push(event); return event;
+  } };
+  let notes: PracticeNote[] = [];
+  const transcriber: LocalPhraseTranscriber = { async run() { return { notes,
+    quality: { usable: true, onset_support: 0.95, supported_fraction: 1, note_support: notes.map(() => 0.95), reason: "synthetic" } }; } };
+  const open = () => new LocalService(store, undefined, () => 1704067200, undefined, undefined, undefined, undefined, undefined, transcriber);
+  let service = open();
+  const request = () => service.fetch("/api/practice/next", { method: "POST", body: JSON.stringify({ focus: "repertoire" }) });
+  const task = await (await request()).json();
+  expected.task.id = task.id; expected.task.piece_id = task.piece_id;
+  assert.deepEqual(task, expected.task);
+  notes = task.target;
+  const params = new URLSearchParams({ mode: "practice", session: "9cfb60dc-a9f7-4e10-9b04-033934f96d9b", task: task.id });
+  const result = await service.fetch(`/api/respond?${params}`, { method: "POST", body: new Float32Array(3200).buffer });
+  assert.equal(result.status, 200);
+  await result.text();
+  service = open();
+  const again = await (await request()).json();
+  expected.again.id = again.id; expected.again.piece_id = task.piece_id;
+  assert.deepEqual(again, expected.again);
+  assert.equal(again.context.familiar, true);
+  expected.pieces[0].id = task.piece_id;
+  assert.deepEqual(await (await service.fetch("/api/pieces")).json(), expected.pieces);
+});
