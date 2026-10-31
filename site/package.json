@@ -3,8 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "astro dev",
-    "build": "astro build",
+    "dev": "vite --config vite.config.ts",
+    "docs:dev": "astro dev --ignore-lock --host 127.0.0.1 --port 4321",
+    "build": "vite build --config vite.config.ts && astro build",
     "preview": "astro preview",
     "check": "astro check"
   },
@@ -13,11 +14,20 @@
   },
   "dependencies": {
     "@astrojs/starlight": "^0.42.8",
+    "@noble/hashes": "^2.4.0",
+    "@sqlite.org/sqlite-wasm": "3.54.1-build1",
+    "@supabase/supabase-js": "^2.118.0",
+    "@xmldom/xmldom": "^0.9.12",
     "astro": "^7.4.4",
-    "sharp": "^0.35.5"
+    "fflate": "^0.8.3",
+    "mediabunny": "^1.65.0",
+    "onnxruntime-web": "^1.31.1",
+    "sharp": "^0.35.5",
+    "vexflow": "5.0.0"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.12",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vite": "^8.3.5"
   }
 }

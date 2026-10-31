@@ -1,0 +1,28 @@
+{
+  "name": "piano-duet",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "concurrently -k -n app,docs \"npm run dev --prefix site\" \"npm run docs:dev --prefix site\"",
+    "test:core": "OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 node --test --test-concurrency=2 tests/core/*.test.ts",
+    "test:web": "npm run build --prefix site && node --test --test-concurrency=1 tests/web/*.test.mjs",
+    "test:sync": "node --test --test-concurrency=1 tests/sync/*.test.mjs",
+    "check:core": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "concurrently": "^10.0.6",
+    "playwright": "^1.64.1",
+    "selenium-webdriver": "^4.51.0",
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "@xmldom/xmldom": "^0.9.12",
+    "fflate": "^0.8.3",
+    "mediabunny": "^1.65.0",
+    "onnxruntime-web": "^1.31.1"
+  }
+}

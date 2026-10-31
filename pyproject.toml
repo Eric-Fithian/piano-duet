@@ -66,6 +66,7 @@ aria = { git = "https://github.com/EleutherAI/aria", rev = "c2f67bc90b49335543c0
 
 [dependency-groups]
 dev = [
+    "onnx-ir>=1.1.0",
     "pytest>=9.1.1",
     "ruff>=0.16.10",
 ]

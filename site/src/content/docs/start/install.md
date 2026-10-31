@@ -1,14 +1,16 @@
 ---
 title: Install
-description: Install Piano Duet on an Apple Silicon Mac with one command.
+description: Open the browser app or install the Python reference on an Apple Silicon Mac.
 ---
 
-Piano Duet is a Mac app that runs in your browser. Every model runs on your Mac, so it needs:
+The new browser app is under development and will open at [piano-duet.vercel.app](https://piano-duet.vercel.app/) without a Terminal installation. The browser downloads its models and stores practice history on the device. Its production release and iPhone validation are still pending.
+
+The instructions below install the existing Python reference app on an Apple Silicon Mac. Every model runs on your Mac, so it needs:
 
 - An Apple Silicon Mac (M1 or later) with macOS 14 or later
 - About 8 GB of free disk space, for the models and their Python environments
 - A microphone near a piano. The built-in microphone works.
-- Google Chrome is recommended. Safari should work but has not been verified.
+- Google Chrome is recommended. The browser rebuild has also been measured in Safari on a Mac; iPhone measurements are pending.
 
 ## One-line install
 
@@ -34,7 +36,7 @@ The installer:
 piano-duet
 ```
 
-The app opens at **http://127.0.0.1:8765**. Leave the Terminal window open while you play; **Ctrl+C** stops it. See [your first session](/start/first-session/) for what to do next.
+The app opens at **http://127.0.0.1:8765**. Leave the Terminal window open while you play; **Ctrl+C** stops it. See [your first session](/docs/start/first-session/) for what to do next.
 
 ## Update
 

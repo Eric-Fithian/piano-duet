@@ -1,9 +1,19 @@
 ---
 title: Architecture
-description: A browser front end and a loopback Python server, with every model running on the Mac.
+description: The local-first browser foundation and the Python reference implementation.
 ---
 
-Piano Duet is a local web app: a Python server bound to `127.0.0.1` and a browser page that talks only to it. Nothing is deployed anywhere. The website you're reading is documentation only and runs no models.
+The browser rebuild is in progress. Its app lives at `/`, and these docs live under `/docs`. The browser reuses the interface in `src/piano_duet/static/`; its API requests go through an injectable local service. A dedicated worker keeps an append-only event log in SQLite using OPFS; model files and piano samples are cached on the device by version and digest. Guided Practice and Reading use the shared curriculum and local inference; Drills use Transkun for recorded takes; Library imports MIDI, MusicXML and recordings. Duet and Variations use full-phrase transcription and Aria. Account sync exchanges the event log with Supabase and rebuilds progress on each device; Google sign-in is configured, with its first real account test pending. The iOS shell remains incomplete. [Inference measurements](/docs/how/performance/) include real Safari on a Mac; iPhone measurements are pending.
+
+```text
+ Shared interface ──▶ local service ──▶ TypeScript curriculum, scoring and library
+       │                    │
+       │                    ├──▶ inference workers ──▶ device models
+       │                    └──▶ SQLite event-log worker ──▶ optional Supabase sync
+       └──▶ microphone and piano playback
+```
+
+The existing Python app remains the reference implementation. It serves a browser page from a server bound to `127.0.0.1` and runs its models on the Mac:
 
 ```text
  Browser (vanilla ES modules)                       Python server (FastAPI, uvicorn)
@@ -17,12 +27,12 @@ Piano Duet is a local web app: a Python server bound to `127.0.0.1` and a browse
 
 ## The front end
 
-`src/piano_duet/static/` is plain HTML, CSS and ES modules, with no build step. `app.mjs` wires the modes together; each mode has its own module (`reading.mjs`, `drills.mjs`, `library.mjs`, `practice.mjs`, `learning.mjs`, `song_editor.mjs`).
+`src/piano_duet/static/` is shared HTML, CSS and ES modules. `app.mjs` wires the modes together; each mode has its own module (`reading.mjs`, `drills.mjs`, `library.mjs`, `practice.mjs`, `learning.mjs`, `song_editor.mjs`). The Python reference serves these files directly. The browser build bundles them with VexFlow and injects the local service before the interface starts.
 
 - **Audio:** `audio.mjs` captures microphone audio with an AudioWorklet, counts attacks in the browser for drills, and plays the sampled piano.
 - **Notation:** `notation.mjs` quantizes notes into a score model. `engraving.mjs` lays out systems with VexFlow, and `score_view.mjs` is the one score viewer every mode uses, with zoom, layout, following and overlays.
 
-## The server
+## The reference server
 
 `server.py` serves the page and a JSON API, and refuses non-GET requests that don't come from its own origin. The main pieces:
 
@@ -37,7 +47,7 @@ Piano Duet is a local web app: a Python server bound to `127.0.0.1` and a browse
 | `library.py`, `score_import.py`, `score_model.py`, `youtube.py` | Songs, MIDI and MusicXML import, and recording-to-score |
 | `key_tracking.py`, `difficulty.py`, `phrasing.py` | Key estimates and playability constraints for Duet |
 
-## Models
+## Reference models
 
 | Model | Runs on | Used for |
 | --- | --- | --- |
@@ -46,4 +56,4 @@ Piano Duet is a local web app: a Python server bound to `127.0.0.1` and a browse
 | [Transkun 2.0](https://github.com/Yujia-Yan/Transkun) | Mac GPU | Drill takes and recordings |
 | [MIDI2ScoreTransformer](https://github.com/TimFelixBeyer/MIDI2ScoreTransformer) | CPU, separate environment | Writing a score from a recording |
 
-`piano-duet setup` downloads all of them at pinned revisions into `.cache/`.
+The Python reference's `piano-duet setup` downloads its models at pinned revisions into `.cache/`. The browser downloads the licensed converted models from Hugging Face, verifies their hashes and caches them locally. The recording importer uses Eric Fithian's published score model; the upstream public MIDI2ScoreTransformer checkpoint remains separate and is not redistributed here.

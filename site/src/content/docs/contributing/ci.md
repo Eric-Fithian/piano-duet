@@ -12,15 +12,18 @@ GitHub Actions runs [`ci.yml`](https://github.com/Eric-Fithian/piano-duet/blob/m
 | **Lint** | Ubuntu | `ruff check` on the Python, `shellcheck` on the installer |
 | **Python tests** | macOS (Apple Silicon) | `pytest` with the locked dependencies, MLX included |
 | **JavaScript tests** | Ubuntu | `node --test` on the browser modules |
+| **TypeScript core and Python parity** | macOS (Apple Silicon) | Type-checks the shared core, compares it with Python and checks the native inference protocol |
+| **Published model parity** | macOS (Apple Silicon) | Downloads pinned model files and checks them against reference fixtures |
+| **Browser storage** | macOS (Apple Silicon) | Chromium and WebKit storage, audio decoding and model checks, plus synthetic-microphone Practice and Drills and timestamped synthetic capture for Duet and Variations |
 | **Website** | Ubuntu | `astro check` and a production build of `site/` |
 
-All four must pass before a pull request can merge into `main`. Dependencies are cached by `uv.lock` and `site/package-lock.json`, and a newer push to the same branch cancels the run in progress.
+The model jobs cache their downloads by the pinned catalog; a newer push to the same pull-request branch cancels the run in progress. The Simulator and TestFlight checks are not implemented yet.
 
 Vercel builds every pull request that touches `site/` and comments with a preview URL. Merging to `main` deploys the site to production.
 
 ## After merging
 
-On every push to `main`, and weekly, the **Installer** job runs the [one-line installer](/start/install/) on a clean macOS runner, without downloading the models, and starts the installed command. This checks that a fresh install still works for new users.
+On every push to `main`, and weekly, the **Installer** job runs the [one-line installer](/docs/start/install/) on a clean macOS runner, without downloading the models, and starts the installed command. This checks that a fresh install still works for new users.
 
 ## Keeping dependencies fresh
 

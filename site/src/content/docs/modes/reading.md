@@ -7,7 +7,7 @@ description: Endless sight-reading composed for you, from first notes to advance
 
 **Reading mode** progresses from first notes to advanced piano scores. Enable the microphone and play the highlighted note or chord. Correct notes turn green and advance the cursor. A wrong press appears in red beside the expected notes; the cursor waits for correction. A held note counts once, and repeated written notes require separate attacks. The score follows you, keeping the music ahead in view; the score you just finished stays faded above, and the next one is already waiting below. Upcoming scores are prepared in advance and stay unchanged once shown; completed attempts save in the background without restarting microphone recognition. Early stages use a single staff; later stages use the grand staff. Your selected mode is remembered in this browser.
 
-Recognition details are in [How Piano Duet listens](/how/listening/).
+Recognition details are in [How Piano Duet listens](/docs/how/listening/).
 
 ## The curriculum
 
@@ -21,7 +21,7 @@ The reading curriculum has **24 stages**. Every score is four bars long, two bar
 
 Stages 1–11 need three recent fresh unaided scores per relevant hand, stages 12–17 need four, and stages 18–24 need six (grand-staff stages use one combined group). Those recent scores must average at least 90% pitch accuracy and, from stage 5, have measurable rhythm averaging at least 80%. A hand that already meets its requirements is not assigned extra scores just to balance attempt counts. Long-note exercises vary the placement and combinations of quarter, half and whole notes, avoid the last four completed rhythm patterns, and always contain enough intervals to assess. Minimum quarter-note tempos begin at 44 BPM in stage 12 and rise gradually to 72 BPM at stage 24. Signature-introduction stages add one accidental at a time, waiting for successful examples in the simpler signatures before expanding, and require successful examples in every introduced key; other multi-key stages require three keys. Stage 22 requires all six of its meters. The first two stages also establish each foundation note with at least three readings and 85% recent accuracy. Completed stages stay earned; explicitly excluding their evidence recalculates the path. Historical white-key reading can establish the first two stages but cannot award unplayed advanced stages. Curriculum progress is recalculated from saved performances, so corrected rhythm rules also credit existing practice without rewriting recordings or assessments.
 
-The scores themselves are written by Aria under the curriculum's rules: see [Constrained decoding](/how/constrained-decoding/).
+The scores themselves are written by Aria under the curriculum's rules: see [Constrained decoding](/docs/how/constrained-decoding/).
 
 ## Holding notes and timing
 

@@ -44,6 +44,7 @@ CHECKSUMS = {PUBLIC_CHECKPOINT: PUBLIC_SHA256, ASAP_SOUP_CHECKPOINT: ASAP_SOUP_S
 RUNNER = Path("src/piano_duet/midi_to_score.py")
 # Versions verified together on Apple silicon; newer transformers changed the RoFormer internals the model extends.
 REQUIREMENTS = ("torch==2.5.1", "pytorch_lightning==2.4.0", "transformers==4.44.2", "pretty_midi>=0.2.10", "numpy<2",
+                "onnx==1.20.1", "onnxruntime==1.23.2",
                 "music21 @ git+https://github.com/TimFelixBeyer/music21@0ed70bb")
 # Greedy decoding is ~60x faster on the M-series CPU than through MPS for this model.
 DEVICE = "cpu"

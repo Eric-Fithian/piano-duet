@@ -1,0 +1,37 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import {localFetch, localRequest, setLocalService} from '../src/piano_duet/static/practice.mjs';
+
+test('API requests use the injected service while other requests keep browser fetch', async () => {
+  const requests = [];
+  const original = globalThis.fetch;
+  globalThis.fetch = async (path, options) => { requests.push({kind: 'network', path, options}); return Response.json({source: 'network'}); };
+  setLocalService({async fetch(path, options) { requests.push({kind: 'local', path, options}); return Response.json({source: 'local'}); }});
+  try {
+    assert.deepEqual(await localRequest('/api/profile'), {source: 'local'});
+    assert.deepEqual(await localRequest('/api/practice/next', {focus: 'reading'}), {source: 'local'});
+    assert.deepEqual(await (await localFetch('/samples/C4.mp3')).json(), {source: 'local'});
+    assert.deepEqual(await (await localFetch('/docs/')).json(), {source: 'network'});
+    assert.equal(requests[0].kind, 'local');
+    assert.equal(requests[1].options.method, 'POST');
+    assert.deepEqual(JSON.parse(requests[1].options.body), {focus: 'reading'});
+    assert.equal(requests[2].kind, 'local');
+    assert.equal(requests[3].kind, 'network');
+    setLocalService(null);
+    assert.deepEqual(await localRequest('/api/profile'), {source: 'network'});
+  } finally {
+    setLocalService(null);
+    globalThis.fetch = original;
+  }
+});
+
+test('learning requests explain browser failures and validation locations', async () => {
+  setLocalService({async fetch(path) {
+    return path.endsWith('/crash') ? new Response('failure', {status: 500, headers: {'content-type': 'text/plain'}})
+      : Response.json({detail: [{loc: ['body', 'focus'], msg: 'Choose a valid focus', type: 'literal_error'}]}, {status: 422});
+  }});
+  try {
+    await assert.rejects(localRequest('/api/crash'), {message: 'Piano Duet failed on /api/crash (500). Reload the page; if it keeps happening, report it with the browser console log.'});
+    await assert.rejects(localRequest('/api/practice/next', {}), {message: 'body.focus: Choose a valid focus'});
+  } finally { setLocalService(null); }
+});

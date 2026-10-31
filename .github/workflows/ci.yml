@@ -49,6 +49,158 @@ jobs:
           node-version: 24
       - run: node --test tests/*.test.mjs
 
+  core:
+    name: TypeScript core and Python parity
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          version: "0.10.12"
+          enable-cache: true
+      - run: npm ci
+      - run: uv sync --frozen
+      - run: npm run check:core
+      - run: npm run test:core
+      - run: sh tests/ios/verify-native-protocol.sh
+
+  model-parity:
+    name: Published model parity
+    runs-on: macos-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          version: "0.10.12"
+          enable-cache: true
+      - run: uv sync --frozen
+      - uses: actions/cache@v4
+        with:
+          path: .cache/ci-models
+          key: published-models-${{ hashFiles('site/app/src/model-catalog.ts', 'tests/inference/download-models.mjs') }}
+          restore-keys: published-models-
+      - run: node tests/inference/download-models.mjs aria live-transcription recording-transcription live-reference
+      - run: uv run --frozen python tests/inference/published_model_parity.py
+
+  browser-storage:
+    name: Browser storage
+    runs-on: macos-latest
+    timeout-minutes: 30
+    env:
+      PIANO_BROWSER_PROFILE: .cache/browser-inference/model-profile
+      PIANO_SITE_PORT: "5180"
+      PIANO_MODEL_PORT: "5181"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          version: "0.10.12"
+          enable-cache: true
+      - run: npm ci
+      - run: npm ci --prefix site
+      - run: npx playwright install chromium webkit
+      - run: npm run test:web
+        timeout-minutes: 4
+      - run: uv run --frozen python tests/inference/audio_fixtures.py
+      - run: node tests/inference/audio-decoding.mjs
+        timeout-minutes: 3
+      - run: node tests/inference/media-recording.mjs
+        timeout-minutes: 3
+      - uses: actions/cache@v4
+        with:
+          path: |
+            .cache/ci-models/recording-transcription
+            .cache/ci-models/midi-to-score
+            .cache/ci-models/phrase-transcription
+            .cache/ci-models/aria
+          key: browser-recording-model-${{ hashFiles('site/app/src/model-catalog.ts', 'tests/inference/download-models.mjs') }}
+          restore-keys: browser-recording-model-
+      - run: node tests/inference/download-models.mjs recording-transcription midi-to-score phrase-transcription aria
+      - run: node tests/inference/expand-score-fixture.mjs
+      - run: node tests/inference/verify-score-browser.mjs wasm
+        timeout-minutes: 10
+        env:
+          PIANO_SCORE_MODEL_DIR: .cache/ci-models/midi-to-score
+          PIANO_SCORE_FIXTURE: .cache/m2st/synthetic-parity.json
+          PIANO_SCORE_RUNTIME: "1"
+      - run: mkdir -p .cache/browser-inference
+      - run: curl --fail --silent --show-error --location https://raw.githubusercontent.com/nbrosowsky/tonejs-instruments/622c2f1c32c8cfce4158ddc3eb26e518ddef37e5/samples/piano/C4.mp3 --output .cache/browser-inference/C4.mp3
+      - run: uv run --frozen python tests/inference/phrase_fixture.py
+        env:
+          PIANO_PHRASE_MODEL: .cache/ci-models/phrase-transcription/piano_crnn.onnx
+      - run: node tests/inference/phrase-transcription.mjs --split --wasm
+        timeout-minutes: 3
+        env:
+          PIANO_PHRASE_MODEL: .cache/ci-models/phrase-transcription/piano_crnn.onnx
+          PIANO_PHRASE_SPLIT_DIR: .cache/ci-models/phrase-transcription
+      - run: node tests/inference/phrase-transcription.mjs --split
+        timeout-minutes: 3
+        env:
+          PIANO_PHRASE_MODEL: .cache/ci-models/phrase-transcription/piano_crnn.onnx
+          PIANO_PHRASE_SPLIT_DIR: .cache/ci-models/phrase-transcription
+      - run: node tests/inference/practice-microphone.mjs chromium
+        timeout-minutes: 4
+        env:
+          PIANO_SITE_PORT: "5182"
+          PIANO_PHRASE_MODEL: .cache/ci-models/phrase-transcription/piano_crnn.onnx
+          PIANO_PHRASE_SPLIT_DIR: .cache/ci-models/phrase-transcription
+      - run: node tests/inference/practice-microphone.mjs webkit
+        timeout-minutes: 4
+        env:
+          PIANO_BROWSER_PROFILE: .cache/browser-inference/webkit-profile
+          PIANO_SITE_PORT: "5182"
+          PIANO_PHRASE_MODEL: .cache/ci-models/phrase-transcription/piano_crnn.onnx
+          PIANO_PHRASE_SPLIT_DIR: .cache/ci-models/phrase-transcription
+      - name: Remove WebKit model browser profile
+        if: always()
+        run: rm -rf .cache/browser-inference/webkit-profile
+      - run: node tests/inference/drill-microphone.mjs
+        timeout-minutes: 3
+        env:
+          PIANO_RECORDING_MODEL_DIR: .cache/ci-models/recording-transcription
+          PIANO_BROWSER_CHANNEL: chrome
+      - run: node tests/inference/creative-microphone.mjs
+        timeout-minutes: 8
+        env:
+          PIANO_CREATIVE_PROVIDER: webgpu
+          PIANO_CREATIVE_PHRASE_PROVIDER: wasm
+          PIANO_CREATIVE_CAPTURE_SEAM: "1"
+          PIANO_PHRASE_MODEL: .cache/ci-models/phrase-transcription/piano_crnn.onnx
+          PIANO_PHRASE_SPLIT_DIR: .cache/ci-models/phrase-transcription
+          PIANO_ARIA_MODEL_DIR: .cache/ci-models/aria
+      - name: Remove temporary model browser profile
+        if: always()
+        run: rm -rf .cache/browser-inference/model-profile
+
+  sync:
+    name: Local accounts and sync
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.115.0
+      - run: npm ci
+      - run: npm ci --prefix site
+      - run: npx playwright install --with-deps chromium
+      - run: supabase start
+      - run: npm run test:sync
+
   site:
     name: Website
     runs-on: ubuntu-latest

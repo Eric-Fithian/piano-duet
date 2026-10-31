@@ -4,7 +4,15 @@
   "installCommand": "npm ci",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "ignoreCommand": "git diff --quiet ${VERCEL_GIT_PREVIOUS_SHA:-HEAD^} HEAD -- .",
+  "trailingSlash": false,
+  "redirects": [
+    {"source": "/start/:path*", "destination": "/docs/start/:path*", "permanent": true},
+    {"source": "/modes/:path*", "destination": "/docs/modes/:path*", "permanent": true},
+    {"source": "/how/:path*", "destination": "/docs/how/:path*", "permanent": true},
+    {"source": "/contributing/:path*", "destination": "/docs/contributing/:path*", "permanent": true},
+    {"source": "/credits", "destination": "/docs/credits", "permanent": true}
+  ],
+  "rewrites": [{"source": "/install.sh", "destination": "/docs/install.sh"}],
   "headers": [
     {
       "source": "/install.sh",
@@ -18,7 +26,9 @@
       "headers": [
         {"key": "X-Content-Type-Options", "value": "nosniff"},
         {"key": "Referrer-Policy", "value": "strict-origin-when-cross-origin"},
-        {"key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()"}
+        {"key": "Permissions-Policy", "value": "camera=(), microphone=(self), geolocation=()"},
+        {"key": "Cross-Origin-Opener-Policy", "value": "same-origin"},
+        {"key": "Cross-Origin-Embedder-Policy", "value": "require-corp"}
       ]
     }
   ]

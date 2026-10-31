@@ -26,4 +26,4 @@ At each step the decoder masks every token the rules forbid, adds practice weigh
 
 ## In Duet
 
-Duet uses the same model with lighter constraints. The estimated key restricts pitch tokens, and **Reply difficulty** limits attack speed, notes per chord and hand, register, span and jumps, all before sampling. See [Duet and Variations](/modes/duet/).
+Duet uses the same model with lighter constraints. The estimated key restricts pitch tokens, and **Reply difficulty** limits attack speed, notes per chord and hand, register, span and jumps, all before sampling. See [Duet and Variations](/docs/modes/duet/).

@@ -1,0 +1,4 @@
+.asset-download { position: fixed; z-index: 100; right: 1rem; bottom: 1rem; width: min(22rem, calc(100vw - 2rem)); padding: .8rem 1rem; border: 1px solid #39465a; border-radius: .6rem; color: #dfe1e4; background: #1d2633; font: .85rem system-ui, sans-serif; box-shadow: 0 .4rem 1.5rem #0006; }
+.asset-download progress { display: block; width: 100%; margin-top: .5rem; accent-color: #91bca2; }
+.recording-import { display: flex; align-items: center; flex-wrap: wrap; gap: .7rem; margin: 0 0 1rem; }
+.recording-import p { color: var(--muted); font-size: .85rem; margin: 0; }

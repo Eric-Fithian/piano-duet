@@ -1,5 +1,6 @@
 import {localRequest} from './practice.mjs';
 import {pitchName} from './learning.mjs';
+import {readLearnerSetting, writeLearnerSetting} from './learner-settings.mjs';
 
 const $ = id => document.getElementById(id);
 const SVG = 'http://www.w3.org/2000/svg';
@@ -201,7 +202,7 @@ export class DrillPicker {
   }
 
   saved() {
-    const stored = localStorage.getItem(STORAGE);
+    const stored = readLearnerSetting(STORAGE);
     if (stored === null) return null;
     const choices = JSON.parse(stored);
     if (!FIELDS.every(field => field in choices)) throw new Error('The saved drill is incomplete.');
@@ -209,7 +210,7 @@ export class DrillPicker {
   }
 
   save() {
-    localStorage.setItem(STORAGE, JSON.stringify(this.read()));
+    void writeLearnerSetting(STORAGE, JSON.stringify(this.read())).catch(error => { throw error; });
   }
 
   // Show the choices, keeping each where the selected drill allows it; Random offers every drill's options.

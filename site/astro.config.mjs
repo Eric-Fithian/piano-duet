@@ -5,6 +5,12 @@ const repository = 'https://github.com/Eric-Fithian/piano-duet';
 
 export default defineConfig({
   site: 'https://piano-duet.vercel.app',
+  base: '/docs',
+  outDir: './dist/docs',
+  vite: {server: {headers: {
+    'Cross-Origin-Opener-Policy': 'same-origin',
+    'Cross-Origin-Embedder-Policy': 'require-corp',
+  }}},
   integrations: [
     starlight({
       title: 'Piano Duet',
@@ -22,7 +28,7 @@ export default defineConfig({
       sidebar: [
         {label: 'Start here', items: ['start/install', 'start/first-session']},
         {label: 'Modes', items: ['modes/reading', 'modes/drills', 'modes/library', 'modes/practice', 'modes/duet', 'modes/viewing']},
-        {label: 'How it works', items: ['how/architecture', 'how/constrained-decoding', 'how/listening', 'how/privacy']},
+        {label: 'How it works', items: ['how/architecture', 'how/constrained-decoding', 'how/listening', 'how/performance', 'how/privacy']},
         {label: 'Contributing', items: ['contributing/development', 'contributing/ci']},
         {label: 'Credits', link: '/credits/'},
       ],
