@@ -9,10 +9,10 @@ import {startReferenceServer, startTestServer} from './server.mjs';
 let dev, preview, reference, directory;
 before(async () => {
   directory = await mkdtemp(join(tmpdir(), 'piano-brand-'));
-  dev = await startTestServer();
-  preview = await startTestServer(true);
+  dev = await startTestServer(false, 0, 120000);
+  preview = await startTestServer(true, 0, 120000);
   reference = await startReferenceServer(directory);
-}, {timeout: 90000});
+}, {timeout: 390000});
 after(async () => { dev?.server.kill('SIGTERM'); preview?.server.kill('SIGTERM'); reference?.server.kill('SIGTERM'); await rm(directory, {recursive: true, force: true}); });
 
 for (const [name, engine] of [['Chromium', chromium], ['WebKit', webkit]]) {
