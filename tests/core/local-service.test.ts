@@ -183,5 +183,5 @@ print(json.dumps({"task": task, "preview": preview.json(), "events": events, "gr
   const restored = await (await request(`/api/attempts/${body.attempt}/exclude`, { excluded: false })).json();
   assert.equal(restored.included_attempts, expected.restored.included_attempts);
   assert.equal(restored.reading.introductions, expected.restored.reading.introductions);
-  assert.equal((await service.fetch("/api/attempts/unknown")).status, 404);
+  assert.equal((await service.fetch("/api/attempts/unknown")).status, 422);
 });

@@ -19,7 +19,7 @@ export async function localRequest(path, body, method = 'POST') {
   if (!response.ok) {
     // A crash in the server answers in plain text, not the JSON of a refused request.
     if (!response.headers.get('content-type')?.includes('application/json')) {
-      throw new Error(`The local server failed on ${path} (${response.status}). Check the Terminal running Piano Duet for details.`);
+      throw new Error(`Piano Duet failed on ${path} (${response.status}). Reload the page; if it keeps happening, report it with the browser console log.`);
     }
     const data = await response.json();
     const detail = Array.isArray(data.detail) ? data.detail.map(item => `${item.loc.join('.')}: ${item.msg}`).join('; ') : data.detail;

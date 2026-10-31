@@ -5,6 +5,8 @@ import { assessPractice } from "./practice-assessment.ts";
 import type { PracticePrompt } from "./practice-assessment.ts";
 import { choosePracticeFocus } from "./practice-selection.ts";
 import type { SelectionProfile } from "./practice-selection.ts";
+import { parseJsonBody, validateAid, validateExclusion, validateMidi, validatePathUuid, validatePiece,
+  validatePracticeQuery, validatePracticeRequest } from "./practice-request.ts";
 import { attemptsFromEvents } from "./reading-events.ts";
 import type { ReadingLogEvent } from "./reading-events.ts";
 import { readingProgress } from "./reading-progress.ts";
@@ -125,12 +127,11 @@ export class LocalService {
       return Response.json(learnerProfile(attemptsFromEvents(await this.store.list()), this.now()));
     }
     if (method === "POST" && url.pathname === "/api/export") {
-      if (typeof options.body !== "string") return Response.json({ detail: "MIDI export needs JSON" }, { status: 400 });
-      const request = JSON.parse(options.body) as { notes?: unknown };
-      if (!Array.isArray(request.notes) || !request.notes.length || !request.notes.every(validMidiNote)) {
-        return Response.json({ detail: "Invalid MIDI notes" }, { status: 422 });
-      }
-      return new Response(exportMidi(request.notes).buffer as ArrayBuffer,
+      const body = parseJsonBody(options.body);
+      if (body.errors.length) return Response.json({ detail: body.errors }, { status: 422 });
+      const { value: notes, errors } = validateMidi(body.value);
+      if (errors.length) return Response.json({ detail: errors }, { status: 422 });
+      return new Response(exportMidi(notes).buffer as ArrayBuffer,
         { headers: { "Content-Type": "audio/midi", "Content-Disposition": 'attachment; filename="piano-duet.mid"' } });
     }
     if (method === "GET" && url.pathname === "/api/profile/export") {
@@ -142,11 +143,10 @@ export class LocalService {
       return Response.json(piecesFromEvents(await this.store.list()));
     }
     if (method === "POST" && url.pathname === "/api/pieces") {
-      if (typeof options.body !== "string") return Response.json({ detail: "A piece needs JSON" }, { status: 400 });
-      const request = JSON.parse(options.body) as { attempt?: unknown; title?: unknown };
-      if (!validUuid(request.attempt) || typeof request.title !== "string" || !request.title.length || request.title.length > 80) {
-        return Response.json({ detail: "Invalid piece details" }, { status: 422 });
-      }
+      const body = parseJsonBody(options.body);
+      if (body.errors.length) return Response.json({ detail: body.errors }, { status: 422 });
+      const { value: request, errors } = validatePiece(body.value);
+      if (errors.length) return Response.json({ detail: errors }, { status: 422 });
       const title = request.title.trim();
       if (!title) return Response.json({ detail: "Give the piece a name" }, { status: 400 });
       const attempt = attemptsFromEvents(await this.store.list()).find((item) => item.id === request.attempt);
@@ -252,15 +252,12 @@ export class LocalService {
       }
     }
     if (method === "POST" && url.pathname === "/api/practice/next") {
+      const body = parseJsonBody(options.body);
+      if (body.errors.length) return Response.json({ detail: body.errors }, { status: 422 });
+      const { value: request, errors } = validatePracticeRequest(body.value, READING_STAGES.length);
+      if (errors.length) return Response.json({ detail: errors }, { status: 422 });
       if (this.responseBusy) return Response.json({ detail: "Finish the current performance first" }, { status: 409 });
-      if (typeof options.body !== "string") return Response.json({ detail: "A practice request needs JSON" }, { status: 400 });
-      const request = JSON.parse(options.body) as { focus?: string; step_by_step?: boolean; piece?: string | null; stage?: number | null; after?: string | null };
-      const focus = request.focus ?? "guided";
-      if (!["guided", "technique", "reading", "theory", "ear", "repertoire"].includes(focus)) return Response.json({ detail: "Invalid practice focus" }, { status: 422 });
-      if ((request.piece != null && !validUuid(request.piece)) || (request.after != null && !validUuid(request.after))
-        || (request.stage != null && (!Number.isInteger(request.stage) || request.stage < 1 || request.stage > READING_STAGES.length))) {
-        return Response.json({ detail: "Invalid practice request" }, { status: 422 });
-      }
+      const focus = request.focus;
       if (request.step_by_step && focus !== "reading") return Response.json({ detail: "Step-by-step practice requires the reading focus" }, { status: 400 });
       if (request.after) {
         const preceding = this.tasks.get(request.after);
@@ -295,8 +292,17 @@ export class LocalService {
       return this.libraryRequest(method, parts, options);
     }
     if (parts[0] === "api" && parts[1] === "attempts" && parts.length >= 3 && parts.length <= 4) {
+      const path = validatePathUuid(parts[2], "attempt_id");
+      let excluded: boolean | undefined;
+      if (method === "POST" && parts.length === 4 && parts[3] === "exclude") {
+        const body = parseJsonBody(options.body);
+        const result = body.errors.length ? { value: false, errors: body.errors } : validateExclusion(body.value);
+        if (path.errors.length || result.errors.length) return Response.json({ detail: [...path.errors, ...result.errors] }, { status: 422 });
+        excluded = result.value;
+      }
+      if (path.errors.length) return Response.json({ detail: path.errors }, { status: 422 });
       const attempts = attemptsFromEvents(await this.store.list());
-      const attempt = attempts.find((item) => item.id === parts[2]);
+      const attempt = attempts.find((item) => item.id === path.value);
       if (!attempt) return Response.json({ detail: "Unknown performance" }, { status: 404 });
       if (method === "GET" && parts.length === 3) {
         if (attempt.prompt.family !== "reading") return Response.json(attempt);
@@ -306,26 +312,25 @@ export class LocalService {
       }
       if (method === "POST" && parts.length === 4 && parts[3] === "exclude") {
         if (!this.store.append) return Response.json({ detail: "Saving practice is not available yet" }, { status: 501 });
-        if (typeof options.body !== "string") return Response.json({ detail: "An exclusion needs JSON" }, { status: 400 });
-        const request = JSON.parse(options.body) as { excluded?: unknown };
-        if (typeof request.excluded !== "boolean") return Response.json({ detail: "Invalid exclusion" }, { status: 422 });
-        await this.store.append("exclusion", { attemptId: attempt.id, excluded: request.excluded });
+        if (excluded === undefined) throw new Error("Missing validated exclusion");
+        await this.store.append("exclusion", { attemptId: attempt.id, excluded });
         return Response.json(learnerProfile(attemptsFromEvents(await this.store.list()), this.now()));
       }
     }
     if (method === "POST" && parts.length === 4 && parts[0] === "api" && parts[1] === "practice" && parts[3] === "aid") {
+      const path = validatePathUuid(parts[2], "task_id"), body = parseJsonBody(options.body);
+      const result = body.errors.length ? { value: "hints" as const, errors: body.errors } : validateAid(body.value);
+      if (path.errors.length || result.errors.length) return Response.json({ detail: [...path.errors, ...result.errors] }, { status: 422 });
+      const kind = result.value;
       if (this.responseBusy) return Response.json({ detail: "Finish the current performance first" }, { status: 409 });
-      const entry = this.tasks.get(parts[2]);
+      const entry = this.tasks.get(path.value!);
       if (!entry || entry.completed) return Response.json({ detail: "Choose an unfinished exercise first" }, { status: 409 });
       const { task } = entry;
-      if (typeof options.body !== "string") return Response.json({ detail: "An aid request needs JSON" }, { status: 400 });
-      const request = JSON.parse(options.body) as { kind?: "hearings" | "reveals" | "hints" };
-      if (request.kind !== "hearings" && request.kind !== "reveals" && request.kind !== "hints") return Response.json({ detail: "Invalid aid" }, { status: 422 });
       if (!("drill" in task)) {
         if (!this.store.append) return Response.json({ detail: "Saving practice is not available yet" }, { status: 501 });
-        await this.store.append("setting", { type: "practice-aid", taskId: task.id, kind: request.kind });
+        await this.store.append("setting", { type: "practice-aid", taskId: task.id, kind });
       }
-      task.context[request.kind]++;
+      task.context[kind]++;
       return Response.json(task);
     }
     if (method === "POST" && url.pathname === "/api/reading/listen") return this.listen(url, options);
@@ -474,14 +479,12 @@ export class LocalService {
   }
 
   private async respondPractice(url: URL, options: RequestInit): Promise<Response> {
+    const { value: request, errors } = validatePracticeQuery(url.searchParams);
+    if (errors.length) return Response.json({ detail: errors }, { status: 422 });
     if (this.responseBusy || this.readingBusy) return Response.json({ detail: "The previous response is still finishing. Please retry." }, { status: 409 });
-    const session = url.searchParams.get("session"), taskId = url.searchParams.get("task"), suppliedAttempt = url.searchParams.get("attempt");
-    const attemptId = suppliedAttempt ?? crypto.randomUUID(), source = url.searchParams.get("source") ?? "microphone";
-    const threshold = Number(url.searchParams.get("threshold") ?? 0.8);
-    if (!validUuid(session) || !validUuid(taskId) || !validUuid(attemptId) || !["microphone", "demo"].includes(source)
-      || !Number.isFinite(threshold) || threshold < 0.1 || threshold > 0.99) return Response.json({ detail: "Invalid practice performance request" }, { status: 422 });
+    const { session, task: taskId, attempt: attemptId, source, threshold } = request;
     if (url.searchParams.has("listening")) return Response.json({ detail: "Only drill takes carry what the live attack counter heard" }, { status: 400 });
-    const entry = this.tasks.get(taskId);
+    const entry = taskId ? this.tasks.get(taskId) : undefined;
     if (!entry || entry.completed) return Response.json({ detail: "Choose an unfinished exercise before playing" }, { status: 409 });
     if ("drill" in entry.task) return Response.json({ detail: "Drills are played in drill mode, and only drills are" }, { status: 400 });
     const task = entry.task;
@@ -721,15 +724,6 @@ function validSongPlay(value: unknown): value is { id: string; attacks: [number,
 function isPiece(value: unknown): boolean {
   return value !== null && typeof value === "object" && !Array.isArray(value)
     && (value as Record<string, unknown>).type === "piece" && "piece" in value;
-}
-
-function validMidiNote(value: unknown): value is { pitch: number; start: number; duration: number; velocity: number } {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-  const note = value as Record<string, unknown>;
-  return Number.isInteger(note.pitch) && (note.pitch as number) >= 21 && (note.pitch as number) <= 108
-    && typeof note.start === "number" && Number.isFinite(note.start) && note.start >= 0
-    && typeof note.duration === "number" && Number.isFinite(note.duration) && note.duration > 0
-    && Number.isInteger(note.velocity) && (note.velocity as number) >= 1 && (note.velocity as number) <= 127;
 }
 
 function piecesFromEvents(events: ReadingLogEvent[]): PracticePiece[] {

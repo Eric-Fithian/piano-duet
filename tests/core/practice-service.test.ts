@@ -199,7 +199,11 @@ print(json.dumps(output))
   for (const [index, body] of bodies.entries()) {
     const response = await service.fetch("/api/practice/next", { method: "POST", body: JSON.stringify(body) });
     assert.equal(response.status, expected[index].status);
-    if (response.status !== 422) assert.deepEqual(await response.json(), expected[index].body);
+    const actual = await response.json();
+    if (response.status === 422) {
+      const locations = (detail: { loc: (string | number)[] }[]) => detail.map((row) => JSON.stringify(row.loc)).sort();
+      assert.deepEqual(locations(actual.detail), locations(expected[index].body.detail));
+    } else assert.deepEqual(actual, expected[index].body);
   }
 });
 
@@ -344,4 +348,63 @@ print(json.dumps({'task':task,'again':again,'pieces':pieces}))
   assert.equal(again.context.familiar, true);
   expected.pieces[0].id = task.piece_id;
   assert.deepEqual(await (await service.fetch("/api/pieces")).json(), expected.pieces);
+});
+
+test("malformed Practice requests report FastAPI validation locations", async () => {
+  const id = "11111111-1111-4111-8111-111111111111";
+  const cases: { method: string; path: string; body?: unknown; audio?: boolean }[] = [
+    { method: "POST", path: "/api/practice/next", body: { focus: "bad", stage: 25, after: "bad" } },
+    { method: "POST", path: "/api/practice/next", body: { focus: null, step_by_step: "bad", piece: 1 } },
+    { method: "POST", path: "/api/practice/next", body: { stage: "no" } },
+    { method: "POST", path: `/api/practice/${id}/aid`, body: {} },
+    { method: "POST", path: "/api/practice/bad/aid", body: { kind: "bad" } },
+    { method: "POST", path: "/api/pieces", body: {} },
+    { method: "POST", path: "/api/pieces", body: { attempt: "bad", title: "" } },
+    { method: "POST", path: "/api/pieces", body: { attempt: id, title: "x".repeat(81) } },
+    { method: "GET", path: "/api/attempts/bad" },
+    { method: "POST", path: `/api/attempts/${id}/exclude`, body: {} },
+    { method: "POST", path: "/api/attempts/bad/exclude", body: { excluded: "wrong" } },
+    { method: "POST", path: "/api/export", body: {} },
+    { method: "POST", path: "/api/export", body: { notes: [] } },
+    { method: "POST", path: "/api/export", body: { notes: [{ pitch: 20, start: -1, duration: 0, velocity: 128 }] } },
+    { method: "POST", path: "/api/respond?mode=practice", audio: true },
+    { method: "POST", path: "/api/respond?mode=practice&session=bad&task=bad&source=bad&threshold=2", audio: true },
+    { method: "POST", path: `/api/respond?mode=practice&session=${id}&seconds=30&temperature=0&difficulty=9&surprise=2&stage=bad`, audio: true },
+  ];
+  const reference = spawnSync("uv", ["run", "--frozen", "python", "-c", `
+import contextlib, io, json, sys, tempfile
+from pathlib import Path
+from types import SimpleNamespace
+from fastapi.testclient import TestClient
+import piano_duet.server as server
+class Engine:
+    def __init__(self): self.generator = SimpleNamespace(phrase=None)
+cases = json.load(sys.stdin)
+with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.StringIO()):
+    server.SAMPLES = server.NOTATION = Path(directory)
+    with TestClient(server.create_app(engine_factory=Engine, profile_path=Path(directory) / 'learner.sqlite3')) as client:
+        result = []
+        for case in cases:
+            options = {'headers':{'X-Duet-Client':'1'}}
+            if case.get('audio'): options['content'] = bytes(6400)
+            elif 'body' in case: options['json'] = case['body']
+            response = client.request(case['method'], case['path'], **options)
+            result.append({'status':response.status_code, 'locations':[item['loc'] for item in response.json()['detail']]})
+print(json.dumps(result))
+`], { input: JSON.stringify(cases), encoding: "utf8", maxBuffer: 10_000_000 });
+  assert.equal(reference.status, 0, reference.stderr);
+  const expected: { status: number; locations: (string | number)[][] }[] = JSON.parse(reference.stdout);
+  const service = new LocalService({ async list() { return []; } });
+  const locations = (rows: (string | number)[][]) => rows.map((row) => JSON.stringify(row)).sort();
+  for (const [index, item] of cases.entries()) {
+    const options: RequestInit = { method: item.method };
+    if (item.audio) options.body = new Uint8Array(6400);
+    else if (Object.hasOwn(item, "body")) options.body = JSON.stringify(item.body);
+    const response = await service.fetch(item.path, options);
+    const actual = await response.json();
+    assert.equal(response.status, expected[index].status, `case ${index}: ${item.path}`);
+    assert.ok(actual.detail.every((row: { loc: unknown; msg: unknown; type: unknown }) => Array.isArray(row.loc)
+      && typeof row.msg === "string" && typeof row.type === "string"));
+    assert.deepEqual(locations(actual.detail.map((row: { loc: (string | number)[] }) => row.loc)), locations(expected[index].locations), `case ${index}: ${item.path}`);
+  }
 });
