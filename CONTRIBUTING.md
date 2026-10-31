@@ -35,7 +35,7 @@ Keep each pull request to one change, and write the description around *why* it 
 
 ## Hosted account rollout
 
-The rollout has not been run. After approving and completing `supabase login`, use the following command from the project root with a Free-plan organization slug. It also requires Node.js 24+, the Supabase CLI, and the Vercel CLI already authenticated to the `eric-fithians-projects` scope with access to `piano-duet`.
+After approving and completing `supabase login`, use the following command from the project root with a Free-plan organization slug. It also requires Node.js 24+, the Supabase CLI, and the Vercel CLI already authenticated to the `eric-fithians-projects` scope with access to `piano-duet`.
 
 ```sh
 node scripts/rollout-sync.mjs --organization <organization-slug>
