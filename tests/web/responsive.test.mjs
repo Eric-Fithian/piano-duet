@@ -371,11 +371,13 @@ for (const [engineName, engine] of [['chromium', chromium], ['webkit', webkit]])
     const denseLibrary = await page.evaluate(() => {
       const view = window.responsiveSheet, system = view.phrases[0].systems[0];
       return {available: view.scroller.clientWidth - 24, natural: system.frame.width * view.scale,
-        drawn: system.svg.getBoundingClientRect().width, zoom: view.preferences.zoom};
+        drawn: system.svg.getBoundingClientRect().width, scrollWidth: view.scroller.scrollWidth,
+        viewportWidth: view.scroller.clientWidth, zoom: view.preferences.zoom};
     });
     assert.equal(denseLibrary.zoom, 'fit');
     assert.ok(denseLibrary.natural > denseLibrary.available, JSON.stringify(denseLibrary));
     assert.ok(denseLibrary.drawn <= denseLibrary.available + 1, JSON.stringify(denseLibrary));
+    assert.ok(denseLibrary.scrollWidth <= denseLibrary.viewportWidth + 1, JSON.stringify(denseLibrary));
     await page.locator('#songSectionSelect').selectOption('1');
     for (const {name, width, height} of viewports) {
       await resizeScore(width, height);
