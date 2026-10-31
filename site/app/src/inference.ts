@@ -42,6 +42,7 @@ export interface DownloadProgress {
 export interface InferenceSession<K extends ModelId> {
   readonly model: K;
   readonly provider: "webgpu" | "wasm" | "native";
+  readonly fallback?: { provider: "webgpu"; message: string; stack?: string };
   run(input: ModelInputs[K], signal?: AbortSignal): Promise<ModelOutputs[K]>;
   close(): Promise<void>;
 }
@@ -49,4 +50,9 @@ export interface InferenceSession<K extends ModelId> {
 export interface InferenceBackend {
   createSession<K extends ModelId>(model: K, onProgress: (progress: DownloadProgress) => void,
     signal?: AbortSignal): Promise<InferenceSession<K>>;
+}
+
+export function describeInferenceBackend(session: InferenceSession<ModelId>): string {
+  const provider = session.provider === "wasm" ? "CPU" : session.provider === "webgpu" ? "WebGPU" : "Native";
+  return `${session.model}: ${provider}${session.fallback ? ` (WebGPU failed: ${session.fallback.message})` : ""}`;
 }

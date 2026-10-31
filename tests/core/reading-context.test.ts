@@ -8,6 +8,19 @@ import type { KeyMode, MusicalKey } from "../../src/core/musical-key.ts";
 import { ReadingReplay } from "./reading-replay.ts";
 import type { ReplayEvent } from "./reading-replay.ts";
 
+type RecordingCase = { stage: ContextStage; progress: ContextProgress; events: ReplayEvent[];
+  score: { reading: { clef: string }; key: MusicalKey; meter: string } };
+let recordedCases: RecordingCase[] | undefined;
+
+function recordings(): RecordingCase[] {
+  if (!recordedCases) {
+    const reference = spawnSync("uv", ["run", "--frozen", "python", "tests/reading_recording.py"], { encoding: "utf8", maxBuffer: 20_000_000 });
+    assert.equal(reference.status, 0, reference.stderr);
+    recordedCases = JSON.parse(reference.stdout) as RecordingCase[];
+  }
+  return recordedCases;
+}
+
 test("all 24 musical keys match the Python reference", () => {
   const reference = spawnSync("uv", ["run", "--frozen", "python", "-c", `
 import json
@@ -20,10 +33,7 @@ print(json.dumps([MusicalKey(tonic, mode).to_dict() for mode in ("major", "minor
 });
 
 test("reading contexts offer the same choices and select the Python result for each stage", () => {
-  const reference = spawnSync("uv", ["run", "--frozen", "python", "tests/reading_recording.py"], { encoding: "utf8", maxBuffer: 20_000_000 });
-  assert.equal(reference.status, 0, reference.stderr);
-  const cases: { stage: ContextStage; progress: ContextProgress; events: ReplayEvent[]; score: { reading: { clef: string }; key: MusicalKey; meter: string } }[] = JSON.parse(reference.stdout);
-  for (const { stage, progress, events, score } of cases) {
+  for (const { stage, progress, events, score } of recordings()) {
     const replay = new ReadingReplay(events.slice(0, 3));
     assert.deepEqual(chooseContext(stage, progress, replay), [score.reading.clef, score.key, score.meter], stage.id);
     replay.finish();
@@ -31,10 +41,7 @@ test("reading contexts offer the same choices and select the Python result for e
 });
 
 test("context selection balances prior practice and unfamiliar signatures", () => {
-  const fixtures = spawnSync("uv", ["run", "--frozen", "python", "tests/reading_recording.py"], { encoding: "utf8", maxBuffer: 20_000_000 });
-  assert.equal(fixtures.status, 0, fixtures.stderr);
-  const cases: { stage: ContextStage; progress: ContextProgress }[] = JSON.parse(fixtures.stdout);
-  const inputs = cases.filter((_, index) => index % 2 === 0).map(({ stage, progress }) => {
+  const inputs = recordings().filter((_, index) => index % 2 === 0).map(({ stage, progress }) => {
     const path = progress.curriculum.path.map((entry) => entry.id === stage.id
       ? { ...entry, groups: entry.groups.map((group, index) => ({ ...group, ready: index === 0 })) } : entry);
     return { stage, progress: { curriculum: { ...progress.curriculum, path,
