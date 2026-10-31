@@ -1,6 +1,41 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {PhraseDetector, readEvents} from '../src/piano_duet/static/audio.mjs';
+import {readFileSync} from 'node:fs';
+import {runInNewContext} from 'node:vm';
+import {PhraseDetector, captureAllowed, capturePerformanceTime, readEvents} from '../src/piano_duet/static/audio.mjs';
+
+test('late microphone chunks are gated by capture time across different audio clocks', () => {
+  const timestamp = {contextTime: 12, performanceTime: 100000}, latency = 0.012;
+  const before = capturePerformanceTime(12.1, timestamp, latency);
+  const after = capturePerformanceTime(12.2, timestamp, latency);
+  assert.ok(Math.abs(before - 100112) < 0.001);
+  assert.ok(Math.abs(after - 100212) < 0.001);
+  const delivered = [{samples: 'during playback', capturedAt: before, deliveredAt: 102000},
+    {samples: 'after playback', capturedAt: after, deliveredAt: 102001}];
+  assert.ok(delivered.every(chunk => chunk.deliveredAt > 100150));
+  const accepted = delivered.filter(chunk => captureAllowed(chunk.capturedAt, 100150, 100140, false));
+  assert.deepEqual(accepted.map(chunk => chunk.samples), ['after playback']);
+  assert.equal(captureAllowed(after, 100150, 100220, false), false);
+  assert.equal(captureAllowed(after, 100150, 100140, true), false);
+  assert.throws(() => capturePerformanceTime(1, undefined, 0), {message: 'The microphone capture clock is unavailable.'});
+});
+
+test('the microphone worklet timestamps the start of each complete chunk', () => {
+  const messages = [];
+  let Capture;
+  class AudioWorkletProcessor { constructor() { this.port = {postMessage: message => messages.push(message)}; } }
+  const scope = {AudioWorkletProcessor, Float32Array, currentFrame: 0, sampleRate: 16000,
+    registerProcessor: (_name, processor) => { Capture = processor; }};
+  runInNewContext(readFileSync('src/piano_duet/static/capture.js', 'utf8'), scope);
+  const worklet = new Capture();
+  for (let block = 0; block < 16; block++) {
+    scope.currentFrame = block * 128;
+    worklet.process([[new Float32Array(128).fill(block)]]);
+  }
+  assert.deepEqual(messages.map(message => message.capturedAt), [0, 0.064]);
+  assert.equal(messages[0].samples.length, 1024);
+  assert.equal(messages[1].samples[0], 8);
+});
 
 test('room noise never becomes a phrase', () => {
   const detector = new PhraseDetector({noise: 0.003});
