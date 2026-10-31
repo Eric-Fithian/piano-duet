@@ -109,6 +109,8 @@ jobs:
       - run: uv run --frozen python tests/inference/audio_fixtures.py
       - run: node tests/inference/audio-decoding.mjs
         timeout-minutes: 3
+      - run: node tests/inference/media-recording.mjs
+        timeout-minutes: 3
       - uses: actions/cache@v4
         with:
           path: |
