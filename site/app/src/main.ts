@@ -59,6 +59,16 @@ async function start(): Promise<void> {
       catch (error) { if (signal?.aborted) live = undefined; throw error; }
     },
   };
+  let fullPhrase: Promise<InferenceSession<"phrase-transcription">> | undefined;
+  const phraseTranscriber = {
+    async run(input: { audio: Float32Array; sampleRate: 16000; threshold: number }, signal?: AbortSignal) {
+      fullPhrase ??= backend.createSession("phrase-transcription", report, signal).catch((error) => { fullPhrase = undefined; throw error; });
+      const session = await fullPhrase;
+      indicator.hidden = true;
+      try { return await session.run(input, signal); }
+      catch (error) { if (signal?.aborted) fullPhrase = undefined; throw error; }
+    },
+  };
   let recording: Promise<InferenceSession<"recording-transcription">> | undefined;
   const recordingTranscriber = {
     async run(input: { audio: Float32Array; sampleRate: 16000 }, signal?: AbortSignal) {
@@ -82,7 +92,7 @@ async function start(): Promise<void> {
   const importer = new BrowserRecordingImporter(recordingAssets, scoreAssets, report, (stage) => {
     indicator.hidden = true; recordingStage(stage);
   });
-  setLocalService(new LocalService(log, transcriber, undefined, new SampleStore(report), random, phrase, recordingTranscriber, importer));
+  setLocalService(new LocalService(log, transcriber, undefined, new SampleStore(report), random, phrase, recordingTranscriber, importer, phraseTranscriber));
   if (import.meta.env.PROD && "serviceWorker" in navigator) await navigator.serviceWorker.register("/service-worker.js");
   const app = await import("../../../src/piano_duet/static/app.mjs");
   setupRecordingUi(importer, app.loadLibrary);
