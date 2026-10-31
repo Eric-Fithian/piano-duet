@@ -24,6 +24,10 @@ import { DRILL_CATALOG } from "./drill-catalog.ts";
 import { drillProgress } from "./drill-progress.ts";
 import type { DrillAttempt } from "./drill-progress.ts";
 import { drillLevels } from "./drill-levels.ts";
+import type { DrillId } from "./drill-levels.ts";
+import { coachDrill, drillConfigKey } from "./drill-coach.ts";
+import { buildDrillTask, validateDrill } from "./drill-task.ts";
+import type { DrillSelection } from "./drill-task.ts";
 
 export type LocalJsonValue = null | boolean | number | string | LocalJsonValue[] | { [key: string]: LocalJsonValue };
 export interface LocalEventStore {
@@ -36,7 +40,7 @@ export interface LocalTranscriber {
 export interface LocalAssets { fetch(path: string, options?: RequestInit): Promise<Response> }
 type ReadingTask = ReadingScore & { id: string; family: "reading"; purpose: string; shape: string; cue: string; even: boolean; dynamics: null;
   context: { notation_visible: boolean; hearings: number; reveals: number; hints: number; familiar: boolean; interaction: string; introduction: boolean } };
-type PracticeTask = ReturnType<typeof initialPracticeTask> | ReadingTask;
+type PracticeTask = ReturnType<typeof initialPracticeTask> | ReadingTask | ReturnType<typeof buildDrillTask>;
 
 export class LocalService {
   private readingBusy = false;
@@ -91,6 +95,45 @@ export class LocalService {
       const attempts = attemptsFromEvents(await this.store.list());
       const { progress, streak_days } = drillProgress(attempts as unknown as DrillAttempt[], this.now());
       return Response.json({ catalog: DRILL_CATALOG, progress, levels: drillLevels(progress), streak_days });
+    }
+    if (method === "POST" && url.pathname === "/api/drills/next") {
+      if (this.readingBusy) return Response.json({ detail: "Finish the current performance first" }, { status: 409 });
+      if (typeof options.body !== "string") return Response.json({ detail: "A drill request needs JSON" }, { status: 400 });
+      const request = JSON.parse(options.body) as Partial<DrillSelection> & { rung?: number | null; avoid?: DrillId[]; focus?: DrillId | null };
+      const drills = Object.keys(DRILL_CATALOG.drills);
+      if ((request.drill != null && !drills.includes(request.drill)) || (request.focus != null && !drills.includes(request.focus))
+        || (request.avoid != null && (!Array.isArray(request.avoid) || request.avoid.some((drill) => !drills.includes(drill))))
+        || (request.practice != null && !Object.hasOwn(DRILL_CATALOG.practices, request.practice))
+        || (request.hands != null && !Object.hasOwn(DRILL_CATALOG.hands, request.hands))
+        || (request.tonic != null && (!Number.isInteger(request.tonic) || request.tonic < 0 || request.tonic > 11))
+        || (request.octaves != null && (!Number.isInteger(request.octaves) || request.octaves < 1 || request.octaves > 4))
+        || (request.inversion != null && (!Number.isInteger(request.inversion) || request.inversion < 0 || request.inversion > 2))
+        || (request.drill == null && (request.variant != null || request.tonic != null || request.hands != null || request.octaves != null || request.rung != null))
+        || (request.drill != null && ((request.avoid?.length ?? 0) > 0 || request.focus != null || request.variant == null || request.tonic == null || request.hands == null || request.octaves == null))
+        || (request.rung != null && (!Number.isInteger(request.rung) || request.rung < 0))) {
+        return Response.json({ detail: "Invalid drill request" }, { status: 422 });
+      }
+      const attempts = attemptsFromEvents(await this.store.list());
+      const { progress } = drillProgress(attempts as unknown as DrillAttempt[], this.now());
+      const coached = request.drill == null ? coachDrill(progress, request.avoid ?? [], this.now(), request.focus ?? null) : null;
+      const config: DrillSelection = coached?.config ?? { drill: request.drill!, variant: request.variant!, tonic: request.tonic!,
+        hands: request.hands!, octaves: request.octaves!, inversion: request.inversion ?? 0, practice: request.practice ?? "even" };
+      try { validateDrill(config); } catch (error) {
+        if (!(error instanceof Error)) throw error;
+        return Response.json({ detail: error.message }, { status: 400 });
+      }
+      const entry = progress[drillConfigKey(config)];
+      const rung = request.rung ?? entry?.working ?? DRILL_CATALOG.drills[config.drill].start;
+      if (rung >= DRILL_CATALOG.drills[config.drill].ladder.length) return Response.json({ detail: "That tempo is outside this drill's ladder" }, { status: 400 });
+      try {
+        const task = buildDrillTask(config, rung, entry ?? null);
+        if (coached) { task.reason = `${coached.reason} ${task.reason}`; Object.assign(task.drill, { coach: coached.reason }); }
+        this.tasks.set(task.id, { task, completed: false });
+        return Response.json(task);
+      } catch (error) {
+        if (!(error instanceof Error) || error.message !== "This drill does not fit on the piano keyboard") throw error;
+        return Response.json({ detail: error.message }, { status: 400 });
+      }
     }
     if (method === "POST" && url.pathname === "/api/practice/next") {
       if (typeof options.body !== "string") return Response.json({ detail: "A practice request needs JSON" }, { status: 400 });

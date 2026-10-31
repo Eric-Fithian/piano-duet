@@ -27,6 +27,10 @@ with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.S
         pieces = client.get("/api/pieces").json()
         library = client.get("/api/library").json()
         drills = client.get("/api/drills").json()
+        drill_coach = client.post("/api/drills/next", json={}, headers={"X-Duet-Client": "1"}).json()
+        drill_choice = client.post("/api/drills/next", json={"drill": "scale", "variant": "major", "tonic": 0, "hands": "right", "octaves": 1, "practice": "even"}, headers={"X-Duet-Client": "1"}).json()
+        invalid_drills = [{"drill": "scale"}, {"practice": "bad"}, {"tonic": 12}, {"drill": "scale", "variant": "melodic minor", "tonic": 0, "hands": "contrary", "octaves": 1}]
+        invalid_drill_responses = [client.post("/api/drills/next", json=body, headers={"X-Duet-Client": "1"}) for body in invalid_drills]
         task = client.post("/api/practice/next", json={"focus": "guided"}, headers={"X-Duet-Client": "1"}).json()
         aided = client.post(f"/api/practice/{task['id']}/aid", json={"kind": "hearings"}, headers={"X-Duet-Client": "1"}).json()
         audio = np.zeros(32000, dtype="<f4")
@@ -34,7 +38,7 @@ with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.S
         heard = client.post("/api/reading/listen?threshold=0.8", content=audio.tobytes(), headers={"X-Duet-Client": "1"}).json()
         invalid = client.post("/api/reading/listen", content=b"x", headers={"X-Duet-Client": "1"})
 profile["generated_at"] = 1700000000
-print(json.dumps({"status": status, "profile": profile, "pieces": pieces, "library": library, "drills": drills, "task": task, "aided": aided, "heard": heard["notes"], "invalid": {"status": invalid.status_code, "body": invalid.json()}}))
+print(json.dumps({"status": status, "profile": profile, "pieces": pieces, "library": library, "drills": drills, "drill_coach": drill_coach, "drill_choice": drill_choice, "invalid_drills": invalid_drills, "invalid_drill_statuses": [r.status_code for r in invalid_drill_responses], "task": task, "aided": aided, "heard": heard["notes"], "invalid": {"status": invalid.status_code, "body": invalid.json()}}))
 `], { encoding: "utf8", maxBuffer: 10_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const expected = JSON.parse(reference.stdout);
@@ -51,6 +55,15 @@ print(json.dumps({"status": status, "profile": profile, "pieces": pieces, "libra
   assert.deepEqual(await (await service.fetch("/api/pieces")).json(), expected.pieces);
   assert.deepEqual(await (await service.fetch("/api/library")).json(), expected.library);
   assert.deepEqual(await (await service.fetch("/api/drills")).json(), expected.drills);
+  for (const [body, reference] of [[{}, expected.drill_coach], [{ drill: "scale", variant: "major", tonic: 0, hands: "right", octaves: 1, practice: "even" }, expected.drill_choice]] as const) {
+    const drill = await (await service.fetch("/api/drills/next", { method: "POST", body: JSON.stringify(body) })).json();
+    reference.id = drill.id;
+    assert.deepEqual(drill, reference);
+  }
+  for (const [index, body] of expected.invalid_drills.entries()) {
+    const response = await service.fetch("/api/drills/next", { method: "POST", body: JSON.stringify(body) });
+    assert.equal(response.status, expected.invalid_drill_statuses[index]);
+  }
   const task = await (await service.fetch("/api/practice/next", { method: "POST", body: JSON.stringify({ focus: "guided" }) })).json();
   expected.task.id = task.id;
   assert.deepEqual(task, expected.task);
