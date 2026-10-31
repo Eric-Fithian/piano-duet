@@ -78,14 +78,20 @@ try {
         return super.postMessage(message, ...args);
       }
     };
-    navigator.mediaDevices.getUserMedia = async () => {
+    document.addEventListener("click", (event) => {
+      if (!event.target.closest("#start") || window.__duetTest.audio) return;
       const audio = new AudioContext({ sampleRate: 16000 }), destination = audio.createMediaStreamDestination();
-      await audio.resume();
+      Object.assign(window.__duetTest, { audio, destination, ready: audio.resume() });
+    }, true);
+    const mediaDevices = Object.getPrototypeOf(navigator.mediaDevices);
+    Object.defineProperty(mediaDevices, "getUserMedia", { configurable: true, value: async () => {
+      const { audio, destination, ready } = window.__duetTest;
+      if (!audio || !destination || !ready) throw new Error("The fake microphone needs a start gesture");
+      await ready;
       if (audio.state !== "running") throw new Error("The fake microphone did not start");
-      Object.assign(window.__duetTest, { audio, destination });
       return destination.stream;
-    };
-    navigator.mediaDevices.enumerateDevices = async () => [];
+    } });
+    Object.defineProperty(mediaDevices, "enumerateDevices", { configurable: true, value: async () => [] });
   }, { selectedProvider: provider, selectedPhraseProvider: phraseProvider });
   await page.goto(`http://127.0.0.1:${site.port}/`);
   await page.waitForFunction(() => document.querySelector("#practiceTitle")?.textContent === "C major scale", null, { timeout: 30000 });
@@ -138,8 +144,8 @@ try {
           done: kind === "duet" ? document.querySelector("#turnCount")?.textContent.includes(`${turn} EXCHANGES`)
             : kind === "idea" ? status === "Your turn. Play back the target." : !document.querySelector("#learningResult").hidden };
     }, { kind, turn }) });
-  const play = async (pitches = [60, 64, 67, 72]) => {
-    const scheduled = await page.evaluate(async ({ path, pitches }) => {
+  const play = async (pitches = [60, 64, 67, 72], spacing = 0.5, duration = 0.35) => {
+    const scheduled = await page.evaluate(async ({ path, pitches, spacing, duration }) => {
       const { PianoSound } = await import(`${path}/audio.mjs`);
       const { audio, destination } = window.__duetTest;
       const piano = new PianoSound(audio);
@@ -147,10 +153,10 @@ try {
       const status = document.querySelector("#status")?.textContent;
       if (!status?.startsWith("Your turn")) throw new Error(`Microphone was not ready when piano playback was scheduled: ${status}`);
       const start = audio.currentTime + 0.5;
-      window.__duetTest.expected = { pitches, performanceSeconds: (pitches.length - 1) * 0.5 + 0.35, sampleRate: 16000 };
-      for (const [index, pitch] of pitches.entries()) piano.play({ pitch, start: 0, duration: 0.35, velocity: 90 }, start + index * 0.5, audio, destination);
+      window.__duetTest.expected = { pitches, performanceSeconds: (pitches.length - 1) * spacing + duration, sampleRate: 16000 };
+      for (const [index, pitch] of pitches.entries()) piano.play({ pitch, start: 0, duration, velocity: 90 }, start + index * spacing, audio, destination);
       return { scheduled: start, audioTime: audio.currentTime, status, pitches, guard: window.__duetTest.guard };
-    }, { path: staticBase, pitches });
+    }, { path: staticBase, pitches, spacing, duration });
     process.stderr.write(`Scheduled synthetic piano: ${JSON.stringify(scheduled)}\n`);
   };
   await waitForListening("First Duet phrase");
@@ -191,7 +197,7 @@ try {
   await waitForListening("Variations mode switch");
   await page.locator("#learningMode").click();
   await waitForListening("Variations idea");
-  await play([60, 67]);
+  await play([60, 64, 67], 0.7, 0.45);
   process.stderr.write(`Waiting for Variations idea at ${Math.round(performance.now() - started)} ms\n`);
   await waitForProgress("Variations idea", "idea");
   const idea = await page.evaluate(() => ({ error: document.querySelector("#error").hidden ? null : document.querySelector("#error").textContent,
@@ -199,7 +205,7 @@ try {
   if (idea.error) throw new Error(idea.error);
   assert.ok(idea.analysis >= 2, await diagnostic(`Variations idea has too few analyzed notes: ${JSON.stringify(idea)}`));
   await waitForListening("Variations playback");
-  await play([60, 67]);
+  await play([60, 64, 67], 0.7, 0.45);
   process.stderr.write(`Waiting for Variations playback at ${Math.round(performance.now() - started)} ms\n`);
   await waitForProgress("Variations playback", "score");
   const variation = await page.evaluate(async (path) => {
