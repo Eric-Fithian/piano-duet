@@ -4,7 +4,7 @@ Thanks for helping. Bug reports, practice-material ideas, documentation fixes an
 
 ## Before you start
 
-- **Bugs:** open an [issue](https://github.com/Eric-Fithian/piano-duet/issues/new/choose) with your Mac model, macOS and browser versions, the mode you were in, and what you heard versus what the app showed. **Progress → Export history** can help when a note was misheard.
+- **Bugs:** open an [issue](https://github.com/Eric-Fithian/piano-duet/issues/new/choose) with your device, operating system and browser versions, the mode you were in, and what you heard versus what the app showed.
 - **Larger changes:** open an issue or a draft pull request first, so we can agree on the approach before you invest in it.
 - **Security issues:** report them privately, as described in [SECURITY.md](SECURITY.md).
 

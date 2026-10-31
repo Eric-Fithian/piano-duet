@@ -1,21 +1,21 @@
 ---
 title: Your first session
-description: Set up the microphone, press Space, and play.
+description: Set up the microphone, tap Start, and play.
 ---
 
 Open the browser app at **piano-duet.vercel.app**. On first use, it downloads the piano samples and any models needed for the selected mode; they are cached on your device.
 
 ## Set up the microphone
 
-Put the Mac or an external microphone near the piano. A quiet room helps. The browser's built-in voice noise suppression, echo cancellation and automatic gain control are turned off to preserve musical attacks.
+Put your device or an external microphone near the piano. A quiet room helps. The browser's built-in voice noise suppression, echo cancellation and automatic gain control are turned off to preserve musical attacks.
 
-When you first press **Space**, the browser asks for microphone access. If you denied it, check the browser's site permissions and **System Settings → Privacy & Security → Microphone**. Choose the input device in **Settings** before turning the microphone on.
+When you first tap **Start**, the browser asks for microphone access. If you denied it, check your browser and device microphone permissions. Choose the input device in **Settings** before turning the microphone on.
 
-## Press Space and play
+## Start and play
 
-**Space** is the one playing control. Press it, or click the **Space** key at the bottom, to start listening.
+Tap **Start** to begin listening. On a keyboard, press **Space**.
 
-- **Reading** starts listening immediately. Space pauses and resumes.
+- **Reading** starts listening immediately. **Pause** and **Resume** control listening.
 - **Drills** end each take by themselves shortly after you stop.
 - **Library** listens for the notes of an imported score and waits at each attack.
 
