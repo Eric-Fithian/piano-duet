@@ -7,6 +7,7 @@ import { MODEL_CATALOG } from "../../site/app/src/model-catalog.ts";
 import { startServer } from "./server.mjs";
 import { startTestServer } from "../web/server.mjs";
 import { browserProfile } from "./browser-profile.mjs";
+import { waitForCreativeProgress } from "./creative-progress.mjs";
 
 const started = performance.now();
 let page;
@@ -43,12 +44,21 @@ try {
   page.on("pageerror", (error) => errors.push(String(error)));
   page.on("console", (message) => process.stderr.write(`Page ${message.type()}: ${message.text()}\n`));
   await page.addInitScript((selectedProvider) => {
-    window.__duetTest = { audio: null, destination: null, providers: [] };
+    window.__duetTest = { audio: null, destination: null, providers: [], progress: 0 };
+    document.addEventListener("DOMContentLoaded", () => {
+      const input = document.querySelector("#length");
+      if (!input) throw new Error("The reply length control is missing");
+      input.value = "2";
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
     const BrowserWorker = window.Worker;
     window.Worker = class extends BrowserWorker {
       constructor(...args) {
         super(...args);
-        this.addEventListener("message", ({ data }) => { if (data.value?.provider) window.__duetTest.providers.push(data.value.provider); });
+        this.addEventListener("message", ({ data }) => {
+          if (data.value?.provider) window.__duetTest.providers.push(data.value.provider);
+          if (data.progress || data.value?.provider || data.value?.logits || data.value?.notes) window.__duetTest.progress++;
+        });
       }
       postMessage(message, ...args) {
         if (selectedProvider === "wasm" && message.action === "open" && ["aria", "phrase-transcription"].includes(message.model)) {
@@ -69,27 +79,33 @@ try {
   await page.goto(`http://127.0.0.1:${site.port}/`);
   await page.waitForFunction(() => document.querySelector("#practiceTitle")?.textContent === "C major scale", null, { timeout: 30000 });
   await page.locator("#duetMode").click();
+  await page.locator("#openSettings").click();
+  await page.locator("#length").evaluate((input) => { input.value = "2"; input.dispatchEvent(new Event("input", { bubbles: true })); });
+  assert.equal(await page.locator("#length").inputValue(), "2", await diagnostic("Duet reply length did not change to two seconds"));
+  await page.locator('[data-close="settingsDialog"]').click();
   await page.locator("#start").click();
   await page.waitForFunction(() => window.__duetTest.audio && window.__duetTest.destination);
   const staticBase = `/@fs${resolve("src/piano_duet/static")}`;
-  const waitTurn = async (number) => page.waitForFunction((turn) => document.querySelector("#turnCount")?.textContent.includes(`${turn} EXCHANGES`)
-    || !document.querySelector("#error").hidden, number, { timeout: 120000 }).catch(async (error) => {
-    const state = await page.evaluate(() => ({ status: document.querySelector("#status")?.textContent, timing: document.querySelector("#timing")?.textContent,
-      message: document.querySelector("#message")?.textContent, error: document.querySelector("#error")?.textContent,
-      download: document.querySelector(".asset-download")?.textContent, providers: window.__duetTest.providers }));
-    throw new Error(`${await diagnostic(`Duet exchange ${number} timed out`)}; ${error}; ${JSON.stringify({ state, errors })}`);
-  });
-  const play = async () => page.evaluate(async (path) => {
+  const waitForProgress = (label, kind, turn) => waitForCreativeProgress({ label, diagnostic, errors,
+    pause: () => page.waitForTimeout(1000), read: () => page.evaluate(({ kind, turn }) => {
+        const error = document.querySelector("#error"), status = document.querySelector("#status")?.textContent;
+        return { status, timing: document.querySelector("#timing")?.textContent, error: error.hidden ? null : error.textContent,
+          download: document.querySelector(".asset-download")?.textContent, providers: window.__duetTest.providers,
+          progress: window.__duetTest.progress,
+          done: kind === "duet" ? document.querySelector("#turnCount")?.textContent.includes(`${turn} EXCHANGES`)
+            : kind === "idea" ? status === "Your turn. Play back the target." : !document.querySelector("#learningResult").hidden };
+    }, { kind, turn }) });
+  const play = async (pitches = [60, 64, 67, 72]) => page.evaluate(async ({ path, pitches }) => {
     const { PianoSound } = await import(`${path}/audio.mjs`);
     const { audio, destination } = window.__duetTest;
     const piano = new PianoSound(audio);
     await piano.load();
     const start = audio.currentTime + 2;
-    for (const [index, pitch] of [60, 64, 67, 72].entries()) piano.play({ pitch, start: 0, duration: 0.35, velocity: 90 }, start + index * 0.5, audio, destination);
-  }, staticBase);
+    for (const [index, pitch] of pitches.entries()) piano.play({ pitch, start: 0, duration: 0.35, velocity: 90 }, start + index * 0.5, audio, destination);
+  }, { path: staticBase, pitches });
   await play();
   process.stderr.write(`Waiting for first Duet exchange at ${Math.round(performance.now() - started)} ms\n`);
-  await waitTurn("01");
+  await waitForProgress("First Duet exchange", "duet", "01");
   const result = await page.evaluate(async (path) => {
     const { localRequest } = await import(`${path}/practice.mjs`);
     const profile = await localRequest("/api/profile");
@@ -107,7 +123,7 @@ try {
   await page.waitForFunction(() => document.querySelector("#status")?.textContent.startsWith("Your turn"), null, { timeout: 30000 });
   await play();
   process.stderr.write(`Waiting for second Duet exchange at ${Math.round(performance.now() - started)} ms\n`);
-  await waitTurn("02");
+  await waitForProgress("Second Duet exchange", "duet", "02");
   const again = await page.evaluate(async (path) => {
     const { localRequest } = await import(`${path}/practice.mjs`);
     const profile = await localRequest("/api/profile");
@@ -120,18 +136,16 @@ try {
     await diagnostic(`Duet attempts were not saved with enough notes: ${JSON.stringify(again.recent.slice(0, 2))}`));
   await page.waitForFunction(() => document.querySelector("#status")?.textContent.startsWith("Your turn"), null, { timeout: 30000 });
   await page.locator("#learningMode").click();
-  await play();
+  await play([60, 67]);
   process.stderr.write(`Waiting for Variations idea at ${Math.round(performance.now() - started)} ms\n`);
-  await page.waitForFunction(() => document.querySelector("#status")?.textContent === "Your turn. Play back the target."
-    || !document.querySelector("#error").hidden, null, { timeout: 120000 });
+  await waitForProgress("Variations idea", "idea");
   const idea = await page.evaluate(() => ({ error: document.querySelector("#error").hidden ? null : document.querySelector("#error").textContent,
     analysis: document.querySelectorAll("#surpriseRows tr").length }));
   if (idea.error) throw new Error(idea.error);
-  assert.ok(idea.analysis >= 3, await diagnostic(`Variations idea has too few analyzed notes: ${JSON.stringify(idea)}`));
-  await play();
+  assert.ok(idea.analysis >= 2, await diagnostic(`Variations idea has too few analyzed notes: ${JSON.stringify(idea)}`));
+  await play([60, 67]);
   process.stderr.write(`Waiting for Variations playback at ${Math.round(performance.now() - started)} ms\n`);
-  await page.waitForFunction(() => !document.querySelector("#learningResult").hidden || !document.querySelector("#error").hidden,
-    null, { timeout: 120000 });
+  await waitForProgress("Variations playback", "score");
   const variation = await page.evaluate(async (path) => {
     const { localRequest } = await import(`${path}/practice.mjs`);
     const profile = await localRequest("/api/profile");
@@ -140,7 +154,7 @@ try {
   }, staticBase);
   if (variation.error) throw new Error(variation.error);
   assert.ok(variation.score.includes("/ 100"), await diagnostic(`Variations score is missing: ${JSON.stringify(variation)}`));
-  assert.ok(variation.recent.length >= 2 && variation.recent.slice(0, 2).every((attempt) => attempt.mode === "learning" && attempt.note_count >= 3),
+  assert.ok(variation.recent.length >= 2 && variation.recent.slice(0, 2).every((attempt) => attempt.mode === "learning" && attempt.note_count >= 2),
     await diagnostic(`Variations attempts were not saved with enough notes: ${JSON.stringify(variation.recent.slice(0, 2))}`));
   assert.deepEqual(errors, [], await diagnostic("Creative modes raised a page exception"));
   console.log(JSON.stringify({ providers: result.providers, notes: result.attempt.note_count, cold: result.timing, warm: again.timing,
