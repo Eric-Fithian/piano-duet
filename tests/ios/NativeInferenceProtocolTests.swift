@@ -27,6 +27,30 @@ struct NativeInferenceProtocolTests {
                 continue
             }
         }
+        let buffer = try JSONDecoder().decode(NativeFloat32Buffer.self, from: Data(#"{"$type":"float32-le","data":"AACAPwAAAL8AAACA"}"#.utf8))
+        precondition(buffer.values.map(\.bitPattern) == ([1.0, -0.5, -0.0] as [Float]).map(\.bitPattern))
+        let encoded = try JSONEncoder().encode(buffer)
+        let decoded = try JSONDecoder().decode(NativeFloat32Buffer.self, from: encoded)
+        precondition(decoded.values.map(\.bitPattern) == buffer.values.map(\.bitPattern))
+        for body in [
+            #"{"$type":"float32-le","data":"AA=="}"#,
+            #"{"$type":"float32-le","data":"not base64"}"#,
+            #"{"$type":"float32-be","data":"AACAPw=="}"#,
+            #"{"$type":"float32-le","data":"AADAfw=="}"#,
+        ] {
+            do {
+                _ = try JSONDecoder().decode(NativeFloat32Buffer.self, from: Data(body.utf8))
+                fatalError("An invalid native float buffer was accepted: \(body)")
+            } catch {
+                continue
+            }
+        }
+        do {
+            _ = try JSONEncoder().encode(NativeFloat32Buffer(values: [.infinity]))
+            fatalError("A non-finite native float buffer was encoded")
+        } catch {
+            precondition(error is EncodingError)
+        }
         print("Native inference request validation passed")
     }
 }
