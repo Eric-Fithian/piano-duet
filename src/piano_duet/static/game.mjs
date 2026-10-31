@@ -96,7 +96,7 @@ export function renderReadingResult(container, task, result, before, after, acti
   const text = status ? `${status} · ` : '';
   const review = element('button', 'secondary', 'Review');
   review.addEventListener('click', actions.review);
-  detail.append(element('span', '', `${text}${number(summary.xp)} XP earned`), review);
+  detail.append(element('span', '', `${text}${summary.xp === null ? 'Progress will update when available' : `${number(summary.xp)} XP earned`}`), review);
   const buttons = element('div', 'reading-result-actions');
   const next = element('button', 'primary', 'Next score');
   const retry = element('button', 'secondary', 'Try again');

@@ -91,6 +91,9 @@ let readingProfile = null;
 let readingNext = null;
 let readingNextPromise = null;
 let readingResult = null;
+let readingResultBefore = null;
+let readingProfilePending = false;
+let readingDiscardNext = false;
 let readingFinishing = false;
 let readingRevision = 0;
 let readingTempo = null;
@@ -184,32 +187,67 @@ async function finishReading(progress) {
     });
     if (revision !== readingRevision || mode !== 'reading') return;
     lastReadingAttempt = lastAttempt = result.id;
-    const before = readingProfile;
-    await refreshProfile();
-    if (revision !== readingRevision || mode !== 'reading') return;
     readingResult = result;
-    if (before.curriculum.number !== readingProfile.curriculum.number && replayStage === null) {
-      const queued = await readingNextPromise;
-      if (queued) sheet.remove(queued.phrase);
-      readingNext = null;
-      readingNextPromise = prepareReadingNext(revision, task);
-    }
-    await readingNextPromise;
-    if (revision !== readingRevision || mode !== 'reading') return;
-    readingReady();
-    renderReadingResult($('readingResultTray'), task, result, before, readingProfile, {
-      review: () => openReview(result.id),
-      next: () => advanceReading().catch(fail),
-      retry: () => retryReading().catch(fail),
-    });
+    readingResultBefore = readingProfile;
+    readingProfilePending = true;
+    readingDiscardNext = false;
+    await ensureReadingNext(revision, task);
   } finally {
+    if (revision === readingRevision && mode === 'reading' && readingResult) {
+      readingReady();
+      renderReadingResult($('readingResultTray'), task, readingResult, readingResultBefore,
+        readingProfilePending ? null : readingProfile, {
+          review: () => openReview(readingResult.id),
+          next: () => advanceReading().catch(fail),
+          retry: () => retryReading().catch(fail),
+        });
+    }
     readingFinishing = false;
     buttons();
   }
 }
 
+async function refreshReadingResult(revision) {
+  if (readingProfilePending) {
+    await refreshProfile();
+    if (revision !== readingRevision || mode !== 'reading') return;
+    readingProfilePending = false;
+    readingDiscardNext = readingResultBefore.curriculum.number !== readingProfile.curriculum.number && replayStage === null;
+  }
+}
+
+async function ensureReadingNext(revision, task) {
+  await refreshReadingResult(revision);
+  if (revision !== readingRevision || mode !== 'reading') return;
+  const waitForNext = () => {
+    const pending = readingNextPromise;
+    return pending.catch(error => {
+      if (readingNextPromise === pending) readingNextPromise = null;
+      throw error;
+    });
+  };
+  if (readingDiscardNext) {
+    if (readingNextPromise) await waitForNext();
+    if (revision !== readingRevision || mode !== 'reading') return;
+    if (readingNext) sheet.remove(readingNext.phrase);
+    readingNext = null;
+    readingNextPromise = null;
+    readingDiscardNext = false;
+  }
+  if (!readingNext && readingNextPromise) await waitForNext();
+  if (revision !== readingRevision || mode !== 'reading') return;
+  if (!readingNext) {
+    readingNextPromise = prepareReadingNext(revision, task);
+    await waitForNext();
+  }
+}
+
 async function advanceReading() {
-  if (!readingResult || !readingNext) throw new Error('The next reading score is not ready.');
+  if (!readingResult) throw new Error('There is no completed score to advance from.');
+  const revision = readingRevision;
+  await ensureReadingNext(revision, practice.task);
+  if (revision !== readingRevision || mode !== 'reading') return;
+  if (!readingNext) throw new Error('The next reading score is not ready.');
   const next = readingNext;
   readingResult = null;
   $('readingResultTray').hidden = true;
@@ -228,9 +266,12 @@ async function advanceReading() {
 
 async function retryReading() {
   if (!readingResult) throw new Error('There is no completed score to retry.');
-  const revision = ++readingRevision;
+  const revision = readingRevision;
+  await refreshReadingResult(revision);
+  if (revision !== readingRevision || mode !== 'reading') return;
   const task = await localRequest(`/api/reading/${practice.task.id}/retry`, {});
   if (revision !== readingRevision || mode !== 'reading') return;
+  ++readingRevision;
   if (readingNext) sheet.remove(readingNext.phrase);
   readingNext = null;
   readingResult = null;
@@ -240,7 +281,7 @@ async function retryReading() {
   practiceScorePhrase = addReadingPhrase(task);
   reading.reset(task.target, readingTiming(task));
   for (const details of $('exerciseDialog').querySelectorAll('details')) details.open = false;
-  readingNextPromise = prepareReadingNext(revision, task);
+  readingNextPromise = prepareReadingNext(readingRevision, task);
   readingNextPromise.catch(fail);
   showKey(task.key);
   practiceReady();

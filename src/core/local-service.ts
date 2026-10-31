@@ -340,6 +340,7 @@ export class LocalService {
     if (method === "POST" && parts.length === 4 && parts[0] === "api" && parts[1] === "reading" && parts[3] === "retry") {
       const path = validatePathUuid(parts[2], "task_id");
       if (path.errors.length) return Response.json({ detail: path.errors }, { status: 422 });
+      if (this.responseBusy) return Response.json({ detail: "Finish the current performance first" }, { status: 409 });
       const entry = this.tasks.get(path.value!);
       if (!entry || entry.task.family !== "reading" || !entry.completed) return Response.json({ detail: "Complete a reading score before trying again" }, { status: 409 });
       const task = structuredClone(entry.task);

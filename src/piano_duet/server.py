@@ -799,6 +799,8 @@ def create_app(
 
     @app.post("/api/reading/{task_id}/retry")
     async def retry_reading(task_id: UUID):
+        if app.state.busy:
+            raise HTTPException(409, "Finish the current performance first")
         previous = app.state.store.task(str(task_id))
         if not previous or previous["family"] != "reading" or not previous["completed"]:
             raise HTTPException(409, "Complete a reading score before trying again")

@@ -17,6 +17,97 @@ let server, port;
 before(async () => { ({server, port} = await startTestServer()); }, {timeout: 45000});
 after(() => server?.kill('SIGTERM'));
 
+for (const [browserName, engine] of [['Chromium', chromium], ['WebKit', webkit]]) {
+  for (const scenario of ['next rejects', 'preview already rejected', 'profile refresh rejects', 'profile refresh rejects before retry']) {
+    test(`${browserName} recovers when ${scenario} after a saved Reading score`, {timeout: 60000}, async () => {
+      const profile = await mkdtemp(join(tmpdir(), 'piano-recovery-'));
+      const context = await engine.launchPersistentContext(profile, {headless: true, viewport: {width: 393, height: 852}});
+      try {
+        await context.route('**/src/piano-samples.ts', route => route.fulfill({contentType: 'text/javascript', body: `export const SAMPLE_REVISION = "result-fixture"; export const PIANO_SAMPLES = ${JSON.stringify([sample])};`}));
+        await context.route('https://raw.githubusercontent.com/**/result-fixture/samples/piano/C4.mp3', route => route.fulfill({body: bytes, headers: {'Content-Type': 'audio/wav', 'Access-Control-Allow-Origin': '*', 'Cross-Origin-Resource-Policy': 'cross-origin'}}));
+        await context.route('**/src/browser-inference.ts', route => route.fulfill({contentType: 'text/javascript', body: 'export class BrowserInference { async createSession(model) { return {model, provider: "wasm", run: async () => model === "aria" ? {logits: new Float32Array(18000)} : {notes: []}}; } }'}));
+        await context.route('**/src/browser-recording-import.ts', route => route.fulfill({contentType: 'text/javascript', body: 'export class BrowserRecordingImporter { async prepare() {} }'}));
+        await context.route('**/static/app.mjs*', async route => {
+          const response = await route.fetch();
+          let source = await response.text();
+          const imported = 'PracticeCycle, localFetch, localRequest,';
+          const entry = 'const $ = id =>';
+          const stream = 'const reading = new ReadingStream({';
+          for (const needle of [imported, entry, stream]) assert.equal(source.split(needle).length, 2);
+          source = source.replace(imported, 'PracticeCycle, localFetch, localRequest as actualLocalRequest,');
+          source = source.replace(entry, 'const localRequest = (path, ...args) => window.testRequest(path, args, actualLocalRequest);\nconst $ = id =>');
+          source = source.replace(stream, 'const reading = window.testReadingStream = new ReadingStream({');
+          await route.fulfill({response, body: source});
+        });
+        const page = await context.newPage();
+        await page.addInitScript(scenario => {
+          window.previewCount = 0;
+          window.savedCount = 0;
+          window.failedOnce = false;
+          window.testRequest = async (path, args, request) => {
+            if (path === '/api/practice/next' && args[0]?.after) {
+              window.previewCount++;
+              if (scenario === 'preview already rejected' && window.previewCount === 1) {
+                throw new Error('Injected preview failure');
+              }
+              if (scenario === 'next rejects' && window.previewCount === 2) {
+                return new Promise((resolve, reject) => { window.rejectPreview = () => reject(new Error('Injected next failure')); });
+              }
+            }
+            if (path === '/api/profile' && scenario.startsWith('profile refresh rejects') && window.savedCount && !window.failedOnce) {
+              window.failedOnce = true;
+              throw new Error('Injected profile failure');
+            }
+            const result = await request(path, ...args);
+            if (path === '/api/reading/complete') window.savedCount++;
+            return result;
+          };
+        }, scenario);
+        await page.goto(`http://127.0.0.1:${port}/`);
+        await page.waitForFunction(() => window.testReadingStream?.progress && document.querySelector('#sheetMusic svg'));
+        if (scenario === 'preview already rejected') await page.locator('#error').waitFor({state: 'visible'});
+        else await page.waitForFunction(() => !document.querySelector('#start').disabled);
+        const take = () => page.evaluate(() => {
+          const stream = window.testReadingStream, target = stream.progress.target, start = stream.progress.latest + 1;
+          const notes = stream.progress.attacks.flatMap((attack, i) => attack.indices.map(index => ({pitch: target[index].pitch, start: start + i * .4, velocity: 80, confidence: .95})));
+          window.testTake = stream.accept(notes, 0, start + 100, stream.generation, start + 100).catch(error => stream.onError(error));
+        });
+        if (scenario === 'next rejects') {
+          await take();
+          await page.locator('#readingResultTray').waitFor({state: 'visible'});
+          await page.getByRole('button', {name: 'Next score'}).click();
+          await page.waitForFunction(() => typeof window.rejectPreview === 'function');
+        }
+        await take();
+        if (scenario === 'next rejects') {
+          await page.waitForFunction(() => window.savedCount === 2);
+          await page.evaluate(() => window.rejectPreview());
+        }
+        await page.evaluate(() => window.testTake);
+        await page.locator('#readingResultTray').waitFor({state: 'visible'});
+        await page.locator('#error').waitFor({state: 'visible'});
+        assert.ok((await page.locator('#error').innerText()).includes('Injected'));
+        assert.equal(await page.locator('#start').isDisabled(), true);
+        assert.equal(await page.getByRole('button', {name: 'Next score'}).isEnabled(), true);
+        assert.equal(await page.getByRole('button', {name: 'Try again'}).isEnabled(), true);
+        if (scenario.startsWith('profile refresh rejects')) assert.ok((await page.locator('#readingResultTray').innerText()).includes('Progress will update when available'));
+        const count = await page.evaluate(() => window.savedCount);
+        const retry = scenario === 'preview already rejected' || scenario === 'profile refresh rejects before retry';
+        await page.getByRole('button', {name: retry ? 'Try again' : 'Next score'}).click();
+        await page.locator('#readingResultTray').waitFor({state: 'hidden'});
+        await page.waitForFunction(() => !document.querySelector('#start').disabled);
+        assert.equal(await page.evaluate(() => window.savedCount), count);
+        if (scenario === 'profile refresh rejects before retry') {
+          await take();
+          await page.evaluate(() => window.testTake);
+          await page.locator('#readingResultTray').waitFor({state: 'visible'});
+          assert.ok((await page.locator('#readingResultTray').innerText()).includes('0 XP earned'));
+        }
+      } finally { await context.close(); await rm(profile, {recursive: true, force: true}); }
+    });
+  }
+}
+
 async function assertRenderedContrast(page, selector, minimumCount) {
   const rows = await page.locator(selector).evaluate(root => {
     // Match numeric RGB and alpha channels in computed CSS color values.

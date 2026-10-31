@@ -36,6 +36,10 @@ test('a stage is celebrated only when evidence clears it, and XP includes stage 
   const task = {reading: {stage_number: 7}};
   const result = {assessment: {score: {first_try: 15, total: 16}, observations: [{matched: false, expected: 60, tries: [[62], [60]]}]}, xp: {total: 100}};
   const summary = resultSummary(task, result, before, after);
+  const pending = resultSummary(task, result, before, null);
+  assert.equal(pending.title, 'Score complete');
+  assert.equal(pending.xp, null);
+  assert.equal(pending.mistake.expected, 60);
   assert.equal(summary.title, 'Stage 7 complete');
   assert.equal(summary.milestone, true);
   assert.equal(summary.detail, '15 of 16 notes first try · Next: Stage 8');

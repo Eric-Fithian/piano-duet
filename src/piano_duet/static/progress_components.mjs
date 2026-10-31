@@ -69,9 +69,11 @@ function nextGoal(stage) {
 }
 
 export function resultSummary(task, result, before, after) {
+  const score = result.assessment.score;
+  if (!after) return {milestone: false, title: 'Score complete', detail: `${score.first_try} of ${score.total} notes first try`,
+    xp: null, mistake: result.assessment.observations.find(row => !row.matched) ?? null};
   const cleared = after.curriculum.path.find(stage => stage.number === task.reading.stage_number)?.status === 'Complete'
     && before.curriculum.path.find(stage => stage.number === task.reading.stage_number)?.status !== 'Complete';
-  const score = result.assessment.score;
   const nextNumber = task.reading.stage_number < before.curriculum.number ? task.reading.stage_number : after.curriculum.number;
   const next = after.curriculum.path.find(stage => stage.number === nextNumber);
   return {

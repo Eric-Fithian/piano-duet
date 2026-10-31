@@ -137,6 +137,9 @@ with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.S
         excluded_detail = client.get(f"/api/attempts/{attempt}").json()
         restored = client.post(f"/api/attempts/{attempt}/exclude", json={"excluded": False}, headers=headers).json()
         repeat = client.post("/api/reading/complete", json={"task": task["id"], "attempt": attempt, "groups": groups, "interruptions": [], "threshold": 0.8}, headers=headers)
+        client.app.state.busy = True
+        busy_retry = client.post(f"/api/reading/{task['id']}/retry", json={}, headers=headers)
+        client.app.state.busy = False
         retry = client.post(f"/api/reading/{task['id']}/retry", json={}, headers=headers)
         assert retry.status_code == 200, retry.text
         retry_task = retry.json()
@@ -144,7 +147,7 @@ with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.S
         retry_result = client.post("/api/reading/complete", json={"task": retry_task["id"], "attempt": retry_attempt, "groups": groups, "interruptions": [], "threshold": 0.8}, headers=headers)
         assert retry_result.status_code == 200, retry_result.text
         retry_profile = client.get("/api/profile").json()["reading"]
-print(json.dumps({"task": task, "preview": preview.json(), "events": events, "groups": groups, "result": result.json(), "detail": detail, "excluded": excluded, "excluded_detail": excluded_detail, "restored": restored, "repeat": repeat.status_code, "retry_task": retry_task, "retry_result": retry_result.json(), "retry_profile": retry_profile, "introductions": profile["reading"]["introductions"]}))
+print(json.dumps({"task": task, "preview": preview.json(), "events": events, "groups": groups, "result": result.json(), "detail": detail, "excluded": excluded, "excluded_detail": excluded_detail, "restored": restored, "repeat": repeat.status_code, "busy_retry": {"status": busy_retry.status_code, "body": busy_retry.json()}, "retry_task": retry_task, "retry_result": retry_result.json(), "retry_profile": retry_profile, "introductions": profile["reading"]["introductions"]}))
 `], { encoding: "utf8", maxBuffer: 10_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const expected = JSON.parse(reference.stdout);
@@ -190,6 +193,12 @@ print(json.dumps({"task": task, "preview": preview.json(), "events": events, "gr
   const restored = await (await request(`/api/attempts/${body.attempt}/exclude`, { excluded: false })).json();
   assert.equal(restored.included_attempts, expected.restored.included_attempts);
   assert.equal(restored.reading.introductions, expected.restored.reading.introductions);
+  const busyService = service as unknown as { responseBusy: boolean };
+  busyService.responseBusy = true;
+  const busyRetry = await request(`/api/reading/${task.id}/retry`, {});
+  assert.equal(busyRetry.status, expected.busy_retry.status);
+  assert.deepEqual(await busyRetry.json(), expected.busy_retry.body);
+  busyService.responseBusy = false;
   const retryResponse = await request(`/api/reading/${task.id}/retry`, {});
   assert.equal(retryResponse.status, 200);
   const retryTask = await retryResponse.json();
