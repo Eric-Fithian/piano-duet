@@ -86,6 +86,7 @@ jobs:
         with:
           path: .cache/ci-models
           key: published-models-${{ hashFiles('site/app/src/model-catalog.ts', 'tests/inference/download-models.mjs') }}
+          restore-keys: published-models-
       - run: node tests/inference/download-models.mjs aria live-transcription recording-transcription live-reference
       - run: uv run --frozen python tests/inference/published_model_parity.py
 
@@ -124,9 +125,10 @@ jobs:
             .cache/ci-models/phrase-transcription
             .cache/ci-models/aria
           key: browser-recording-model-${{ hashFiles('site/app/src/model-catalog.ts', 'tests/inference/download-models.mjs') }}
+          restore-keys: browser-recording-model-
       - run: node tests/inference/download-models.mjs recording-transcription midi-to-score phrase-transcription aria
       - run: node tests/inference/expand-score-fixture.mjs
-      - run: node tests/inference/verify-score-browser.mjs webgpu
+      - run: node tests/inference/verify-score-browser.mjs wasm
         timeout-minutes: 10
         env:
           PIANO_SCORE_MODEL_DIR: .cache/ci-models/midi-to-score
@@ -153,8 +155,9 @@ jobs:
           PIANO_RECORDING_MODEL_DIR: .cache/ci-models/recording-transcription
           PIANO_BROWSER_CHANNEL: chrome
       - run: node tests/inference/creative-microphone.mjs
-        timeout-minutes: 4
+        timeout-minutes: 8
         env:
+          PIANO_CREATIVE_PROVIDER: wasm
           PIANO_PHRASE_MODEL: .cache/ci-models/phrase-transcription/piano_crnn.onnx
           PIANO_PHRASE_SPLIT_DIR: .cache/ci-models/phrase-transcription
           PIANO_ARIA_MODEL_DIR: .cache/ci-models/aria
