@@ -161,6 +161,20 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) {
       await page.evaluate(() => window.scoreFixture.view.setActive(false));
       await page.waitForFunction(element => !element.isConnected, beforeHeight, {timeout: 10000});
 
+      const beforeRestart = await page.locator('#scoreFixture .score-system svg').first().elementHandle();
+      await page.evaluate(() => {
+        const {view} = window.scoreFixture;
+        view.setActive(true);
+        document.querySelector('#scoreFixture').style.bottom = '50px';
+        view.relayout();
+        view.setActive(false);
+        view.setActive(true);
+      });
+      await page.waitForTimeout(250);
+      assert.equal(await beforeRestart.evaluate(element => element.isConnected), true);
+      await page.evaluate(() => window.scoreFixture.view.setActive(false));
+      await page.waitForFunction(element => !element.isConnected, beforeRestart, {timeout: 10000});
+
       // WebKit does not reliably deliver synthetic FontFaceSet loading events.
       if (name === 'chromium') {
         const beforeActiveFont = await page.locator('#scoreFixture .score-system svg').first().elementHandle();

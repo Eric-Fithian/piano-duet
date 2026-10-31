@@ -176,6 +176,7 @@ export class ScoreView {
     if (active) {
       for (const [phrase, reasons] of this.pending) {
         reasons.delete('height');
+        reasons.delete('fit');
         if (reasons.delete('font')) this.fontDeferred = true;
         if (!reasons.size) this.pending.delete(phrase);
       }
