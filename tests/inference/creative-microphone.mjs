@@ -96,7 +96,30 @@ try {
   if (again.error) throw new Error(again.error);
   assert.ok(again.turn.includes("02 EXCHANGES"));
   assert.ok(again.recent.length >= 2 && again.recent.slice(0, 2).every((attempt) => attempt.mode === "duet" && attempt.note_count >= 3));
-  console.log(JSON.stringify({ providers: result.providers, notes: result.attempt.note_count, cold: result.timing, warm: again.timing }));
+  await page.waitForFunction(() => document.querySelector("#status")?.textContent.startsWith("Your turn"), null, { timeout: 30000 });
+  await page.locator("#learningMode").click();
+  await play();
+  await page.waitForFunction(() => document.querySelector("#status")?.textContent === "Your turn. Play back the target."
+    || !document.querySelector("#error").hidden, null, { timeout: 120000 });
+  const idea = await page.evaluate(() => ({ error: document.querySelector("#error").hidden ? null : document.querySelector("#error").textContent,
+    analysis: document.querySelectorAll("#surpriseRows tr").length }));
+  if (idea.error) throw new Error(idea.error);
+  assert.ok(idea.analysis >= 3);
+  await play();
+  await page.waitForFunction(() => !document.querySelector("#learningResult").hidden || !document.querySelector("#error").hidden,
+    null, { timeout: 120000 });
+  const variation = await page.evaluate(async (path) => {
+    const { localRequest } = await import(`${path}/practice.mjs`);
+    const profile = await localRequest("/api/profile");
+    return { score: document.querySelector("#learningScore").textContent,
+      error: document.querySelector("#error").hidden ? null : document.querySelector("#error").textContent, recent: profile.recent };
+  }, staticBase);
+  if (variation.error) throw new Error(variation.error);
+  assert.ok(variation.score.includes("/ 100"));
+  assert.ok(variation.recent.length >= 2 && variation.recent.slice(0, 2).every((attempt) => attempt.mode === "learning" && attempt.note_count >= 3));
+  assert.deepEqual(errors, []);
+  console.log(JSON.stringify({ providers: result.providers, notes: result.attempt.note_count, cold: result.timing, warm: again.timing,
+    variationNotes: idea.analysis, variationScore: variation.score }));
 } finally {
   await browser?.close();
   await profile.cleanup();

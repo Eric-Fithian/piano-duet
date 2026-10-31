@@ -10,6 +10,7 @@ const CACHES = Array.from({ length: 8 }, (_, index) => ["self_key", "self_value"
 
 export type ScoreGraphs = { encoder: ArrayBuffer | string; first: ArrayBuffer | string; context: ArrayBuffer | string; step: ArrayBuffer | string };
 export type ScoreTokens = Record<string, number[]>;
+export type ScoreProgress = { phase: "encoder" | "decoder"; chunk: number; completed: number; total: number };
 
 function select(values: Float32Array, allowed: (index: number) => boolean = () => true): number {
   let result = -1, best = -Infinity;
@@ -70,7 +71,8 @@ export class ScoreRuntime {
     return new ScoreRuntime(encoder, first, context, step);
   }
 
-  async generate(initial: ScoreInputTokens, signal?: AbortSignal, complete?: Promise<ScoreInputTokens>): Promise<ScoreTokens> {
+  async generate(initial: ScoreInputTokens, signal?: AbortSignal, complete?: Promise<ScoreInputTokens>,
+    progress?: (value: ScoreProgress) => void): Promise<ScoreTokens> {
     let sourceTokens = initial, n = initial.pad.length;
     if (!n) throw new Error("Score writing needs at least one note");
     const result: ScoreTokens = Object.fromEntries(ORDER.map((name) => [name, []]));
@@ -84,7 +86,9 @@ export class ScoreRuntime {
         source[name] = new ort.Tensor("float32", values, [1, length, width]);
       }
       source.pad = new ort.Tensor("int64", BigInt64Array.from(sourceTokens.pad.slice(from, from + length).map(BigInt)), [1, length]);
+      progress?.({ phase: "encoder", chunk: chunks, completed: 0, total: 1 });
       const encoded = (await this.encoder.run(source)).encoded;
+      progress?.({ phase: "encoder", chunk: chunks, completed: 1, total: 1 });
       let cache: Record<string, ort.Tensor> = {}, token: Record<string, ort.Tensor>, previousOffset = 0;
       if (chunks) {
         const initialContext = contextInput(result);
@@ -95,6 +99,7 @@ export class ScoreRuntime {
         previousOffset = last.offset; token = tokenInput(last, last.pad);
       } else token = tokenInput({}, 0);
       const count = chunks ? 448 : 512;
+      progress?.({ phase: "decoder", chunk: chunks, completed: 0, total: count });
       for (let position = 0; position < count; position++) {
         signal?.throwIfAborted();
         const isFirst = chunks === 0 && position === 0;
@@ -122,6 +127,7 @@ export class ScoreRuntime {
           cache[`past_${name}`]?.dispose(); cache[`past_${name}`] = output;
         }
         for (const name of ORDER) observed[`out_${name}`].dispose();
+        progress?.({ phase: "decoder", chunk: chunks, completed: position + 1, total: count });
       }
       for (const value of [...Object.values(token), ...Object.values(cache), ...Object.values(source), encoded]) value.dispose();
       chunks++;

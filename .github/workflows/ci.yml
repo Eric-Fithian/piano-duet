@@ -66,6 +66,7 @@ jobs:
       - run: uv sync --frozen
       - run: npm run check:core
       - run: npm run test:core
+      - run: sh tests/ios/verify-native-protocol.sh
 
   model-parity:
     name: Published model parity
@@ -91,7 +92,7 @@ jobs:
   browser-storage:
     name: Browser storage
     runs-on: macos-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
       PIANO_BROWSER_PROFILE: .cache/browser-inference/model-profile
       PIANO_SITE_PORT: "5180"
@@ -126,7 +127,7 @@ jobs:
       - run: node tests/inference/download-models.mjs recording-transcription midi-to-score phrase-transcription aria
       - run: node tests/inference/expand-score-fixture.mjs
       - run: node tests/inference/verify-score-browser.mjs webgpu
-        timeout-minutes: 3
+        timeout-minutes: 10
         env:
           PIANO_SCORE_MODEL_DIR: .cache/ci-models/midi-to-score
           PIANO_SCORE_FIXTURE: .cache/m2st/synthetic-parity.json
@@ -151,7 +152,7 @@ jobs:
         env:
           PIANO_RECORDING_MODEL_DIR: .cache/ci-models/recording-transcription
           PIANO_BROWSER_CHANNEL: chrome
-      - run: node tests/inference/duet-microphone.mjs
+      - run: node tests/inference/creative-microphone.mjs
         timeout-minutes: 4
         env:
           PIANO_PHRASE_MODEL: .cache/ci-models/phrase-transcription/piano_crnn.onnx

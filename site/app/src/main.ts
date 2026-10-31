@@ -7,21 +7,36 @@ import { setLocalService } from "../../../src/piano_duet/static/practice.mjs";
 import { LocalService } from "../../../src/core/local-service.ts";
 import { AriaPhrase } from "../../../src/core/aria-phrase.ts";
 import { generateDuet } from "../../../src/core/duet-decoder.ts";
+import { analyzeVariation } from "../../../src/core/variation-analysis.ts";
+import type { VariationDetail } from "../../../src/core/variation-analysis.ts";
 import type { ContextNote } from "../../../src/core/aria-tokenizer.ts";
 import type { PhraseContext } from "../../../src/core/aria-tokenizer.ts";
 import { RandomSource } from "../../../src/core/random.ts";
 import { BrowserInference } from "./browser-inference";
+import { NativeInference } from "./native-inference";
+import { WebKitInferenceTransport } from "./webkit-inference-transport";
+import type { WebKitMessageHandler } from "./webkit-inference-transport";
 import { MODEL_CATALOG } from "./model-catalog";
 import type { DownloadProgress, InferenceSession } from "./inference";
 import { EventLog, requestPersistentStorage } from "./event-log";
 import { PIANO_SAMPLES } from "./piano-samples";
 import { SampleStore } from "./sample-store";
-import { BrowserRecordingImporter } from "./recording-import";
+import { BrowserRecordingImporter } from "./browser-recording-import";
+import { NativeRecordingImporter } from "./native-recording-import";
 import { recordingStage, setupRecordingUi } from "./recording-ui";
 import { setupHistoryImport } from "./history-import";
 import "./style.css";
 
 Object.assign(window, { VexFlow });
+if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", (event: MessageEvent<unknown>) => {
+  const message = event.data as { type?: string; error?: string } | null;
+  if (message?.type !== "offline-install-error") return;
+  const display = document.querySelector<HTMLElement>("#error");
+  if (!display) throw new Error("The interface has no error display");
+  display.textContent = `Offline setup failed: ${message.error}. Check available device storage and reload.`;
+  display.hidden = false;
+  console.error(display.textContent);
+});
 const indicator = document.createElement("section");
 indicator.className = "asset-download";
 indicator.setAttribute("aria-live", "polite");
@@ -51,7 +66,8 @@ async function start(): Promise<void> {
   const log = new EventLog();
   await requestPersistentStorage();
   await log.open();
-  const backend = new BrowserInference(MODEL_CATALOG);
+  const native = (window as Window & { webkit?: { messageHandlers?: { pianoInference?: WebKitMessageHandler } } }).webkit?.messageHandlers?.pianoInference;
+  const backend = native ? new NativeInference(new WebKitInferenceTransport(native, window)) : new BrowserInference(MODEL_CATALOG);
   let live: Promise<InferenceSession<"live-transcription">> | undefined;
   const transcriber = {
     async run(input: { audio: Float32Array; sampleRate: 16000; threshold: number }, signal?: AbortSignal) {
@@ -101,13 +117,22 @@ async function start(): Promise<void> {
       finally { if (signal?.aborted) aria = undefined; }
     },
   };
+  const variationAnalyzer = {
+    async run(notes: ContextNote[], threshold: number, signal?: AbortSignal, onNote?: (detail: VariationDetail, progress: number) => void) {
+      const session = await openAria(signal);
+      try { return await analyzeVariation(session, notes, threshold, signal, onNote); }
+      catch (error) { if (signal?.aborted) aria = undefined; throw error; }
+    },
+  };
   const recordingAssets = MODEL_CATALOG["recording-transcription"], scoreAssets = MODEL_CATALOG["midi-to-score"];
   if (!recordingAssets || !scoreAssets) throw new Error("Recording import models are missing from the catalog");
-  const importer = new BrowserRecordingImporter(recordingAssets, scoreAssets, report, (stage) => {
+  const importStage = (stage: string) => {
     indicator.hidden = true; recordingStage(stage);
-  });
+  };
+  const importer = native ? new NativeRecordingImporter(backend, report, importStage)
+    : new BrowserRecordingImporter(recordingAssets, scoreAssets, report, importStage);
   setLocalService(new LocalService(log, transcriber, undefined, new SampleStore(report), random, phrase, recordingTranscriber, importer,
-    phraseTranscriber, duetGenerator));
+    phraseTranscriber, duetGenerator, variationAnalyzer));
   if (import.meta.env.PROD && "serviceWorker" in navigator) await navigator.serviceWorker.register("/service-worker.js");
   const app = await import("../../../src/piano_duet/static/app.mjs");
   setupRecordingUi(importer, app.loadLibrary);
