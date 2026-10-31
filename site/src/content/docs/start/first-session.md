@@ -3,7 +3,7 @@ title: Your first session
 description: Set up the microphone, press Space, and play.
 ---
 
-Start the app with `piano-duet`. It opens in your browser at **http://127.0.0.1:8765**.
+Open the browser app at **piano-duet.vercel.app**. On first use, it downloads the piano samples and any models needed for the selected mode; they are cached on your device.
 
 ## Set up the microphone
 
@@ -17,7 +17,9 @@ When you first press **Space**, the browser asks for microphone access. If you d
 
 - **Reading** starts listening immediately. Space pauses and resumes.
 - **Drills** end each take by themselves shortly after you stop.
-- **Practice, Duet and Variations** listen for a one-second room calibration first, so keep quiet, then play. Press **Space** to finish your attempt. Duet and Variations can also answer after a pause.
+- **Library** listens for the notes of an imported score and waits at each attack.
+
+The browser versions of Practice, Duet and Variations are still being built.
 
 The app fits one screen, with the microphone controls always at the bottom. Exercise details, help, settings and progress open in panels. **Mic off** releases the microphone and stops playback. **Stop** is also available during processing or playback.
 
@@ -31,7 +33,7 @@ The app fits one screen, with the microphone controls always at the bottom. Exer
 | [Practice](/docs/modes/practice/) | Guided exercises across technique, theory, ear and repertoire |
 | [Duet and Variations](/docs/modes/duet/) | Improvising with Aria and imitating your own ideas |
 
-Use **Try a demo** in Duet or Variations to run the whole audio → transcription → Aria → playback path without a microphone. Demonstrations never change your levels.
+The Python reference app also includes demonstrations in Duet and Variations; those browser modes are still in progress.
 
 ## If notes are missed or misheard
 

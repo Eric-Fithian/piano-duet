@@ -12,6 +12,7 @@ import type { ComposerRandom, PhraseFactory, ReadingScore } from "./reading-comp
 import { READING_STAGES } from "./reading-stages.ts";
 import { RandomSource } from "./random.ts";
 import { musicalKey } from "./musical-key.ts";
+import type { KeyMode } from "./musical-key.ts";
 import { roundDecimal, roundEven } from "./numeric.ts";
 import { assessReading, matchesReading } from "./reading-assessment.ts";
 import type { HeardNote } from "./reading-assessment.ts";
@@ -31,11 +32,16 @@ import type { DrillSelection } from "./drill-task.ts";
 import { assessDrill } from "./drill-assessment.ts";
 import type { DrillNote } from "./drill-timing.ts";
 import { KeyTracker } from "./key-tracker.ts";
+import { buildSong, parseScore } from "./score-build.ts";
+import { ScoreError } from "./score-midi.ts";
+import { editSong, revertSong, songAttacks, songStats, songSummary, songVersion } from "./library.ts";
+import type { Song, SongNote } from "./library.ts";
+import { libraryFromEvents } from "./library-events.ts";
 
 export type LocalJsonValue = null | boolean | number | string | LocalJsonValue[] | { [key: string]: LocalJsonValue };
 export interface LocalEventStore {
   list(): Promise<ReadingLogEvent[]>;
-  append?(kind: "attempt" | "exclusion", payload: LocalJsonValue, eventId?: string): Promise<ReadingLogEvent>;
+  append?(kind: "attempt" | "exclusion" | "song" | "edit", payload: LocalJsonValue, eventId?: string): Promise<ReadingLogEvent>;
 }
 export interface LocalTranscriber {
   run(input: { audio: Float32Array; sampleRate: 16000; threshold: number }, signal?: AbortSignal): Promise<{ notes: unknown[] }>;
@@ -95,11 +101,28 @@ export class LocalService {
       return Response.json(pieces);
     }
     if (method === "GET" && url.pathname === "/api/library") {
-      const events = await this.store.list();
-      if (events.some((event) => event.kind === "song" && !isPiece(event.payload))) {
-        return Response.json({ detail: "Saved songs are not available yet" }, { status: 501 });
+      const { songs, plays } = libraryFromEvents(await this.store.list());
+      const summaries = await Promise.all([...songs.values()].map((song) => songSummary(song, plays.get(song.id) ?? [])));
+      const imported = new Set(summaries.map((song) => song.title.toLowerCase()));
+      return Response.json({ songs: summaries, catalog: LIBRARY_CATALOG.filter((item) => !imported.has(item.title.toLowerCase())) });
+    }
+    if (method === "POST" && url.pathname === "/api/library/import") {
+      const filename = url.searchParams.get("filename"), title = url.searchParams.get("title"), artist = url.searchParams.get("artist");
+      if (!filename || filename.length > 200 || (title?.length ?? 0) > 120 || (artist?.length ?? 0) > 120) return Response.json({ detail: "Invalid score details" }, { status: 422 });
+      const body = options.body;
+      if (!(body instanceof ArrayBuffer) && !ArrayBuffer.isView(body)) return Response.json({ detail: "Import a score file under 8 MB" }, { status: 400 });
+      const data = body instanceof ArrayBuffer ? new Uint8Array(body) : new Uint8Array(body.buffer, body.byteOffset, body.byteLength);
+      if (!data.length || data.length > 8_000_000) return Response.json({ detail: "Import a score file under 8 MB" }, { status: 400 });
+      if (!this.store.append) return Response.json({ detail: "Saving songs is not available yet" }, { status: 501 });
+      let draft;
+      try { draft = buildSong(parseScore(filename, data), title, artist, filename); }
+      catch (error) {
+        if (!(error instanceof ScoreError)) throw error;
+        return Response.json({ detail: `Could not import ${filename}: ${error.message}` }, { status: 400 });
       }
-      return Response.json({ songs: [], catalog: LIBRARY_CATALOG });
+      const id = crypto.randomUUID(), song = { id, ...draft };
+      const event = await this.store.append("song", { action: "import", song } as unknown as LocalJsonValue, id);
+      return Response.json(await songSummary({ ...song, created_at: Date.parse(event.createdAt) / 1000 }, []));
     }
     if (method === "GET" && url.pathname === "/api/drills") {
       const attempts = attemptsFromEvents(await this.store.list());
@@ -160,6 +183,9 @@ export class LocalService {
       return Response.json({ detail: "This practice selection is not available yet" }, { status: 501 });
     }
     const parts = url.pathname.split("/").filter(Boolean);
+    if (parts[0] === "api" && parts[1] === "library" && parts.length >= 3 && parts.length <= 4) {
+      return this.libraryRequest(method, parts, options);
+    }
     if (parts[0] === "api" && parts[1] === "attempts" && parts.length >= 3 && parts.length <= 4) {
       const attempts = attemptsFromEvents(await this.store.list());
       const attempt = attempts.find((item) => item.id === parts[2]);
@@ -193,6 +219,55 @@ export class LocalService {
     if (method === "POST" && url.pathname === "/api/reading/complete") return this.completeReading(options);
     if (method === "POST" && url.pathname === "/api/respond" && url.searchParams.get("mode") === "drills") return this.respondDrill(url, options);
     return Response.json({ detail: `Local service does not yet implement ${method} ${url.pathname}` }, { status: 501 });
+  }
+
+  private async libraryRequest(method: string, parts: string[], options: RequestInit): Promise<Response> {
+    const id = parts[2];
+    if (!validUuid(id)) return Response.json({ detail: "Invalid song ID" }, { status: 422 });
+    const events = await this.store.list(), { songs, plays } = libraryFromEvents(events), song = songs.get(id);
+    if (!song) return Response.json({ detail: "Unknown song" }, { status: 404 });
+    const history = plays.get(id) ?? [];
+    if (method === "GET" && parts.length === 3) return Response.json({ ...song, stats: await songStats(song, history) });
+    if (!this.store.append) return Response.json({ detail: "Saving songs is not available yet" }, { status: 501 });
+    if (method === "DELETE" && parts.length === 3) {
+      await this.store.append("song", { action: "delete", songId: id });
+      return Response.json({ deleted: id });
+    }
+    if (method === "POST" && parts.length === 4 && parts[3] === "revert") {
+      if (!song.original) return Response.json({ detail: "This song has not been edited" }, { status: 400 });
+      const reverted = revertSong(song);
+      await this.store.append("edit", { action: "song", songId: id, song: reverted } as unknown as LocalJsonValue);
+      return Response.json({ ...reverted, stats: await songStats(reverted, history) });
+    }
+    if (typeof options.body !== "string") return Response.json({ detail: "A song request needs JSON" }, { status: 400 });
+    let request: unknown;
+    try { request = JSON.parse(options.body) as unknown; }
+    catch (error) { if (error instanceof SyntaxError) return Response.json({ detail: "Invalid song request" }, { status: 422 }); throw error; }
+    if (method === "PUT" && parts.length === 3) {
+      if (!validSongEdit(request)) return Response.json({ detail: "Invalid song edit" }, { status: 422 });
+      const notes = request.notes.map((note) => ({ pitch: note.pitch, start: note.start, duration: note.duration, velocity: note.velocity,
+        staff: note.staff, voice: note.voice, grace: note.grace ?? false }));
+      let edited: Song;
+      try { edited = editSong(song, request.bpm, request.meter, request.tonic, request.mode, notes); }
+      catch (error) {
+        if (!(error instanceof Error) || !["A song needs at least one note", "Every note must start and end on the score's sixteenth or triplet grid", `${request.meter} time is not supported`].includes(error.message)) throw error;
+        return Response.json({ detail: error.message }, { status: 400 });
+      }
+      await this.store.append("edit", { action: "song", songId: id, song: edited } as unknown as LocalJsonValue);
+      return Response.json({ ...edited, stats: await songStats(edited, history) });
+    }
+    if (method === "POST" && parts.length === 4 && parts[3] === "plays") {
+      if (!validSongPlay(request)) return Response.json({ detail: "Invalid song play" }, { status: 422 });
+      const indices = request.attacks.map(([index]) => index), total = songAttacks(song.notes).length;
+      if (new Set(indices).size !== indices.length || indices.some((index) => index < 0 || index >= total)) {
+        return Response.json({ detail: "Each played attack must be a distinct position in the song" }, { status: 400 });
+      }
+      if (events.some((event) => event.id === request.id)) return Response.json({ detail: "This play has already been saved" }, { status: 409 });
+      const version = await songVersion(song.notes);
+      const event = await this.store.append("song", { action: "play", songId: id, version, attacks: request.attacks }, request.id);
+      return Response.json(await songStats(song, [...history, { created_at: Date.parse(event.createdAt) / 1000, version, attacks: request.attacks }]));
+    }
+    return Response.json({ detail: `Local service does not yet implement ${method} /${parts.join("/")}` }, { status: 501 });
   }
 
   private async nextReading(request: { stage?: number | null; after?: string | null }, attempts: ProgressAttempt[]): Promise<Response> {
@@ -417,6 +492,25 @@ function validListening(value: unknown): boolean {
     && [data.floor, data.noise, data.seconds].every((item) => typeof item === "number" && Number.isFinite(item) && item >= 0)
     && [data.attacks, data.strengths].every((items) => Array.isArray(items) && items.length <= 600
       && items.every((item) => typeof item === "number" && Number.isFinite(item)));
+}
+
+function validSongEdit(value: unknown): value is { bpm: number; meter: string; tonic: number; mode: KeyMode; notes: SongNote[] } {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const data = value as Record<string, unknown>;
+  if (!Number.isInteger(data.bpm) || (data.bpm as number) < 30 || (data.bpm as number) > 240 || typeof data.meter !== "string"
+    || !Number.isInteger(data.tonic) || (data.tonic as number) < 0 || (data.tonic as number) > 11 || !["major", "minor"].includes(data.mode as string)
+    || !Array.isArray(data.notes) || !data.notes.length) return false;
+  return data.notes.every((note) => note && typeof note === "object" && Number.isInteger(note.pitch) && note.pitch >= 21 && note.pitch <= 108
+    && Number.isFinite(note.start) && note.start >= 0 && Number.isFinite(note.duration) && note.duration > 0
+    && Number.isInteger(note.velocity) && note.velocity >= 1 && note.velocity <= 127 && ["treble", "bass"].includes(note.staff)
+    && (note.voice === 0 || note.voice === 1) && (note.grace === undefined || typeof note.grace === "boolean"));
+}
+
+function validSongPlay(value: unknown): value is { id: string; attacks: [number, boolean][] } {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const data = value as Record<string, unknown>;
+  return validUuid(data.id) && Array.isArray(data.attacks) && data.attacks.length > 0
+    && data.attacks.every((row) => Array.isArray(row) && row.length === 2 && Number.isInteger(row[0]) && typeof row[1] === "boolean");
 }
 
 function isPiece(value: unknown): boolean {

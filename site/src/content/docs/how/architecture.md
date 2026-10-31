@@ -3,7 +3,7 @@ title: Architecture
 description: The local-first browser foundation and the Python reference implementation.
 ---
 
-The browser rebuild is in progress. Its app lives at `/`, and these docs live under `/docs`. The browser reuses the interface in `src/piano_duet/static/`; its API requests go through an injectable local service. A dedicated worker keeps an append-only event log in SQLite using OPFS; model files and piano samples are cached on the device by version and digest. Aria and live transcription have browser inference prototypes with WebGPU and WASM execution. The initial guided exercise and some local service endpoints are connected; playable modes, sync, the other models and the iOS shell are not yet complete.
+The browser rebuild is in progress. Its app lives at `/`, and these docs live under `/docs`. The browser reuses the interface in `src/piano_duet/static/`; its API requests go through an injectable local service. A dedicated worker keeps an append-only event log in SQLite using OPFS; model files and piano samples are cached on the device by version and digest. Reading uses Aria and live transcription; Drills use Transkun for recorded takes; Library imports MIDI and MusicXML. Practice, Duet, Variations, recording-to-score, sync and the iOS shell are not yet complete. Real Safari and iPhone inference measurements are pending.
 
 The existing Python app remains the reference implementation. It serves a browser page from a server bound to `127.0.0.1` and runs its models on the Mac:
 
@@ -39,7 +39,7 @@ The existing Python app remains the reference implementation. It serves a browse
 | `library.py`, `score_import.py`, `score_model.py`, `youtube.py` | Songs, MIDI and MusicXML import, and recording-to-score |
 | `key_tracking.py`, `difficulty.py`, `phrasing.py` | Key estimates and playability constraints for Duet |
 
-## Models
+## Reference models
 
 | Model | Runs on | Used for |
 | --- | --- | --- |
@@ -48,4 +48,4 @@ The existing Python app remains the reference implementation. It serves a browse
 | [Transkun 2.0](https://github.com/Yujia-Yan/Transkun) | Mac GPU | Drill takes and recordings |
 | [MIDI2ScoreTransformer](https://github.com/TimFelixBeyer/MIDI2ScoreTransformer) | CPU, separate environment | Writing a score from a recording |
 
-`piano-duet setup` downloads all of them at pinned revisions into `.cache/`.
+The Python reference's `piano-duet setup` downloads its models at pinned revisions into `.cache/`. The browser downloads the licensed converted models from Hugging Face, verifies their hashes and caches them locally; the score model remains unavailable until its author permits redistribution.

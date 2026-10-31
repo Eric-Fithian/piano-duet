@@ -26,7 +26,12 @@ export function unzipMusicXml(data: Uint8Array): Uint8Array {
     file.start();
   });
   unzip.register(UnzipInflate);
-  for (let at = 0; at < data.length; at += 1024) unzip.push(data.subarray(at, at + 1024), at + 1024 >= data.length);
+  try { for (let at = 0; at < data.length; at += 1024) unzip.push(data.subarray(at, at + 1024), at + 1024 >= data.length); }
+  catch (error) {
+    if (error instanceof ScoreError) throw error;
+    if (error instanceof Error && typeof (error as Error & { code?: unknown }).code === "number") throw new ScoreError(`Invalid MXL archive: ${error.message}`);
+    throw error;
+  }
   if (finished.size !== entries.size) throw new ScoreError("The MXL archive is incomplete");
   const read = (name: string) => {
     const chunks = entries.get(name), size = sizes.get(name);

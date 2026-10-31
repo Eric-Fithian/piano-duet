@@ -1,9 +1,9 @@
 ---
 title: Library
-description: Import MIDI or MusicXML, or turn a piano video into a score, then play it with a cursor that waits for you.
+description: Import MIDI or MusicXML and play with a cursor that waits for you.
 ---
 
-**Library** holds full songs. Import a MIDI (`.mid`) or MusicXML (`.musicxml`, `.xml`, `.mxl`) file with **Import**, by dropping it on the list, or with **Import file** on a catalogue entry, which links to the composer's official store. MuseScore exports both formats; PDF scores are not supported yet. One time signature per piece is supported. Rhythms are written on sixteenths or, in simple meters, triplet eighths, chosen per beat; finer values such as 32nds and sextuplets are rounded onto them. MusicXML keeps the written staves; a two-track MIDI file maps its lower track to the left hand, and other MIDI files split at middle C. Songs and plays stay in `.local/learner.sqlite3`. Open a song and press **Space**: the cursor waits for each note or chord, and if your last three attacks match another passage it moves there. Sections of eight bars (four in short pieces) are coloured by recent first-try accuracy; click one to jump. **▶** previews from the cursor. Pausing or finishing saves the play; the list shows plays, recent and best first-try accuracy, how much of the piece you have covered, and when you last played it. Song plays do not award XP yet.
+**Library** holds full songs. Import a MIDI (`.mid`) or MusicXML (`.musicxml`, `.xml`, `.mxl`) file with **Import**, by dropping it on the list, or with **Import file** on a catalogue entry, which links to the composer's official store. MuseScore exports both formats; PDF scores are not supported yet. One time signature per piece is supported. Rhythms are written on sixteenths or, in simple meters, triplet eighths, chosen per beat; finer values such as 32nds and sextuplets are rounded onto them. MusicXML keeps the written staves; a two-track MIDI file maps its lower track to the left hand, and other MIDI files split at middle C. The browser keeps songs and plays in its local SQLite database. Open a song and press **Space**: the cursor waits for each note or chord, and if your last three attacks match another passage it moves there. Sections of eight bars (four in short pieces) are coloured by recent first-try accuracy; click one to jump. **▶** previews from the cursor. Pausing or finishing saves the play; the list shows plays, recent and best first-try accuracy, how much of the piece you have covered, and when you last played it. Song plays do not award XP yet.
 
 ## Editing a song
 
@@ -11,7 +11,7 @@ Transcriptions can get the tempo, meter, key or bar lines wrong, or mishear note
 
 ## Recording import
 
-The browser app will replace YouTube import with audio-file and microphone-recording import, using Transkun and MIDI2ScoreTransformer to write a score. The same rights confirmation will apply. This flow is not implemented in the browser yet; its target is under 60 seconds for a song, with two minutes as the worst-case budget. The score-model checkpoints cannot be redistributed without the author's permission; a user-supplied checkpoint and on-device conversion remain under consideration.
+The browser app will replace YouTube import with audio-file and microphone-recording import, using Transkun and MIDI2ScoreTransformer to write a score. The same rights confirmation will apply. Score writing from recordings is unavailable in the browser while redistribution permission for the score model is pending. The target is under 60 seconds for a song, with two minutes as the worst-case budget.
 
 ## From YouTube in the Mac app
 

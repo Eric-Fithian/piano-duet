@@ -5,6 +5,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {after, before, test} from 'node:test';
 import {chromium, webkit} from 'playwright';
+import {strToU8, zipSync} from 'fflate';
 import {startTestServer} from './server.mjs';
 
 function sampleWave() {
@@ -46,6 +47,25 @@ for (const [name, engine] of [['Chromium', chromium], ['WebKit', webkit]]) {
       await page.locator('#libraryMode').click();
       assert.equal(await page.locator('#recordingImportStatus').textContent(), 'Score writing for audio files and recordings is unavailable for now.');
       assert.equal(await page.locator('.recording-import button:disabled').count(), 2);
+      const score = '<score-partwise><work><work-title>Browser test song</work-title></work><part id="P1"><measure number="1"><attributes><divisions>1</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes><note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note><note><pitch><step>E</step><octave>4</octave></pitch><duration>1</duration></note></measure></part></score-partwise>';
+      await page.locator('#libraryFile').setInputFiles({name: 'test.musicxml', mimeType: 'application/xml', buffer: Buffer.from(score)});
+      await page.getByText('Browser test song', {exact: true}).waitFor({timeout: 15000});
+      const midi = Buffer.from('4d546864000000060000000101e04d54726b0000000d00903c508360803c0000ff2f00', 'hex');
+      await page.locator('#libraryFile').setInputFiles({name: 'Browser MIDI.mid', mimeType: 'audio/midi', buffer: midi});
+      await page.getByText('Browser MIDI', {exact: true}).waitFor({timeout: 15000});
+      const container = '<container xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="score.musicxml"/></rootfiles></container>';
+      const mxl = zipSync({'META-INF/container.xml': strToU8(container), 'score.musicxml': strToU8(score.replace('Browser test song', 'Packed test song'))});
+      await page.locator('#libraryFile').setInputFiles({name: 'test.mxl', mimeType: 'application/zip', buffer: Buffer.from(mxl)});
+      await page.getByText('Packed test song', {exact: true}).waitFor({timeout: 15000});
+      await page.getByText('Browser test song', {exact: true}).click();
+      await page.waitForFunction(() => document.body.classList.contains('song-open'));
+      assert.equal(await page.locator('#songTitle').textContent(), 'Browser test song');
+      await page.locator('#songEdit').click();
+      assert.equal(await page.locator('#songEditBar').isVisible(), true);
+      await page.locator('#editCancel').click();
+      await page.locator('#songBack').click();
+      await page.reload();
+      await page.getByText('Browser test song', {exact: true}).waitFor({timeout: 15000});
       await page.locator('#drillsMode').click();
       await page.waitForFunction(() => document.querySelector('#drillTitle')?.textContent?.includes('five-finger pattern'), null, {timeout: 30000});
       assert.equal(await page.locator('#error').isHidden(), true);

@@ -1,4 +1,4 @@
-import { DOMParser } from "@xmldom/xmldom";
+import { DOMParser, ParseError } from "@xmldom/xmldom";
 import { roundEven } from "./numeric.ts";
 import { ScoreError } from "./score-midi.ts";
 
@@ -11,7 +11,10 @@ export function parseSafeXml(data: Uint8Array) {
   const encoding = data[0] === 0xff && data[1] === 0xfe || data[0] === 0x3c && data[1] === 0 && data[2] === 0x3f && data[3] === 0
     ? "utf-16le" : data[0] === 0xfe && data[1] === 0xff || data[0] === 0 && data[1] === 0x3c && data[2] === 0 && data[3] === 0x3f
       ? "utf-16be" : "utf-8";
-  const source = new TextDecoder(encoding, { fatal: true }).decode(data), upper = source.toUpperCase();
+  let source: string;
+  try { source = new TextDecoder(encoding, { fatal: true }).decode(data); }
+  catch (error) { if (error instanceof TypeError) throw new ScoreError("Invalid MusicXML encoding"); throw error; }
+  const upper = source.toUpperCase();
   if (upper.includes("<!ENTITY")) throw new ScoreError("MusicXML entity declarations are not supported");
   let from = 0;
   while (true) {
@@ -28,7 +31,8 @@ export function parseSafeXml(data: Uint8Array) {
     if (end < 0) throw new ScoreError("MusicXML has an incomplete DOCTYPE");
     from = end + 1;
   }
-  return new DOMParser({ onError: (_level, message) => { throw new ScoreError(`Invalid MusicXML: ${message}`); } }).parseFromString(source, "application/xml");
+  try { return new DOMParser({ onError: (_level, message) => { throw new Error(message); } }).parseFromString(source, "application/xml"); }
+  catch (error) { if (error instanceof ParseError) throw new ScoreError(`Invalid MusicXML: ${error.message}`); throw error; }
 }
 
 function children(parent: XmlElement, tag: string): XmlElement[] {
