@@ -3,14 +3,12 @@
 import {createScore, spellPitch} from './notation.mjs';
 
 const MARGIN = 14;
-const OPENING = 85;
-const TIME_SIGNATURE = 28;
+const OPENING = 50;
+const TIME_SIGNATURE = 22;
 const STAFF_TOP = 60;
 const GRAND_GAP = 104;
 // Room above and below the staves that every system keeps, so lines of plain notes line up evenly.
 const CLEARANCE = 22;
-// The reading cursor sits under the lowest stem or beam of its staff.
-const CURSOR_ROOM = 16;
 
 // Bars of each system, as [start, end) ranges: the fewest lines the width allows, with the bars shared out so the
 // lines are as evenly full as possible (no stub of a last line). A bar too wide for any line gets a line of its own.
@@ -107,7 +105,7 @@ function buildBars(model, doc, clefs, flats) {
     const voices = clefs.flatMap(clef => parts[clef].map(layer => layer.voice));
     const formatter = new Formatter();
     for (const clef of clefs) formatter.joinVoices(parts[clef].map(layer => layer.voice));
-    return {source: bar, parts, voices, formatter, minimum: formatter.preCalculateMinTotalWidth(voices) + 45};
+    return {source: bar, parts, voices, formatter, minimum: formatter.preCalculateMinTotalWidth(voices) + 10};
   });
 }
 
@@ -123,7 +121,7 @@ function staffGap(model, range) {
  * Engraves `doc` into `host`, one `.score-system` per line, and returns the systems and the marks of every written
  * note. `width` is the line width in staff units; null lays every bar out on a single line at its natural width.
  */
-export function engrave(doc, host, {width = null, maxBars = null, barNumbers = 'systems', reserveCursor = false} = {}) {
+export function engrave(doc, host, {width = null, maxBars = null, barNumbers = 'systems'} = {}) {
   const {Renderer, Stave, GhostNote, Beam, Fraction, StaveConnector, StaveTie} = window.VexFlow;
   const model = createScore(doc.notes, {bpm: doc.bpm, meter: doc.meter, exact: Boolean(doc.exact), bars: doc.bars || 0});
   const clefs = clefsOf(doc);
@@ -146,9 +144,10 @@ export function engrave(doc, host, {width = null, maxBars = null, barNumbers = '
     const inLine = bars.slice(...range);
     const extra = opening + (systemIndex === 0 ? TIME_SIGNATURE : 0);
     const widths = inLine.map(bar => bar.minimum);
+    const minimumLineWidth = 2 * MARGIN + extra + widths.reduce((sum, value) => sum + value, 0);
     const lineWidth = width === null
       ? 2 * MARGIN + extra + widths.reduce((sum, minimum) => sum + naturalWidth(minimum), 0)
-      : width;
+      : Math.max(width, minimumLineWidth);
     const natural = width === null;
     const stretch = natural ? 0 : (lineWidth - 2 * MARGIN - extra - widths.reduce((sum, value) => sum + value, 0)) / inLine.length;
     const renderer = new Renderer(element, Renderer.Backends.SVG);
@@ -204,13 +203,14 @@ export function engrave(doc, host, {width = null, maxBars = null, barNumbers = '
           for (const [noteIndex, source] of item.part.notes.entries()) {
             const finger = doc.notes[source.id].finger;
             if (!finger || source.tied) continue;
-            const hollow = item.part.value === 'h' || item.part.value === 'w';
             const head = item.note.noteHeads[noteIndex];
             const noteY = item.note.getYs()[noteIndex];
+            const stemUp = item.note.getStemDirection() === 1;
             const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-            label.setAttribute('x', head.getAbsoluteX() + head.getWidth() / 2);
-            label.setAttribute('y', hollow ? Math.min(noteY - 12, staves[clef].getYForLine(0) - 10) : noteY + 2.8);
-            label.setAttribute('class', `score-finger${hollow ? '' : ' score-finger-inside'}`);
+            label.setAttribute('x', head.getAbsoluteX() + head.getWidth() / 2 + (noteIndex - (item.part.notes.length - 1) / 2) * 14);
+            label.setAttribute('y', stemUp ? Math.max(noteY + 19, staves[clef].getYForLine(4) + 17)
+              : Math.min(noteY - 12, staves[clef].getYForLine(0) - 10));
+            label.setAttribute('class', 'score-finger');
             label.setAttribute('data-finger', finger);
             label.textContent = String(finger);
             noteElement.append(label);
@@ -248,7 +248,7 @@ export function engrave(doc, host, {width = null, maxBars = null, barNumbers = '
     const boxes = system.marks.map(mark => mark.note.getBoundingBox()).filter(Boolean);
     const tuplets = system.marks.some(mark => mark.note.getTuplet?.()) ? 16 : 0;
     const top = Math.min(staffTop - CLEARANCE, ...boxes.map(box => box.getY() - tuplets)) - 6;
-    const bottom = Math.max(staffBottom + CLEARANCE, ...boxes.map(box => box.getY() + box.getH())) + (reserveCursor ? CURSOR_ROOM : 0) + 6;
+    const bottom = Math.max(staffBottom + CLEARANCE, ...boxes.map(box => box.getY() + box.getH())) + 6;
     system.frame = {top, height: bottom - top, width: system.width};
     system.svg = svg;
     svg.setAttribute('viewBox', `0 ${top} ${system.width} ${bottom - top}`);

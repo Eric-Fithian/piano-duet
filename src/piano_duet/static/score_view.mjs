@@ -10,7 +10,7 @@ export const ZOOMS = [0.5, 0.67, 0.8, 1, 1.25, 1.5, 2];
 export const LOOKAHEAD = {less: 0.45, normal: 0.25, more: 0.06};
 export const LAYOUTS = ['wrap', 'line'];
 export const FOLLOWS = ['smooth', 'page', 'off'];
-const PREFERENCES = {layout: 'wrap', zoom: 1, lookahead: 'normal', follow: 'smooth'};
+const PREFERENCES = {layout: 'wrap', zoom: 'fit', lookahead: 'normal', follow: 'smooth'};
 const FEATURES = {
   scale: 1, cursor: false, feedback: false, heard: false, pace: false, sounding: false, focus: false,
   headings: false, maxBars: null, barNumbers: 'systems', followNewest: false,
@@ -18,6 +18,24 @@ const FEATURES = {
 };
 const PADDING = 12;
 const SVG = 'http://www.w3.org/2000/svg';
+export const MIN_FIT_SCALE = 1.4;
+
+// Pick the largest fitting staff, keeping the minimum legible size when the score must scroll.
+export function fitScale(measure, width, height) {
+  const minimum = measure(MIN_FIT_SCALE);
+  const fits = scale => {
+    const size = measure(scale);
+    return size.width <= width + 0.5 && size.height <= height + 0.5 && size.breaks === minimum.breaks;
+  };
+  if (minimum.width > width + 0.5 || minimum.height > height + 0.5) return MIN_FIT_SCALE;
+  let low = MIN_FIT_SCALE, high = 4;
+  for (let i = 0; i < 8; i++) {
+    const middle = (low + high) / 2;
+    if (fits(middle)) low = middle;
+    else high = middle;
+  }
+  return low;
+}
 
 export function readingMark(phrase, index, seconds = null) {
   if (seconds !== null) {
@@ -101,6 +119,7 @@ export class ScoreView {
     this.paused = false;
     this.motion = null;
     this.width = 0;
+    this.height = 0;
     this.buildControls();
     this.clear();
     // Scrolling by hand pauses following until the player resumes it or the music moves on to another line.
@@ -123,9 +142,13 @@ export class ScoreView {
     }, {passive: false});
     this.observer = new ResizeObserver(() => {
       const width = this.scroller.clientWidth;
+      const height = this.scroller.clientHeight;
       if (!width) return;
-      if (width !== this.width && this.preferences.layout === 'wrap') for (const phrase of this.phrases) this.schedule(phrase);
+      if ((width !== this.width || (height !== this.height && this.preferences.zoom === 'fit')) && this.preferences.layout === 'wrap') {
+        for (const phrase of this.phrases) this.schedule(phrase);
+      }
       this.width = width;
+      this.height = height;
       this.refollow(true);
     });
     this.observer.observe(this.scroller);
@@ -151,13 +174,13 @@ export class ScoreView {
     this.profile = {...FEATURES, ...profile};
     const saved = JSON.parse(localStorage.getItem(`piano-duet.view.${profile.preferences || name}`) || '{}');
     this.preferences = {...PREFERENCES, ...this.profile.defaults, ...saved};
-    if (!ZOOMS.includes(this.preferences.zoom)) this.preferences.zoom = 1;
+    if (this.preferences.zoom !== 'fit' && !ZOOMS.includes(this.preferences.zoom)) this.preferences.zoom = 'fit';
     this.clear();
   }
 
   set(changes) {
     for (const [key, value] of Object.entries(changes)) {
-      if (key === 'zoom' && !ZOOMS.includes(value)) throw new Error(`Zoom must be one of ${ZOOMS.join(', ')}.`);
+      if (key === 'zoom' && value !== 'fit' && !ZOOMS.includes(value)) throw new Error(`Zoom must be fit or one of ${ZOOMS.join(', ')}.`);
       if (key === 'layout' && !LAYOUTS.includes(value)) throw new Error(`Unknown score layout ${value}.`);
       if (key === 'follow' && !FOLLOWS.includes(value)) throw new Error(`Unknown follow mode ${value}.`);
       if (key === 'lookahead' && !(value in LOOKAHEAD)) throw new Error(`Unknown look-ahead ${value}.`);
@@ -176,13 +199,17 @@ export class ScoreView {
   }
 
   step(direction) {
-    const zoom = ZOOMS[ZOOMS.indexOf(this.preferences.zoom) + direction];
+    const current = this.preferences.zoom === 'fit' ? (this.fittedScale || MIN_FIT_SCALE) / this.baseScale : this.preferences.zoom;
+    const zoom = direction > 0 ? ZOOMS.find(value => value > current + 0.001) : [...ZOOMS].reverse().find(value => value < current - 0.001);
     if (zoom !== undefined) this.set({zoom});
   }
 
+  get baseScale() {
+    return this.name === 'reading' && matchMedia('(max-width: 600px), (max-height: 500px)').matches ? 1 : this.profile.scale;
+  }
+
   get scale() {
-    const scale = this.name === 'reading' && matchMedia('(max-width: 600px), (max-height: 500px)').matches ? 1 : this.profile.scale;
-    return scale * this.preferences.zoom;
+    return this.preferences.zoom === 'fit' ? (this.fittedScale || MIN_FIT_SCALE) : this.baseScale * this.preferences.zoom;
   }
 
   configure(options) {
@@ -290,7 +317,7 @@ export class ScoreView {
       this.pending.clear();
       this.applyLayout();
       for (const current of pending) {
-        if (!this.phrases.includes(current) || !current.notes.length || !this.scroller.clientWidth) continue;
+        if (!this.phrases.includes(current) || current.article.hidden || !current.notes.length || !this.scroller.clientWidth) continue;
         try { this.render(current); } catch (error) { this.onError(error); }
       }
       this.showControls();
@@ -304,9 +331,23 @@ export class ScoreView {
     const bpm = target || this.options.tempo === 'auto' ? phrase.bpm : this.options.bpm;
     const meter = target ? (phrase.meter || '4/4') : this.options.meter;
     const wrap = this.preferences.layout === 'wrap';
-    const width = wrap ? Math.max(260, (this.scroller.clientWidth - 2 * PADDING) / this.scale) : null;
-    const engraved = engrave({...phrase, bpm, meter, flats: this.options.flats ?? phrase.flats}, phrase.host,
-      {width, maxBars: this.profile.maxBars, barNumbers: this.profile.barNumbers, reserveCursor: this.profile.cursor});
+    const availableWidth = this.scroller.clientWidth - 2 * PADDING;
+    const doc = {...phrase, bpm, meter, flats: this.options.flats ?? phrase.flats};
+    const draw = scale => engrave(doc, phrase.host, {width: wrap ? availableWidth / scale : null,
+      maxBars: this.profile.maxBars, barNumbers: this.profile.barNumbers});
+    if (wrap && this.preferences.zoom === 'fit') {
+      const flowStyle = getComputedStyle(this.flow);
+      const verticalPadding = parseFloat(flowStyle.paddingTop) + parseFloat(flowStyle.paddingBottom);
+      const gap = parseFloat(getComputedStyle(phrase.host).rowGap) || 0;
+      const availableHeight = Math.max(0, this.scroller.clientHeight - verticalPadding - 32);
+      this.fittedScale = fitScale(scale => {
+        const candidate = draw(scale);
+        return {width: Math.max(...candidate.systems.map(system => system.frame.width * scale)),
+          height: candidate.systems.reduce((sum, system) => sum + system.frame.height * scale, 0) + gap * (candidate.systems.length - 1),
+          breaks: candidate.systems.map(system => system.bars.join('-')).join(',')};
+      }, availableWidth, availableHeight);
+    }
+    const engraved = draw(this.scale);
     phrase.engraved = engraved;
     phrase.marks = engraved.marks;
     phrase.systems = engraved.systems;
@@ -337,8 +378,11 @@ export class ScoreView {
     }
     const available = this.scroller.clientWidth - 2 * PADDING;
     for (const system of phrase.systems) {
-      const scale = this.preferences.layout === 'wrap' ? Math.min(this.scale, available / system.frame.width) : this.scale;
+      const scale = this.preferences.zoom === 'fit' ? this.scale
+        : this.preferences.layout === 'wrap' ? Math.min(this.scale, available / system.frame.width) : this.scale;
       system.scale = scale;
+      system.svg.style.setProperty('--score-finger-size', `${Math.max(13, 12 / scale)}px`);
+      system.svg.style.setProperty('--score-mark-size', `${Math.max(14, 12 / scale)}px`);
       system.svg.style.width = `${system.frame.width * scale}px`;
       system.svg.style.height = `${system.frame.height * scale}px`;
     }
@@ -487,12 +531,14 @@ export class ScoreView {
     if (!phrase) return;
     const previous = this.reading?.phrase;
     if (previous && previous !== phrase) {
-      for (const system of previous.systems || []) system.svg.querySelector('.reading-overlay')?.remove();
+      for (const system of previous.systems || []) system.svg.querySelectorAll('.reading-overlay, .reading-cursor').forEach(node => node.remove());
       this.pace = null;
     }
     this.reading = {phrase, progress, next};
     phrase.state = progress;
-    this.showPending(!next && !phrase.final ? 'Preparing the next score…' : null);
+    for (const item of this.phrases) item.article.hidden = item !== phrase;
+    this.showPending(next ? 'Next score ready' : !phrase.final ? 'Preparing the next score…' : null);
+    if (previous !== phrase || !phrase.systems) this.schedule(phrase);
     if (phrase.systems) this.applyReading();
   }
 
@@ -521,14 +567,21 @@ export class ScoreView {
         && (tick === null ? !mark.tiedIds.some(id => active.includes(id)) : mark.start <= tick && mark.end > tick));
       mark.current = selected;
       if (!this.profile.feedback) continue;
-      mark.element?.classList.toggle('score-read-done', !progress.preview && mark.ids.length && mark.ids.every(id => id < progress.index));
-      mark.element?.classList.toggle('score-read-missed', mark.ids.some(id => progress.mistakes.has(id)));
+      mark.ids.forEach((id, position) => {
+        const head = mark.note.noteHeads[position].getSVGElement();
+        const missed = progress.mistakes.has(id);
+        head.classList.toggle('score-read-done', !progress.preview && id < progress.index && !missed);
+        head.classList.toggle('score-read-missed', !progress.preview && missed);
+      });
     }
-    for (const system of phrase.systems) system.svg.querySelector('.reading-overlay')?.remove();
+    for (const system of phrase.systems) {
+      system.svg.querySelectorAll('.reading-overlay, .reading-feedback, .reading-cursor').forEach(node => node.remove());
+      if (this.profile.feedback) this.drawFeedback(phrase, system, progress);
+    }
     if (!current) return;
     const system = phrase.systems[current.system];
     const overlay = shape(system.svg, 'g', {class: 'reading-overlay'});
-    if (this.profile.cursor) this.drawCursor(phrase, current, overlay);
+    if (this.profile.cursor) this.drawCursor(phrase, current, system);
     if (this.profile.heard) {
       const extent = this.drawHeard(phrase, current, overlay, progress.wrong);
       if (extent) this.fit(system, ...extent);
@@ -539,17 +592,32 @@ export class ScoreView {
     this.tick(progress);
   }
 
-  // One baseline per staff keeps the cursor below every stem and beam on its line as it moves.
-  drawCursor(phrase, current, overlay) {
-    const cursors = shape(overlay, 'g', {class: 'reading-cursor'});
+  drawFeedback(phrase, system, progress) {
+    const overlay = shape(system.svg, 'g', {class: 'reading-feedback'});
+    for (const mark of system.marks) {
+      mark.ids.forEach((id, index) => {
+        const missed = progress.mistakes.has(id);
+        if (progress.preview || (!missed && id >= progress.index)) return;
+        const head = mark.note.noteHeads[index];
+        const x = head.getAbsoluteX() + head.getWidth() / 2;
+        const y = mark.note.getYs()[index];
+        if (missed) shape(overlay, 'ellipse', {cx: x, cy: y, rx: 10, ry: 7, class: 'score-mark-ring'});
+        shape(overlay, 'text', {x: x + 8, y: y - 9, class: missed ? 'score-mark-cross' : 'score-mark-check'}).textContent = missed ? '×' : '✓';
+      });
+    }
+  }
+
+  drawCursor(phrase, current, system) {
+    const cursors = shape(system.svg, 'g', {class: 'reading-cursor'});
+    system.svg.insertBefore(cursors, system.svg.firstChild);
     let x = null;
     for (const mark of phrase.marks.filter(item => item.current && item.system === current.system)) {
       const stave = mark.note.getStave();
-      const bottom = Math.max(stave.getYForLine(4), ...phrase.marks
-        .filter(other => other.system === current.system && other.note.getStave() === stave)
-        .map(other => { const box = other.note.getBoundingBox(); return box.getY() + box.getH(); }));
       x = mark.note.getAbsoluteX() + 7;
-      shape(cursors, 'rect', {x: x - 10, y: bottom + 9, width: 20, height: 3.5, rx: 1.75});
+      const left = Math.max(stave.getNoteStartX(), x - 10);
+      const top = Math.min(stave.getYForLine(0), ...mark.note.getYs()) - 8;
+      const bottom = Math.max(stave.getYForLine(4), ...mark.note.getYs()) + 8;
+      shape(cursors, 'rect', {x: left, y: top, width: Math.max(1, x + 10 - left), height: bottom - top, rx: 2});
     }
     const at = {phrase, system: current.system, x};
     const last = this.cursorAt;
@@ -736,6 +804,7 @@ export class ScoreView {
     this.zoomOut = button('Zoom out', '−', () => this.step(-1));
     this.zoomLabel = element('span', 'score-zoom', controls);
     this.zoomIn = button('Zoom in', '+', () => this.step(1));
+    this.fitButton = button('Fit score to page', 'Fit', () => this.set({zoom: 'fit'}));
     this.menuButton = button('View options', '', () => this.toggleMenu());
     this.menuButton.className = 'score-menu-button';
     this.menuButton.setAttribute('aria-haspopup', 'true');
@@ -794,8 +863,9 @@ export class ScoreView {
     const settings = this.profile.settings;
     this.controls.hidden = !settings.length || !this.phrases.some(phrase => phrase.notes.length);
     const zoom = settings.includes('zoom');
-    for (const node of [this.zoomOut, this.zoomLabel, this.zoomIn]) node.hidden = !zoom;
-    this.zoomLabel.textContent = `${Math.round(this.preferences.zoom * 100)}%`;
+    for (const node of [this.zoomOut, this.zoomLabel, this.zoomIn, this.fitButton]) node.hidden = !zoom;
+    this.zoomLabel.textContent = this.preferences.zoom === 'fit' ? 'Fit' : `${Math.round(this.preferences.zoom * 100)}%`;
+    this.fitButton.setAttribute('aria-pressed', this.preferences.zoom === 'fit');
     this.zoomOut.disabled = this.preferences.zoom === ZOOMS[0];
     this.zoomIn.disabled = this.preferences.zoom === ZOOMS.at(-1);
     const menu = settings.filter(key => key !== 'zoom');

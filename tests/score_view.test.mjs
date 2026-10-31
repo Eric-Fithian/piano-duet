@@ -1,9 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {naturalWidth, planSystems} from '../src/piano_duet/static/engraving.mjs';
-import {LOOKAHEAD, focusAt, followOffset, paceX, pageOffset, readingMark} from '../src/piano_duet/static/score_view.mjs';
+import {LOOKAHEAD, MIN_FIT_SCALE, fitScale, focusAt, followOffset, paceX, pageOffset, readingMark} from '../src/piano_duet/static/score_view.mjs';
 
 const widths = (lines, bars) => lines.map(([start, end]) => bars.slice(start, end).reduce((sum, value) => sum + value, 0));
+
+test('fit uses both page dimensions and never shrinks below readable staff spacing', () => {
+  const measure = scale => ({width: 200 * scale, height: 100 * scale});
+  assert.ok(Math.abs(fitScale(measure, 500, 180) - 1.8) < 0.02);
+  assert.ok(Math.abs(fitScale(measure, 400, 500) - 2) < 0.02);
+  assert.equal(fitScale(measure, 200, 100), MIN_FIT_SCALE);
+});
+
+test('fit preserves the most bars per line before increasing staff size', () => {
+  const measure = scale => ({width: 300, height: 100 * scale, breaks: scale < 1.7 ? '2,2' : '1,2,1'});
+  assert.ok(Math.abs(fitScale(measure, 400, 600) - 1.7) < 0.02);
+});
 
 test('lines are as few as the width allows and balanced so the last is not a stub', () => {
   const bars = [200, 200, 200, 200];

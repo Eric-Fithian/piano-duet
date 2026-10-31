@@ -7,10 +7,10 @@
 .notation-controls select, .notation-controls input { width: auto; margin: 0; padding: 6px 8px; font-size: 11px; }
 .notation-controls input { width: 65px; color: #d8dbdf; background: #1c242e; border: 1px solid #323c4a; border-radius: 5px; }
 .notation-help { color: #9da2aa; font-size: 10px; line-height: 1.6; padding: 0 26px; margin: 10px 0 14px; }
-#sheetMusic { flex:1; min-width:0; min-height:0; position:relative; overflow:hidden; background:#f6f3e9; color:#25312d; }
+#sheetMusic { flex:1; min-width:0; min-height:0; position:relative; overflow:hidden; background:var(--folio-paper, #fffdf8); color:var(--folio-ink, #0b100d); }
 .score-scroller { position:absolute; inset:0; overflow:auto; overscroll-behavior:contain; scrollbar-width:thin; }
 .score-scroller:focus-visible { outline: 2px solid #648b85; outline-offset: -3px; }
-.score-flow { box-sizing:border-box; min-height:100%; padding:12px 12px 56px; }
+.score-flow { box-sizing:border-box; min-height:100%; padding:8px 12px 18px; }
 .score-flow-wrap { display:flex; flex-direction:column; gap:6px; }
 .score-flow-line { display:flex; align-items:center; gap:36px; width:max-content; min-width:100%; padding-right:40vw; }
 .sheet-empty { flex:1; padding: 40px 26px; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; box-sizing:border-box; }
@@ -19,6 +19,7 @@
 .sheet-empty small { font-size: 11px; line-height: 1.7; color: #5c6e61; }
 .score-message { flex:1; display:grid; place-items:center; margin:0; padding:40px 26px; text-align:center; font:18px Georgia, serif; color:#53665b; }
 .score-phrase { display:flex; flex-direction:column; flex:none; }
+.piano-app[data-mode=reading] .score-phrase::before { content:'Current score'; font:600 13px Atkinson, sans-serif; margin:2px 0 4px; }
 .score-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 4px 2px; min-height:28px; }
 .score-heading h2 { font-size: 11px; font-weight: 650; margin: 0; padding: 5px 9px; border-radius: 4px; background: #ead2b8; color: #654326; }
 .score-phrase.duet h2 { background: #d2e5e6; color: #315b61; }
@@ -27,12 +28,11 @@
 .score-flow-line .score-systems { flex-direction:row; align-items:flex-start; }
 .score-system svg, .score-header svg { display:block; overflow:visible; }
 .score-system { transition: opacity .25s; }
-.score-system-past { opacity:.42; }
-.score-system-ahead { opacity:.72; }
+.score-system-past, .score-system-ahead { opacity:1; }
 /* The pinned clef and key cover the music scrolling under them, fading at their right edge. */
-.score-header { position:sticky; left:0; z-index:1; background:linear-gradient(90deg, #f6f3e9 80%, #f6f3e900); visibility:hidden; }
+.score-header { position:sticky; left:0; z-index:1; background:var(--folio-paper, #fffdf8); visibility:hidden; }
 .score-header-pinned { visibility:visible; }
-.score-pending { margin:0; padding:22px; text-align:center; font-size:12px; color:#53665b; border-top:1px dashed #d9dfd5; }
+.score-pending { margin:0; padding:2px 0; font-size:13px; font-weight:600; color:var(--folio-ink, #0b100d); }
 .score-flow-line .score-pending { border:0; align-self:center; }
 .score-pulse { position:absolute; z-index:2; top:8px; right:14px; display:flex; align-items:center; gap:10px; padding:3px 8px; border-radius:6px; background:#f6f3e9d9;
   color:#53665b; font:12px var(--display, sans-serif); letter-spacing:1px; text-transform:uppercase; pointer-events:none; }
@@ -61,17 +61,32 @@
 .piano-app[data-mode=reading] .roll-footer { display:none; }
 .piano-app[data-mode=reading] .score-toolbar { padding-block:0; border-top:0; }
 .piano-app[data-mode=reading] #fingerHelp { padding-block:6px; min-height:30px; }
+.score-system svg g[fill="#25312d"] { fill:var(--folio-ink, #0b100d); stroke:var(--folio-ink, #0b100d); }
 .score-sounding path, .score-sounding text { fill: #168696; stroke: #168696; }
-.score-read-done path, .score-read-done text { fill:#287a43; stroke:#287a43; }
-.score-read-missed path, .score-read-missed text { fill:#bf4038; stroke:#bf4038; }
-.score-system .score-finger { stroke:none; font:bold 8px sans-serif; text-anchor:middle; pointer-events:none; }
-.score-system .score-finger-inside { fill:#fff; }
-.score-heard { fill:#bf4038; stroke:#bf4038; }
+.score-read-done text { fill:var(--folio-correct, #174f2b); stroke:var(--folio-correct, #174f2b); }
+.score-read-missed text { fill:var(--folio-error, #a83e1f); stroke:var(--folio-ink, #0b100d); }
+.score-system .score-finger { fill:var(--folio-ink, #0b100d); stroke:none; font:700 var(--score-finger-size, 13px) Atkinson, sans-serif; text-anchor:middle; pointer-events:none; }
+.score-heard { fill:var(--folio-error, #a83e1f); stroke:var(--folio-error, #a83e1f); }
 line.score-heard { fill:none; }
 .reading-overlay { pointer-events:none; }
 .reading-pace-band { fill:#ef5a4c; opacity:.13; }
 .reading-pace-line { fill:#ef5a4c; opacity:.85; }
-.reading-cursor rect { fill:#168696; filter:drop-shadow(0 0 3px #16869680); }
+.reading-cursor rect { fill:var(--folio-cursor, #357db0); fill-opacity:.13; stroke:var(--folio-cursor, #357db0); stroke-width:2; vector-effect:non-scaling-stroke; }
+.reading-feedback { pointer-events:none; }
+.score-system .score-mark-check, .score-system .score-mark-cross { fill:var(--folio-ink, #0b100d); stroke:var(--folio-paper, #fffdf8); stroke-width:1; paint-order:stroke; font:900 var(--score-mark-size, 14px) Atkinson, sans-serif; }
+.score-mark-ring { fill:none; stroke:var(--folio-ink, #0b100d); stroke-width:2; }
+[data-night=true] #sheetMusic { background:var(--folio-nightPaper, #1c2a23); color:var(--folio-nightInk, #f5ebd8); }
+[data-night=true] .score-system svg g[fill="#25312d"] { fill:var(--folio-nightInk, #f5ebd8); stroke:var(--folio-nightInk, #f5ebd8); }
+[data-night=true] .score-system svg text { fill:var(--folio-nightInk, #f5ebd8); }
+[data-night=true] .score-system svg .vf-stave path, [data-night=true] .score-system svg .vf-stem path, [data-night=true] .score-system svg .vf-stavenote>path { stroke:var(--folio-nightInk, #f5ebd8); }
+[data-night=true] .score-system svg .vf-stavebarline rect { fill:var(--folio-nightInk, #f5ebd8); }
+[data-night=true] .score-system svg .score-read-done text { fill:var(--folio-nightCorrect, #9dd5b0); stroke:var(--folio-nightCorrect, #9dd5b0); }
+[data-night=true] .score-system svg .score-read-missed text { fill:var(--folio-nightError, #c36e48); stroke:var(--folio-nightInk, #f5ebd8); }
+[data-night=true] .score-system svg .reading-cursor rect { fill:var(--folio-nightCursor, #65b6e8); stroke:var(--folio-nightCursor, #65b6e8); }
+[data-night=true] .score-system svg .score-mark-check, [data-night=true] .score-system svg .score-mark-cross { fill:var(--folio-nightInk, #f5ebd8); stroke:var(--folio-nightPaper, #1c2a23); }
+[data-night=true] .score-mark-ring { stroke:var(--folio-nightInk, #f5ebd8); }
+[data-night=true] .score-heard { fill:var(--folio-nightError, #c36e48); stroke:var(--folio-nightError, #c36e48); }
+[data-night=true] .score-pending { color:var(--folio-nightInk, #f5ebd8); }
 @media (prefers-reduced-motion: reduce) { .score-system { transition:none; } }
 @media (max-width: 760px) {
   .notation-controls { padding-inline: 18px; gap: 10px; }
