@@ -273,7 +273,7 @@ export class DrillPicker {
     $('drillTempoDisplay').textContent = `♩ ${drill.bpm}`;
     $('drillSubdivision').textContent = SUBDIVISION[drill.per_beat];
     const level = this.levels[drill.drill];
-    $('drillLevelNumber').textContent = level.level || 'New';
+    $('drillLevelNumber').textContent = level.level || 'New drill';
     $('drillProgress').textContent = level.level ? `Drill level ${level.level}` : 'New drill';
     $('drillLevelFill').style.width = `${level.next ? 100 * level.next.done / level.next.keys : 100}%`;
     $('drillLevel').title = `${level.name}: ${level.level ? `level ${level.level}` : 'new drill'}${level.next ? ` · next: ${level.next.done} of ${level.next.keys} keys at ${tempoLabel(level.next.tempo.per_beat, level.next.tempo.bpm)}` : ' · top level'}`;
@@ -486,7 +486,7 @@ export class DrillPicker {
       section.append(element('h3', group, 'rule-heading'));
       for (const [drill, level] of Object.entries(this.levels).filter(([, item]) => item.group === group)) {
         const card = element('div', undefined, 'drill-level-card');
-        const badge = element('b', String(level.level), 'drill-level-badge');
+        const badge = element('b', level.level ? String(level.level) : 'New drill', 'drill-level-badge');
         const body = element('div');
         body.append(element('strong', level.name));
         const track = element('span', undefined, 'xp-track');

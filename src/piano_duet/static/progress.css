@@ -1,0 +1,59 @@
+.progress-stage-path { width: 130px; height: 24px; overflow: visible; color: var(--text); }
+.progress-node, .progress-check, .progress-ring-track, .progress-ring-fill, .progress-stem { fill: none; stroke: currentColor; stroke-width: 1.8; }
+.progress-node.current { stroke-width: 2.8; }
+.progress-node.earned { fill: var(--gold); animation: progress-earned .45s ease-out both; }
+.progress-check { stroke: var(--folio-onReward, #0b100d); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.progress-level-ring { width: 100%; height: 100%; flex: none; }
+.progress-ring-track { stroke: var(--text); }
+.progress-ring-fill { stroke: var(--gold); stroke-width: 5; animation: progress-ring .6s ease-out both; }
+.progress-streak-beam { width: calc(var(--beam-width) * 1px); height: 24px; flex: none; }
+.progress-beam { fill: currentColor; animation: progress-beam .3s ease-out both; }
+.progress-stem { stroke-width: 1.5; }
+.progress-streak { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.reading-result { grid-column: 1 / -1; width: 100%; color: var(--text); }
+.reading-result-head { display: flex; align-items: center; gap: 12px; }
+.reading-result-mark { width: 48px; height: 40px; flex: none; }
+.reading-result h2 { font-family: Fraunces, serif; font-size: 20px; margin: 0; }
+.reading-result p { margin: 2px 0; }
+.reading-result-detail { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 8px 0; }
+.reading-result-actions { display: flex; gap: 12px; }
+.reading-result button { min-height: 44px; }
+@keyframes progress-beam { from { fill-opacity: .75; } }
+.progress-result-fill { animation: progress-earned .45s ease-out both; }
+@keyframes progress-earned { from { fill-opacity: .75; } }
+@keyframes progress-ring { from { stroke-dasharray: 0 100; } to { stroke-dasharray: var(--ring-fill) 100; } }
+@media (prefers-reduced-motion: reduce) {
+  .progress-ring-fill, .progress-node.earned, .progress-result-fill, .progress-beam { animation: none; }
+}
+
+.transport:has(.reading-result:not([hidden])) > :not(.reading-result) { display: none; }
+.level-diamond:has(.progress-level-ring)::before { display: none; }
+.reading-result[hidden], .progress-streak[hidden] { display: none; }
+
+
+.piano-app.is-playing #openProfile, .piano-app.is-playing #hudStreak { visibility: hidden; }
+
+.piano-app.is-playing .stage-summary { visibility: hidden; }
+.piano-app[data-mode=drills] #openProfile { display: none; }
+
+.level-diamond:has(.progress-level-ring) { border: 0; }
+#hudNotes { display: flex; align-items: center; flex: none; }
+.reading-hud { flex-wrap: wrap; }
+.hud-right { flex-wrap: wrap; min-width: 0; }
+@media (max-width: 600px) {
+  .reading-hud .hud-stage:not(:has(#hudReplay:not([hidden]))) { display: none; }
+  .progress-stage-path { width: 104px; }
+  .progress-streak { font-size: 13px; }
+  .progress-streak-beam { height: 20px; }
+}
+
+.career-dialog .close { width: 44px; height: 44px; }
+@media (max-width: 600px) {
+  dialog.career-dialog { padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+}
+@media (max-height: 500px) and (orientation: landscape) {
+  .reading-result { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; }
+  .reading-result-head, .reading-result-detail { grid-column: 1; }
+  .reading-result-detail { margin: 0; }
+  .reading-result-actions { grid-column: 2; grid-row: 1 / span 2; align-self: end; }
+}

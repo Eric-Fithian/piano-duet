@@ -3,7 +3,7 @@ import {ScoreView} from './score_view.mjs';
 import {LearningCycle, pitchName, renderAnalysis} from './learning.mjs';
 import {PracticeCycle, localFetch, localRequest, renderPractice, renderProfile, renderAttempt, beatGroups} from './practice.mjs';
 import {ReadingStream} from './reading.mjs';
-import {TEMPO_LIMITS, renderCareer, renderLevel, renderReadingHud, showBanner, showXpToast} from './game.mjs';
+import {TEMPO_LIMITS, renderCareer, renderLevel, renderReadingHud, renderReadingResult, showBanner} from './game.mjs';
 import {currentOrdinal, renderLibrary, renderSongHud, sessionAccuracy} from './library.mjs';
 import {DrillPicker, attackPlan, followPosition, heardAttacks, planSession, playedGap, streakText, takeEnded, tempoLabel} from './drills.mjs';
 import {METERS, SongEditor, musicalKey} from './song_editor.mjs';
@@ -86,13 +86,12 @@ let practiceScorePhrase = null;
 let lastAttempt = null;
 let targetScore = null;
 let lastReadingAttempt = null;
-// The score just finished stays above the current one as context until the next one is finished too.
-let readingPast = null;
 let readingProfile = null;
 let readingNext = null;
 let readingNextPromise = null;
+let readingResult = null;
+let readingFinishing = false;
 let readingRevision = 0;
-let sessionXp = 0;
 let readingTempo = null;
 let replayStage = null;
 const TEMPO_STEP = 4;
@@ -148,9 +147,9 @@ function practiceReady() {
 function readingReady() {
   if (mode !== 'reading' || !reading.progress || !practice.task) return;
   const progress = reading.progress;
-  renderReadingHud(practice.task, progress, readingProfile?.curriculum, sessionXp, replayStage !== null);
+  renderReadingHud(practice.task, progress, readingProfile?.curriculum, replayStage !== null);
   sheet.progress(practiceScorePhrase, progress, readingNext?.phrase);
-  status(microphone || busy ? '' : progress.groups.length || sessionXp ? 'Paused' : '');
+  status(microphone || busy ? '' : progress.groups.length ? 'Paused' : '');
 }
 
 // The player chooses the tempo, never below a curriculum minimum; grading uses only onsets.
@@ -176,37 +175,76 @@ function readingTiming(task) {
 async function finishReading(progress) {
   const revision = readingRevision;
   const task = practice.task;
-  const saving = localRequest('/api/reading/complete', {
-    task: task.id, attempt: crypto.randomUUID(), groups: progress.groups,
-    interruptions: [...progress.interruptions],
-    threshold: Number($('threshold').value),
-  }).then(async result => {
+  readingFinishing = true;
+  try {
+    await stop();
+    const result = await localRequest('/api/reading/complete', {
+      task: task.id, attempt: crypto.randomUUID(), groups: progress.groups,
+      interruptions: [...progress.interruptions], threshold: Number($('threshold').value),
+    });
     if (revision !== readingRevision || mode !== 'reading') return;
     lastReadingAttempt = lastAttempt = result.id;
     const before = readingProfile;
     await refreshProfile();
     if (revision !== readingRevision || mode !== 'reading') return;
-    sessionXp += result.xp.total;
-    showXpToast(task, result, readingProfile.xp, () => openReview(result.id));
-    celebrate(before, readingProfile);
+    readingResult = result;
+    if (before.curriculum.number !== readingProfile.curriculum.number && replayStage === null) {
+      const queued = await readingNextPromise;
+      if (queued) sheet.remove(queued.phrase);
+      readingNext = null;
+      readingNextPromise = prepareReadingNext(revision, task);
+    }
+    await readingNextPromise;
+    if (revision !== readingRevision || mode !== 'reading') return;
     readingReady();
-  });
-  const next = readingNext || (await Promise.all([readingNextPromise, saving]))[0];
-  if (revision !== readingRevision || mode !== 'reading') return;
-  if (!next) throw new Error('The next reading score is not ready. Choose a fresh score to continue.');
-  const completed = practiceScorePhrase;
+    renderReadingResult($('readingResultTray'), task, result, before, readingProfile, {
+      review: () => openReview(result.id),
+      next: () => advanceReading().catch(fail),
+      retry: () => retryReading().catch(fail),
+    });
+  } finally {
+    readingFinishing = false;
+    buttons();
+  }
+}
+
+async function advanceReading() {
+  if (!readingResult || !readingNext) throw new Error('The next reading score is not ready.');
+  const next = readingNext;
+  readingResult = null;
+  $('readingResultTray').hidden = true;
+  sheet.remove(practiceScorePhrase);
   practice.acceptTask(next.task);
   practiceScorePhrase = next.phrase;
   readingNext = null;
   reading.advance(next.task.target, readingTiming(next.task));
-  if (readingPast) sheet.remove(readingPast);
-  readingPast = completed;
   for (const details of $('exerciseDialog').querySelectorAll('details')) details.open = false;
   showKey(next.task.key);
+  readingNextPromise = prepareReadingNext(readingRevision, next.task);
+  readingNextPromise.catch(fail);
   practiceReady();
   buttons();
-  readingNextPromise = prepareReadingNext(revision, next.task, saving);
+}
+
+async function retryReading() {
+  if (!readingResult) throw new Error('There is no completed score to retry.');
+  const revision = ++readingRevision;
+  const task = await localRequest(`/api/reading/${practice.task.id}/retry`, {});
+  if (revision !== readingRevision || mode !== 'reading') return;
+  if (readingNext) sheet.remove(readingNext.phrase);
+  readingNext = null;
+  readingResult = null;
+  $('readingResultTray').hidden = true;
+  sheet.clear();
+  practice.acceptTask(task);
+  practiceScorePhrase = addReadingPhrase(task);
+  reading.reset(task.target, readingTiming(task));
+  for (const details of $('exerciseDialog').querySelectorAll('details')) details.open = false;
+  readingNextPromise = prepareReadingNext(revision, task);
   readingNextPromise.catch(fail);
+  showKey(task.key);
+  practiceReady();
+  buttons();
 }
 
 function addReadingPhrase(task) {
@@ -452,16 +490,6 @@ function previewTick() {
   songReady();
 }
 
-function celebrate(before, after) {
-  const cleared = after.curriculum.path.filter(stage => stage.status === 'Complete'
-    && before.curriculum.path.find(previous => previous.id === stage.id).status !== 'Complete');
-  for (const stage of cleared) {
-    const next = after.curriculum.path[stage.number];
-    showBanner({kind: 'stage', caption: `Stage ${stage.number} cleared`, title: stage.label, detail: next ? `Unlocked · ${next.label}` : 'Every stage cleared'});
-  }
-  if (after.xp.level > before.xp.level) showBanner({kind: 'level', caption: 'Level up', title: `Level ${after.xp.level}`});
-}
-
 function openReview(id) {
   reading.interrupt();
   const reviewOnly = !ENABLED_MODES.includes('practice');
@@ -558,6 +586,8 @@ async function loadPractice() {
   const revision = ++readingRevision;
   readingNext = null;
   readingNextPromise = null;
+  readingResult = null;
+  $('readingResultTray').hidden = true;
   reading.pause();
   busy = true;
   detector.reset();
@@ -602,7 +632,6 @@ async function loadPractice() {
   heard = []; reply = []; transcript = [];
   sheet.clear();
   practiceScorePhrase = null;
-  readingPast = null;
   $('scoreError').hidden = true;
   if (practice.visible) showPracticeTarget();
   else sheet.message(task.family === 'ear' ? 'Let your ears lead. Hear the melody, then find it on the keys.' : 'Find the notes yourself. Reveal the score whenever you need help.');
@@ -921,6 +950,7 @@ async function selectMode(value, persist = true) {
 function updateModeControls() {
   const value = mode;
   document.body.dataset.mode = value;
+  if (value !== 'reading') { readingResult = null; $('readingResultTray').hidden = true; $('noteStatus').textContent = ''; }
   $('currentMode').textContent = $(`${value}Mode`).textContent;
   $('openProfile').hidden = value === 'library' && !ENABLED_MODES.includes('practice');
   for (const selector of ['.session-info', '.session-actions', '.key-settings', '.score-settings']) {
@@ -979,15 +1009,16 @@ function status(text, color = '#9ab89d') {
 
 function buttons() {
   appearance.setLocked(Boolean(microphone));
+  document.body.classList.toggle('is-playing', Boolean(microphone));
   $('songEdit').disabled = busy || Boolean(songEditor);
-  $('start').disabled = !ready || (!microphone && busy && !previewing) || (mode === 'library' && !song);
+  $('start').disabled = readingFinishing || Boolean(readingResult) || !ready || (!microphone && busy && !previewing) || (mode === 'library' && !song);
   $('start').setAttribute('aria-pressed', Boolean(microphone));
   $('micState').textContent = microphone ? 'Mic on' : 'Mic ready';
   $('drillProgress').hidden = mode !== 'drills';
   const following = mode === 'reading' || mode === 'library';
   $('start').classList.toggle('no-key', Boolean(microphone) && !following);
   $('micLabel').textContent = previewing ? 'Stop preview' : microphone ? (following ? 'Stop' : 'Mic off')
-    : mode === 'reading' && (reading.progress?.groups.length || sessionXp) ? 'Resume'
+    : mode === 'reading' && reading.progress?.groups.length ? 'Resume'
       : mode === 'library' && songStream.progress?.groups.length ? 'Resume' : 'Start';
   $('answer').disabled = !microphone || busy || calibrating > 0 || !detector.active;
   $('answer').hidden = mode === 'reading' || mode === 'library' || !microphone || busy || (isPracticeMode() && (!practice.canPlay || practice.completed));
@@ -1005,8 +1036,8 @@ function buttons() {
   for (const id of ['practiceMode', 'readingMode', 'practiceFocus', 'practicePiece', 'nextPractice', 'skipPractice']) $(id).disabled = !ready || busy || detector.active;
   for (const id of ['drillNext', 'drillAuto', 'drillSession']) $(id).disabled = !ready || busy || detector.active;
   $('drillSession').classList.toggle('active', Boolean(coachSession));
-  for (const id of ['revealPractice', 'practiceBeat', 'hudBeat', 'drillBeat']) $(id).disabled = !ready || busy || detector.active || !practice.task;
-  for (const id of ['hearPractice', 'hudListen', 'drillListen']) $(id).disabled = !ready || (busy && !listening) || detector.active || !practice.task;
+  for (const id of ['revealPractice', 'practiceBeat', 'hudBeat', 'drillBeat']) $(id).disabled = readingFinishing || !ready || busy || detector.active || !practice.task;
+  for (const id of ['hearPractice', 'hudListen', 'drillListen']) $(id).disabled = readingFinishing || !ready || (busy && !listening) || detector.active || !practice.task;
   if (listening) $('hearPractice').textContent = 'Stop playback';
   $('hudListen').classList.toggle('playing', listening);
   $('hudListen').setAttribute('aria-label', listening ? 'Stop playback' : 'Hear this score (halves its XP)');
@@ -1290,7 +1321,7 @@ async function requestReply(audio, {source = 'microphone'} = {}) {
         turn++;
         $('turnCount').textContent = `LEARNING · ${turn} ROUND${turn === 1 ? '' : 'S'} COMPLETE`;
         $('learningScore').textContent = `${event.score} / 100`;
-        const rhythm = event.rhythm_accuracy === null ? 'Rhythm: not enough matching attacks to measure' : `Rhythm ${event.rhythm_accuracy}%`;
+        const rhythm = event.rhythm_accuracy === null ? 'Rhythm: not enough matching notes to measure' : `Rhythm ${event.rhythm_accuracy}%`;
         $('learningFeedback').textContent = `Pitch accuracy ${event.pitch_accuracy}% · ${rhythm}. ${event.matched} notes matched, ${event.wrong} wrong pitches, ${event.missing} missing, ${event.extra} extra. Practice tempo: ${event.tempo_percent}% of the target.`;
         $('learningResult').hidden = false;
         $('timing').textContent = `Playback score: ${event.score} / 100`;
@@ -1421,7 +1452,6 @@ function reset() {
   heard = [];
   reply = [];
   sheet.use(mode, SCORE_VIEWS[mode]);
-  readingPast = null;
   $('scoreError').hidden = true;
   $('keyName').textContent = 'Listening for a key…';
   $('keyDetail').textContent = 'Each reply follows the key of just your latest phrase.';

@@ -36,6 +36,11 @@ test("reading rewards match the Python reference across stages, help, rhythm and
     assessment: { score: { first_try: 1, total: 1 }, observations: [] },
     context: { hearings: 0, reveals: 0, hints: 1 },
   });
+  cases.push({
+    prompt: { reading: { stage_number: 8, introduce: null, rhythm_required: false } },
+    assessment: { score: { first_try: 4, total: 4 }, observations: Array.from({ length: 4 }, (_, index) => ({ index, matched: true })) },
+    context: { hearings: 0, reveals: 0, hints: 0, familiar: true },
+  });
   const levels = [0, 1, 399, 400, 899, 900, 1499, 1500, 100000];
   const reference = spawnSync("uv", ["run", "--frozen", "python", "-c", `
 import json, sys
@@ -50,4 +55,14 @@ print(json.dumps({"scores": [score_xp(**case) for case in data["cases"]],
   assert.deepEqual(cases.map(({ prompt, assessment, context }) => scoreXp(prompt, assessment, context)), expected.scores);
   assert.deepEqual(levels.map(levelProgress), expected.levels);
   assert.deepEqual(Array.from({ length: 24 }, (_, index) => stageClearXp(index + 1)), expected.stages);
+});
+
+test("the sign-off take earns 507 XP through the real reward rules", () => {
+  const prompt = { reading: { stage_number: 1, introduce: null, rhythm_required: false } };
+  const observations = Array.from({ length: 16 }, (_, index) => ({ index, group: index, matched: index !== 4 }));
+  const assessment = { score: { first_try: 15, total: 16 }, observations };
+  const result = scoreXp(prompt, assessment, { hearings: 0, reveals: 0, hints: 0 });
+  assert.equal(result.total, 207);
+  assert.equal(result.total + stageClearXp(1), 507);
+  assert.deepEqual(levelProgress(600 + result.total + stageClearXp(1)), { xp: 1107, level: 3, into: 207, needed: 600 });
 });

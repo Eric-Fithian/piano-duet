@@ -22,6 +22,7 @@
   <link rel="stylesheet" href="/static/practice.css">
   <link rel="stylesheet" href="/static/game.css">
   <link rel="stylesheet" href="/static/chrome.css">
+  <link rel="stylesheet" href="/static/progress.css">
   <script src="/notation-assets/vexflow.js" defer></script>
   <script type="module" src="/static/app.mjs"></script>
 </head>
@@ -84,7 +85,7 @@
             <span id="drillTempoDisplay" class="drill-tempo-display">♩ —</span><span id="drillBest" class="drill-best">Best tempo —</span>
             <button id="drillMore" class="drill-more-button" aria-expanded="false" aria-controls="drillExtra">More</button>
             <div id="drillExtra" class="drill-extra">
-            <button id="drillLevel" class="drill-level" aria-haspopup="dialog" title="Drill levels"><b id="drillLevelNumber">0</b><span class="xp-track"><i id="drillLevelFill"></i></span></button>
+            <button id="drillLevel" class="drill-level" aria-haspopup="dialog" title="Drill levels"><b id="drillLevelNumber">New drill</b><span class="xp-track"><i id="drillLevelFill"></i></span></button>
             <span id="drillTempoControl" class="hud-tempo" role="group" aria-label="Drill tempo"><button id="drillSlower" aria-label="Slower" aria-keyshortcuts="ArrowLeft">−</button><span><small>♩</small><b id="drillTempo">—</b><small id="drillSubdivision"></small></span><button id="drillFaster" aria-label="Faster" aria-keyshortcuts="ArrowRight">+</button></span>
             <button id="drillListen" class="secondary listen-button" aria-label="Hear it played" title="Hear it played">Listen</button>
             <button id="drillBeat" class="icon-button" aria-label="Hear the beat" title="Hear the beat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 21h8l-2.5-17h-3zM12 14l5-8"/></svg></button>
@@ -128,9 +129,7 @@
           <div class="hud-stage"><strong id="hudStageLabel"></strong><span id="hudNew" class="hud-tag hud-new" hidden>New note</span><button id="hudReplay" class="hud-tag hud-replay" hidden>Replay ✕</button><span id="hudHand" class="hud-tag"></span></div>
           <div id="hudNotes" class="hud-notes" role="img"></div>
           <div class="hud-right">
-            <span id="readingFeedback" class="hud-wrong" role="status" hidden></span>
             <span id="hudStreak" class="hud-streak" aria-label="Streak"><b>0</b><small>Streak</small></span>
-            <span id="hudXp" class="hud-session"><b>0</b><small>XP</small></span>
             <span id="hudTempo" class="hud-tempo" role="group" aria-label="Playing tempo" hidden><button id="tempoDown" aria-label="Slower" aria-keyshortcuts="ArrowLeft">−</button><span><small>♩</small><b id="tempoValue"></b></span><button id="tempoUp" aria-label="Faster" aria-keyshortcuts="ArrowRight">+</button></span>
             <button id="hudBeat" class="icon-button" aria-label="Hear the beat" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 21h8l-2.5-17h-3zM12 14l5-8"/></svg></button>
             <button id="hudListen" class="secondary listen-button" aria-label="Hear this score (halves its XP)" title="Hear this score (halves its XP)">Listen</button>
@@ -146,6 +145,7 @@
         <div class="roll-footer"><div class="legend"><span><i class="swatch you"></i>You</span><span><i class="swatch partner"></i><span id="partnerLabel">Exercise</span></span></div><span id="timing"></span><button id="demo" class="text-button" disabled hidden>Try a demo ↗</button></div>
       </section>
       <section class="transport" aria-label="Microphone and playing controls">
+        <div id="readingResultTray" class="reading-result" aria-live="polite" hidden></div>
         <div id="noteStatus" class="note-status" role="status" aria-live="polite"></div>
         <div class="transport-actions">
           <div id="listenSlot"></div>
@@ -159,7 +159,6 @@
         </div>
         <div class="transport-side"><span id="levelText" class="sr-only">MIC OFF</span></div>
       </section>
-      <div id="xpToast" class="xp-toast" role="status" hidden></div>
       <div id="banner" class="banner" aria-live="assertive" hidden></div>
       <p id="message" class="message sr-only">Enable your microphone, then play the exercise on your piano.</p>
       <div id="error" class="error" role="alert" hidden></div>

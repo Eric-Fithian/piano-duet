@@ -56,7 +56,7 @@ export default defineConfig({
           if (html.split(before).length !== 2) throw new Error(`Expected exactly one reference interface element: ${before}`);
           html = html.replace(before, after);
         };
-        for (const file of ["style.css", "score.css", "practice.css", "game.css", "chrome.css"]) {
+        for (const file of ["style.css", "score.css", "practice.css", "game.css", "chrome.css", "progress.css"]) {
           replace(`  <link rel="stylesheet" href="/static/${file}">\n`, "");
         }
         replace('  <script src="/notation-assets/vexflow.js" defer></script>\n', "");

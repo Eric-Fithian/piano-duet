@@ -239,10 +239,10 @@ class ReadingRequest(BaseModel):
         previous = -1
         for group in self.groups:
             if not group:
-                raise ValueError("Reading attacks cannot be empty")
+                raise ValueError("Reading note groups cannot be empty")
             start = min(note.start for note in group)
             if start < previous:
-                raise ValueError("Reading attacks must be chronological")
+                raise ValueError("Reading note groups must be chronological")
             previous = start
         return self
 

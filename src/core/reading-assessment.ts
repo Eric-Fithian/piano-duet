@@ -79,9 +79,9 @@ export function assessReading(task: ReadingScore, groups: HeardNote[][], context
   const strengths: number[] = [];
   let attempts: number[][] = [], cursor = 0, previous = -1;
   groups.forEach((group, groupIndex) => {
-    if (!group.length) throw new Error("Reading attacks cannot be empty");
+    if (!group.length) throw new Error("Reading note groups cannot be empty");
     const start = Math.min(...group.map((note) => note.start));
-    if (start < previous || cursor >= attacks.length) throw new Error("Reading attacks must be chronological and end with the last target");
+    if (start < previous || cursor >= attacks.length) throw new Error("Reading note groups must be chronological and end with the last target");
     previous = start;
     const pitches = group.map((note) => note.pitch);
     attempts.push(pitches);

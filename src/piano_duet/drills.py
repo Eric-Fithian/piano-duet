@@ -367,7 +367,7 @@ def line(pitches, hand, fingers=None):
 
 def merge(*voices):
     if len({len(voice) for voice in voices}) != 1:
-        raise ValueError("Both hands must play the same number of attacks")
+        raise ValueError("Both hands must play the same number of note groups")
     return [[note for voice in group for note in voice] for group in zip(*voices, strict=True)]
 
 

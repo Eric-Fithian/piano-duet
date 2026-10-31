@@ -109,7 +109,7 @@ def assess_reading(task, groups, context):
     for group_index, group in enumerate(groups):
         start = min(note["start"] for note in group)
         if start < previous or cursor >= len(attacks):
-            raise ValueError("Reading attacks must be chronological and end with the last target")
+            raise ValueError("Reading note groups must be chronological and end with the last target")
         previous = start
         pitches = [note["pitch"] for note in group]
         attempts.append(pitches)

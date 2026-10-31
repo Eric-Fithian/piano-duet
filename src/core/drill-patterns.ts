@@ -44,7 +44,7 @@ function line(pitches: number[], hand: string, fingers: (number | null)[] = pitc
 }
 
 function merge(...voices: DrillPattern[]): DrillPattern {
-  if (!voices.length || voices.some((voice) => voice.length !== voices[0].length)) throw new Error("Both hands must play the same number of attacks");
+  if (!voices.length || voices.some((voice) => voice.length !== voices[0].length)) throw new Error("Both hands must play the same number of note groups");
   return voices[0].map((_, index) => voices.flatMap((voice) => voice[index]));
 }
 
