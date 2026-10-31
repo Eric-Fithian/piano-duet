@@ -209,8 +209,8 @@ export class LocalService {
     }
     if (method === "GET" && url.pathname === "/api/drills") {
       const attempts = attemptsFromEvents(await this.store.list());
-      const { progress, streak_days } = drillProgress(attempts as unknown as DrillAttempt[], this.now());
-      return Response.json({ catalog: DRILL_CATALOG, progress, levels: drillLevels(progress), streak_days });
+      const { progress, practice_days } = drillProgress(attempts as unknown as DrillAttempt[]);
+      return Response.json({ catalog: DRILL_CATALOG, progress, levels: drillLevels(progress), practice_days });
     }
     if (method === "POST" && url.pathname === "/api/drills/next") {
       if (this.responseBusy) return Response.json({ detail: "Finish the current performance first" }, { status: 409 });
@@ -230,7 +230,7 @@ export class LocalService {
         return Response.json({ detail: "Invalid drill request" }, { status: 422 });
       }
       const attempts = attemptsFromEvents(await this.store.list());
-      const { progress } = drillProgress(attempts as unknown as DrillAttempt[], this.now());
+      const { progress } = drillProgress(attempts as unknown as DrillAttempt[]);
       const coached = request.drill == null ? coachDrill(progress, request.avoid ?? [], this.now(), request.focus ?? null) : null;
       const config: DrillSelection = coached?.config ?? { drill: request.drill!, variant: request.variant!, tonic: request.tonic!,
         hands: request.hands!, octaves: request.octaves!, inversion: request.inversion ?? 0, practice: request.practice ?? "even" };

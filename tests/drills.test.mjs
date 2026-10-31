@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {allowedHands, allowedOctaves, heardAttacks, issueSummary, loudnessOutliers, meterState, planSession, playedGap, tempoBand, resolveChoices, streakText, takeEnded, tempoLabel} from '../src/piano_duet/static/drills.mjs';
+import {DrillPicker, allowedHands, allowedOctaves, heardAttacks, issueSummary, loudnessOutliers, meterState, planSession, playedGap, tempoBand, resolveChoices, streakText, takeEnded, tempoLabel} from '../src/piano_duet/static/drills.mjs';
 
 const scale = {variants: ['major', 'melodic minor'], hands: ['right', 'left', 'together', 'contrary'], octaves: [1, 2, 3, 4], inversions: 0, practices: ['even', 'accent-3']};
 const hanon = {variants: ['major'], hands: ['right', 'together'], octaves: [1, 2], inversions: 0, practices: ['even']};
@@ -45,6 +45,20 @@ test('sessions stay on a drill for at least five minutes or takes, in at most th
 test('the streak counts consecutive clean reps at any tempo', () => {
   assert.equal(streakText({streak: 2}, 3), '2 of 3 clean in a row');
   assert.equal(streakText(null, 3), '0 of 3 clean in a row');
+});
+
+test('the level board shows only positive practice days', t => {
+  const board = {replaceChildren() {}}, label = {textContent: ''};
+  const previous = globalThis.document;
+  globalThis.document = {getElementById: id => ({drillLevels: board, drillStreak: label})[id]};
+  t.after(() => { globalThis.document = previous; });
+  const picker = new DrillPicker();
+  picker.catalog = {groups: []};
+  for (const [days, expected] of [[0, ''], [1, 'Practised on 1 day'], [4, 'Practised on 4 days']]) {
+    picker.practiceDays = days;
+    picker.renderLevels(() => {});
+    assert.equal(label.textContent, expected);
+  }
 });
 
 test('the score follows the attacks heard, at the player\'s own pace', async () => {

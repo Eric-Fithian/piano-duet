@@ -739,8 +739,8 @@ def create_app(
 
     @app.get("/api/drills")
     async def drills():
-        progress, streak = drill_progress(app.state.store.attempts())
-        return {"catalog": catalog(), "progress": progress, "levels": drill_levels(progress), "streak_days": streak}
+        progress, practice_days = drill_progress(app.state.store.attempts())
+        return {"catalog": catalog(), "progress": progress, "levels": drill_levels(progress), "practice_days": practice_days}
 
     @app.post("/api/drills/next")
     async def drills_next(payload: DrillRequest):

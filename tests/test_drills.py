@@ -154,9 +154,9 @@ def test_three_clean_takes_in_a_row_climb_and_empty_takes_step_back():
     assert progress["scale|major|0|right|1|0"]["working"] == start
     assert progress["scale|major|0|right|1|0"]["streak"] == STREAK - 1
     attempts.append(attempt(first, performance(first), STREAK))
-    progress, streak = drill_progress(attempts)
+    progress, practice_days = drill_progress(attempts)
     entry = progress["scale|major|0|right|1|0"]
-    assert entry["working"] == start + 1 and entry["best"] == start and streak == 0
+    assert entry["working"] == start + 1 and entry["best"] == start and practice_days == 1
     wrong = build_task(config(), entry["working"], entry)
     attempts += [attempt(wrong, performance(wrong, wrong={1, 3, 5}), at) for at in (10, 11)]
     assert not attempts[-1]["assessment"]["drill"]["clean"]
@@ -164,6 +164,21 @@ def test_three_clean_takes_in_a_row_climb_and_empty_takes_step_back():
     dotted = build_task(config(practice="long-short"), start)
     assert not attempt(dotted, performance(dotted), 12)["assessment"]["drill"]["clean"]
     assert drill_progress([attempt(first, performance(first), 1, "demo")])[0] == {}
+
+
+def test_practice_days_count_distinct_included_drill_days_even_after_a_gap():
+    task = build_task(config(), 0)
+    notes = performance(task)
+    first = 1700000000
+    takes = [attempt(task, notes, first), attempt(task, notes, first + 60),
+             attempt(task, notes, first + 7 * 86400)]
+    excluded = attempt(task, notes, first + 14 * 86400)
+    excluded["excluded"] = True
+    demo = attempt(task, notes, first + 21 * 86400, "demo")
+    empty = {**takes[0], "created_at": first + 28 * 86400, "notes": []}
+    other = {**takes[0], "created_at": first + 35 * 86400, "mode": "reading"}
+    assert drill_progress([])[1] == 0
+    assert drill_progress(takes + [excluded, demo, empty, other])[1] == 2
 
 
 def test_tempo_is_the_players_own_and_credited_as_played():
@@ -363,7 +378,7 @@ def test_drill_flow_moves_the_working_tempo(client):
     summary = client.get("/api/drills").json()
     progress = summary["progress"][task["drill"]["config_key"]]
     assert progress["working"] == task["drill"]["rung"] + 1
-    assert summary["levels"][task["drill"]["drill"]]["level"] == 1 and summary["streak_days"] == 1
+    assert summary["levels"][task["drill"]["drill"]]["level"] == 1 and summary["practice_days"] == 1
     again = client.post("/api/drills/next", json=request, headers=HEADERS).json()
     assert again["drill"]["rung"] == task["drill"]["rung"] + 1
     events = [json.loads(line) for line in response.text.splitlines()]

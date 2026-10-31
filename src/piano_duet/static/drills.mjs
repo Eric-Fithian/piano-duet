@@ -178,7 +178,7 @@ export class DrillPicker {
     this.catalog = null;
     this.progress = {};
     this.levels = {};
-    this.streak = 0;
+    this.practiceDays = 0;
   }
 
   async refresh() {
@@ -198,7 +198,7 @@ export class DrillPicker {
     }
     this.progress = data.progress;
     this.levels = data.levels;
-    this.streak = data.streak_days;
+    this.practiceDays = data.practice_days;
   }
 
   saved() {
@@ -480,7 +480,7 @@ export class DrillPicker {
   renderLevels(onTrain) {
     const board = $('drillLevels');
     board.replaceChildren();
-    $('drillStreak').textContent = this.streak ? `${this.streak}-day streak` : '';
+    $('drillStreak').textContent = this.practiceDays ? `Practised on ${this.practiceDays} day${this.practiceDays === 1 ? '' : 's'}` : '';
     for (const group of this.catalog.groups) {
       const section = element('section', undefined, 'drill-level-group');
       section.append(element('h3', group, 'rule-heading'));

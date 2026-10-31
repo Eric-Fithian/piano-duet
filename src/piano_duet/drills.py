@@ -816,18 +816,7 @@ def drill_progress(attempts):
         )
         entry["goal"] = entry["best"] == len(rungs) - 1
         entry["milestone"] = milestone(drill, entry["best"])["reached"] if entry["best"] is not None else None
-    return progress, streak_days(days)
-
-
-def streak_days(days, today=None):
-    day = today or time.strftime("%Y-%m-%d")
-    if day not in days:
-        day = time.strftime("%Y-%m-%d", time.localtime(time.mktime(time.strptime(day, "%Y-%m-%d")) - 86400))
-    count = 0
-    while day in days:
-        count += 1
-        day = time.strftime("%Y-%m-%d", time.localtime(time.mktime(time.strptime(day, "%Y-%m-%d")) - 86400))
-    return count
+    return progress, len(days)
 
 
 def ladder_share(drill, rung):
