@@ -38,7 +38,7 @@ The TypeScript composer timings include constrained sampling and chord probes, b
 
 The transcription fixture contains three sampled piano notes. The split graph's maximum onset-tensor difference from the Python reference was about `0.0000023`, and it detected the same three pitches. The full graph took roughly 1.03 seconds per window on WebGPU; pruning and splitting matters. A four-thread Python reference took roughly 125–158 ms per window in these measurements. An exploratory fp16 conversion clamped constants and changed onset values by as much as 0.409, so it is not the current candidate.
 
-The Reading comparison uses the existing app's `ReadingStream` and score renderer. A local test proxy provides the cross-origin isolation needed for threaded WASM, and swaps only the transcription call. The sampled note is rendered into a synthetic microphone; no physical microphone was used. That particular comparison does not validate the complete standalone browser app. The iOS shell, account sync, download sizes and memory usage are not yet validated.
+The Reading comparison uses the existing app's `ReadingStream` and score renderer. A local test proxy provides the cross-origin isolation needed for threaded WASM, and swaps only the transcription call. The sampled note is rendered into a synthetic microphone; no physical microphone was used. That particular comparison does not validate the complete standalone browser app. The iOS shell, account sync and memory usage are not yet validated.
 
 The transcription-only measurements exclude model download and initialization, audio-file decoding, and score writing. The worker pool preserves the reference decoder's dependence on the preceding segment, and the app selects four or three workers only when the browser reports enough memory and cores; other devices use one. These are single-run Mac measurements, not iPhone results. Quantization and parity on a broader range of recordings remain to be tested.
 
@@ -55,6 +55,21 @@ The WAV-to-MusicXML prototype adds worker audio decoding and browser score writi
 The Library timings cover the file selection through the saved song, including audio decoding, model setup, transcription, score writing and saving. The first-use run fetched all six required model files from Hugging Face and took 70.6 seconds on this connection. A separate locally served run took 67.1 seconds on its first cache fill, 55.3 seconds after reloading from the cache, and 48.7 seconds with sessions already open. Each was a single run; network speed and other devices will vary. The first-use result exceeds the 60-second target but remains under the two-minute worst-case budget. A separate synthetic microphone recording passed the capture-to-saved-song flow; it was not a physical-microphone test.
 
 Model files are verified against their pinned SHA-256 and size when downloaded. A marker tied to the exact URL, revision, hash and size allows later loads to check the stored size without hashing the entire file again. If the marker is missing, the file is hashed again; a size mismatch fails the integrity check. As requested, a same-size change to a marked cached file is not detected until the file is reverified or inference fails.
+
+The pinned files have the following download sizes, calculated from the catalog rather than measured network transfer. Sizes use decimal MB and exclude the app itself, HTTP overhead and browser storage overhead. Files are downloaded when needed and reused from the cache; switching providers or falling back after a failed GPU initialization can require an additional graph.
+
+| Asset | Download size |
+| --- | ---: |
+| Aria graph and weights | 469.6 MB |
+| Live transcription, split WebGPU/WASM | 98.7 MB |
+| Live transcription, WASM fallback | 98.7 MB |
+| Full-phrase transcription, split WebGPU/WASM | 135.8 MB |
+| Full-phrase transcription, WASM fallback | 154.2 MB |
+| Recording transcription | 56.7 MB |
+| Score model | 985.8 MB |
+| Piano samples, all 29 files | 5.6 MB |
+
+Downloading all of the WebGPU-selected graph sets, the recording and score models, and the samples totals about 1.75 GB. A WASM-only device downloads about 1.77 GB for the equivalent sets. Neither figure is a measurement of peak memory or of iPhone storage use.
 
 For a three-second synthetic stereo fixture, Chrome, Playwright WebKit and real Safari decoded MP3, M4A/AAC, FLAC and WebM/Opus at the file's native sample rate and then used the same polyphase resampling as Python. All twelve results had the same sample count as ffmpeg and RMS error below 0.000027 on normalized audio (the regression tolerance is 0.005). Chrome used WebCodecs for AAC, FLAC and WebM/Opus and Web Audio for MP3; Safari and Playwright WebKit used WebCodecs for AAC and WebM/Opus and Web Audio for MP3 and FLAC. The WebM path accounts for Opus pre-skip and discard padding explicitly. A synthetic Chrome MediaRecorder recording also matched ffmpeg's sample count and had RMS error below 0.000001. The Safari format checks used `safaridriver` on the same Mac, not an iPhone.
 

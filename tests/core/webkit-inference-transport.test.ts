@@ -28,11 +28,39 @@ test("WebKit inference cancels in-flight native work and rejects malformed progr
   const transport = new WebKitInferenceTransport(handler, events);
   await assert.rejects(transport.request({ action: "run", session: "one" }, abort.signal), { name: "AbortError" });
   assert.deepEqual(messages[1], { action: "cancel", target: messages[0].requestId });
+  const invalidMessages: Record<string, unknown>[] = [];
   const invalid = new WebKitInferenceTransport({ async postMessage(message) {
+    invalidMessages.push(message);
+    if (message.action === "cancel") return {};
     events.dispatchEvent(new CustomEvent("piano-inference-progress", { detail: { requestId: message.requestId, progress: { model: "aria" } } }));
     return new Promise(() => {});
   } }, events);
   await assert.rejects(invalid.request({ action: "open", model: "aria" }), { message: "Native inference sent invalid download progress" });
+  assert.deepEqual(invalidMessages[1], { action: "cancel", target: invalidMessages[0].requestId });
+  let finishCancellation: (() => void) | undefined;
+  const completedAfterInvalidProgress = new WebKitInferenceTransport({ async postMessage(message) {
+    if (message.action === "cancel") return new Promise<void>((resolve) => { finishCancellation = resolve; });
+    events.dispatchEvent(new CustomEvent("piano-inference-progress", { detail: { requestId: message.requestId, progress: {} } }));
+    return { session: "unexpected" };
+  } }, events);
+  const rejected = completedAfterInvalidProgress.request({ action: "open", model: "aria" });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.ok(finishCancellation);
+  finishCancellation();
+  await assert.rejects(rejected, { message: "Native inference sent invalid download progress" });
+  const nativeCancelled = new WebKitInferenceTransport({ async postMessage(message) {
+    if (message.action === "cancel") return {};
+    events.dispatchEvent(new CustomEvent("piano-inference-progress", { detail: { requestId: message.requestId, progress: {} } }));
+    throw new Error("Native task cancelled");
+  } }, events);
+  await assert.rejects(nativeCancelled.request({ action: "open", model: "aria" }), { message: "Native inference sent invalid download progress" });
+  const rejectedCancel = new WebKitInferenceTransport({ async postMessage(message) {
+    if (message.action === "cancel") throw new Error("Cancellation failed");
+    events.dispatchEvent(new CustomEvent("piano-inference-progress", { detail: { requestId: message.requestId, progress: {} } }));
+    return new Promise(() => {});
+  } }, events);
+  await assert.rejects(rejectedCancel.request({ action: "open", model: "aria" }), (error: unknown) =>
+    error instanceof AggregateError && error.errors.some((cause: unknown) => cause instanceof Error && cause.message === "Cancellation failed"));
   const race = new AbortController();
   const raced = new WebKitInferenceTransport({ async postMessage(message) {
     if (message.action === "cancel") return {};

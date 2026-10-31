@@ -1,6 +1,6 @@
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
-import type { AssetId, DownloadProgress } from "./inference";
+import type { AssetId, DownloadProgress } from "./inference.ts";
 
 export interface ModelFile {
   model: AssetId;
