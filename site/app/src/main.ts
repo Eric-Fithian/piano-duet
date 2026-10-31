@@ -17,7 +17,8 @@ import { NativeInference } from "./native-inference";
 import { WebKitInferenceTransport } from "./webkit-inference-transport";
 import type { WebKitMessageHandler } from "./webkit-inference-transport";
 import { MODEL_CATALOG } from "./model-catalog";
-import type { DownloadProgress, InferenceSession } from "./inference";
+import { describeInferenceBackend } from "./inference";
+import type { DownloadProgress, InferenceSession, ModelId } from "./inference";
 import { EventLog, requestPersistentStorage } from "./event-log";
 import { PIANO_SAMPLES } from "./piano-samples";
 import { SampleStore } from "./sample-store";
@@ -67,10 +68,21 @@ async function start(): Promise<void> {
   await log.open();
   const native = (window as Window & { webkit?: { messageHandlers?: { pianoInference?: WebKitMessageHandler } } }).webkit?.messageHandlers?.pianoInference;
   const backend = native ? new NativeInference(new WebKitInferenceTransport(native, window)) : new BrowserInference(MODEL_CATALOG);
+  const settings = document.querySelector<HTMLElement>("#settingsDialog");
+  if (!settings) throw new Error("The settings dialog is missing");
+  const backendStatus = document.createElement("p"), backends = new Map<ModelId, string>();
+  backendStatus.setAttribute("aria-live", "polite");
+  settings.append(backendStatus);
+  const openSession = async <K extends ModelId>(model: K, signal?: AbortSignal): Promise<InferenceSession<K>> => {
+    const session = await backend.createSession(model, report, signal);
+    backends.set(model, describeInferenceBackend(session));
+    backendStatus.textContent = `Model backends: ${[...backends.values()].join("; ")}`;
+    return session;
+  };
   let live: Promise<InferenceSession<"live-transcription">> | undefined;
   const transcriber = {
     async run(input: { audio: Float32Array; sampleRate: 16000; threshold: number }, signal?: AbortSignal) {
-      live ??= backend.createSession("live-transcription", report, signal).catch((error) => { live = undefined; throw error; });
+      live ??= openSession("live-transcription", signal).catch((error) => { live = undefined; throw error; });
       const session = await live;
       indicator.hidden = true;
       try { return await session.run(input, signal); }
@@ -80,7 +92,7 @@ async function start(): Promise<void> {
   let recording: Promise<InferenceSession<"recording-transcription">> | undefined;
   const recordingTranscriber = {
     async run(input: { audio: Float32Array; sampleRate: 16000 }, signal?: AbortSignal) {
-      recording ??= backend.createSession("recording-transcription", report, signal).catch((error) => { recording = undefined; throw error; });
+      recording ??= openSession("recording-transcription", signal).catch((error) => { recording = undefined; throw error; });
       const session = await recording;
       indicator.hidden = true;
       try { return await session.run(input, signal); }
@@ -90,7 +102,7 @@ async function start(): Promise<void> {
   const random = new RandomSource();
   let aria: Promise<InferenceSession<"aria">> | undefined;
   const openAria = async (signal?: AbortSignal) => {
-    aria ??= backend.createSession("aria", report, signal).catch((error) => { aria = undefined; throw error; });
+    aria ??= openSession("aria", signal).catch((error) => { aria = undefined; throw error; });
     const session = await aria;
     indicator.hidden = true;
     return session;
@@ -102,7 +114,7 @@ async function start(): Promise<void> {
   let phraseSession: Promise<InferenceSession<"phrase-transcription">> | undefined;
   const phraseTranscriber = {
     async run(input: { audio: Float32Array; sampleRate: 16000; threshold: number }, signal?: AbortSignal) {
-      phraseSession ??= backend.createSession("phrase-transcription", report, signal).catch((error) => { phraseSession = undefined; throw error; });
+      phraseSession ??= openSession("phrase-transcription", signal).catch((error) => { phraseSession = undefined; throw error; });
       const session = await phraseSession;
       indicator.hidden = true;
       try { return await session.run(input, signal); }

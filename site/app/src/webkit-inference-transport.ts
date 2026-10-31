@@ -13,18 +13,28 @@ export class WebKitInferenceTransport implements NativeInferenceTransport {
     signal?.throwIfAborted();
     if (Object.hasOwn(message, "requestId")) throw new Error("Native inference request IDs are reserved");
     const requestId = crypto.randomUUID();
+    let invalidProgress = false;
     let failProgress: (error: Error) => void = () => { throw new Error("Native progress channel is not initialized"); };
     const progressFailure = new Promise<never>((_resolve, reject) => { failProgress = reject; });
     const progress = (event: Event) => {
       const detail = (event as CustomEvent<unknown>).detail;
       if (!isObject(detail) || detail.requestId !== requestId) return;
-      if (!isProgress(detail.progress)) { failProgress(new Error("Native inference sent invalid download progress")); return; }
+      if (!isProgress(detail.progress)) {
+        if (invalidProgress) return;
+        invalidProgress = true;
+        const error = new Error("Native inference sent invalid download progress");
+        void Promise.resolve().then(() => this.handler.postMessage({ action: "cancel", target: requestId }))
+          .then(() => failProgress(error), (cause: unknown) => failProgress(new AggregateError([error, cause], "Native progress and cancellation failed")));
+        return;
+      }
       onProgress?.(detail.progress);
     };
     this.events.addEventListener("piano-inference-progress", progress);
     let abort: (() => void) | undefined;
     try {
-      const response = Promise.race([Promise.resolve().then(() => this.handler.postMessage({ ...message, requestId })), progressFailure])
+      const response = Promise.race([Promise.resolve().then(() => this.handler.postMessage({ ...message, requestId }))
+        .then((result) => invalidProgress ? progressFailure : result,
+          (error: unknown) => { if (invalidProgress) return progressFailure; throw error; }), progressFailure])
         .catch((error: unknown) => { if (signal?.aborted) throw signal.reason; throw error; });
       if (!signal) return await response;
       const cancellation = new Promise<never>((_resolve, reject) => {
