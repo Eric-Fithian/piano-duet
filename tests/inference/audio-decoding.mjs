@@ -14,11 +14,15 @@ try {
     try {
       for (const format of ["mp3", "m4a", "flac", "webm"]) {
         const page = await browser.newPage();
+        const failedResponses = [];
         page.on("console", (message) => process.stderr.write(`${name}: ${message.text()}\n`));
+        page.on("response", (response) => { if (response.status() >= 400) failedResponses.push(`${response.status()} ${response.url()}`); });
         await page.goto(`http://127.0.0.1:${site.port}/test/audio-decoder.html`);
         await page.waitForFunction(() => typeof window.verifyAudioDecoder === "function");
+        await page.waitForLoadState("networkidle");
         const url = `http://127.0.0.1:${models.address().port}/fixtures/audio/fixture.${format}`;
         const result = await page.evaluate((address) => window.verifyAudioDecoder(address), url);
+        assert.deepEqual(failedResponses, [], `Failed ${name} ${format} resources`);
         await writeFile(`.cache/audio-formats/${name}-${format}.pcm`, new Uint8Array(Float32Array.from(result.audio).buffer));
         const bytes = await readFile(`.cache/audio-formats/fixture.${format}.pcm`);
         const reference = new Float32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 4);

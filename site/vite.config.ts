@@ -14,7 +14,7 @@ export default defineConfig({
   publicDir: false,
   build: { outDir: "../dist", emptyOutDir: true, assetsInlineLimit: 0 },
   optimizeDeps: { exclude: ["@sqlite.org/sqlite-wasm"],
-    include: ["@noble/hashes/sha2.js", "@noble/hashes/utils.js", "onnxruntime-web/webgpu"] },
+    include: ["@noble/hashes/sha2.js", "@noble/hashes/utils.js", "mediabunny", "onnxruntime-web/webgpu"] },
   server: { host: "127.0.0.1", headers, fs: { allow: [fileURLToPath(new URL("..", import.meta.url))] }, proxy: {
     "/docs": "http://127.0.0.1:4321",
     "/install.sh": { target: "http://127.0.0.1:4321", rewrite: () => "/docs/install.sh" },
