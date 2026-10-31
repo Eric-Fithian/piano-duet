@@ -26,7 +26,7 @@
   .progress-ring-fill, .progress-node.earned, .progress-result-fill, .progress-beam { animation: none; }
 }
 
-.transport:has(.reading-result:not([hidden])) > :not(.reading-result) { display: none; }
+.transport:has(.reading-result:not([hidden])) > :not(.reading-result):not(.note-status) { display: none; }
 .level-diamond:has(.progress-level-ring)::before { display: none; }
 .reading-result[hidden], .progress-streak[hidden] { display: none; }
 

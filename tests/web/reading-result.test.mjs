@@ -147,6 +147,10 @@ for (const [name, engine] of [['Chromium', chromium], ['WebKit', webkit]]) for (
         return head.width > 2 && head.height > 2 && head.left >= svg.left - 1 && head.right <= svg.right + 1
           && getComputedStyle(node).fill !== 'none' && Number(getComputedStyle(node).fillOpacity) >= .75;
       }), true);
+      const statusAfter = page.locator('#noteStatus');
+      assert.equal((await statusAfter.boundingBox()).height, 18);
+      assert.ok((await statusAfter.innerText()).includes('expected'));
+      assert.ok((await statusAfter.innerText()).includes('heard'));
       const resultText = await page.locator('#readingResultTray').innerText();
       assert.ok(resultText.includes('expected') && resultText.includes('heard'));
       assert.equal(await page.locator('.reading-result-actions button').count(), 2);

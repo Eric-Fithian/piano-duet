@@ -91,7 +91,9 @@ export function renderReadingResult(container, task, result, before, after, acti
   const detail = element('div', 'reading-result-detail');
   const mistake = summary.mistake;
   const heard = mistake ? mistake.tries[0].map(pitch => pitchName(pitch, task.key)).join(' + ') : '';
-  const text = mistake ? `${pitchName(mistake.expected, task.key)} expected · ${heard} heard · ` : '';
+  const status = mistake ? `${pitchName(mistake.expected, task.key)} expected · ${heard} heard` : '';
+  $('noteStatus').textContent = status;
+  const text = status ? `${status} · ` : '';
   const review = element('button', 'secondary', 'Review');
   review.addEventListener('click', actions.review);
   detail.append(element('span', '', `${text}${number(summary.xp)} XP earned`), review);

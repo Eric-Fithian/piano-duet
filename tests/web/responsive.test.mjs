@@ -226,6 +226,13 @@ for (const [engineName, engine] of [['chromium', chromium], ['webkit', webkit]])
       await page.getByRole('button', {name: 'Score controls', exact: true}).click();
     }
     await mode('drills');
+    await page.waitForFunction(() => !document.querySelector('#start').disabled);
+    await page.locator('#start').click();
+    await page.waitForFunction(() => document.querySelector('#start').getAttribute('aria-pressed') === 'true');
+    assert.equal(await page.locator('#drillProgress').isVisible(), false);
+    assert.equal(await page.locator('#drillBest').isVisible(), false);
+    await checkLayout(page, `${engineName} drills playing`);
+    await page.locator('#start').click();
     for (const {name, width, height} of viewports) {
       await resizeScore(width, height); await capture(`${name}-drills`);
       if (await page.locator('#drillMore').isVisible()) {
