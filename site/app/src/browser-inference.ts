@@ -1,5 +1,4 @@
-import type { DownloadProgress, InferenceBackend, InferenceSession, ModelId, ModelInputs, ModelOutputs } from "./inference.ts";
-import type { ModelFile } from "./model-store.ts";
+import type { DownloadProgress, InferenceBackend, InferenceSession, ModelFile, ModelId, ModelInputs, ModelOutputs } from "./inference.ts";
 
 export type ModelRole = "graph" | "weights" | "convolution" | "recurrent" | "features" | "attributes"
   | "score-encoder" | "score-first" | "score-context" | "score-step";

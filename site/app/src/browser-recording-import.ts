@@ -1,6 +1,6 @@
-import { decodeAudioFile } from "./audio-decoder";
-import type { DownloadProgress, PianoNote } from "./inference";
-import type { ModelAsset } from "./browser-inference";
+import { decodeAudioFile } from "./audio-decoder.ts";
+import type { DownloadProgress, InferenceBackendRecord, PianoNote } from "./inference.ts";
+import type { ModelAsset } from "./browser-inference.ts";
 
 type Pending = { resolve: (value: unknown) => void; reject: (error: Error) => void };
 
@@ -9,25 +9,41 @@ export class BrowserRecordingImporter {
   private pending = new Map<number, Pending>();
   private sequence = 0;
   private opening?: Promise<void>;
+  private readonly recording: ModelAsset[];
+  private readonly score: ModelAsset[];
+  private readonly progress: (value: DownloadProgress) => void;
+  private readonly stage: (value: string) => void;
+  private readonly reportBackend: (value: InferenceBackendRecord) => void;
 
-  constructor(private recording: ModelAsset[], private score: ModelAsset[], private progress: (value: DownloadProgress) => void,
-    private stage: (value: string) => void) {}
+  constructor(recording: ModelAsset[], score: ModelAsset[], progress: (value: DownloadProgress) => void,
+    stage: (value: string) => void, reportBackend: (value: InferenceBackendRecord) => void = () => {}) {
+    this.recording = recording; this.score = score; this.progress = progress; this.stage = stage; this.reportBackend = reportBackend;
+  }
 
   prepare(signal?: AbortSignal): Promise<void> {
     if (!this.opening) {
       this.worker = new Worker(new URL("./recording-import-worker.ts", import.meta.url), { type: "module" });
       this.worker.onmessage = ({ data }: MessageEvent<{ id: number; value?: unknown; error?: string; errorName?: string;
+        errorStack?: string; errorCauses?: { message: string; name: string; stack?: string }[];
         progress?: DownloadProgress; stage?: string }>) => {
         if (data.progress) { this.progress(data.progress); return; }
         if (data.stage) { this.stage(data.stage); return; }
         const pending = this.pending.get(data.id);
         if (!pending) throw new Error(`Unexpected recording import response ${data.id}`);
         this.pending.delete(data.id);
-        if (data.error) pending.reject(data.errorName === "AbortError" ? new DOMException(data.error, "AbortError") : new Error(data.error));
+        if (data.error) {
+          const causes = data.errorCauses?.map((cause) => Object.assign(new Error(cause.message), { name: cause.name, stack: cause.stack }));
+          const error = data.errorName === "AbortError" ? new DOMException(data.error, "AbortError")
+            : causes ? new AggregateError(causes, data.error) : Object.assign(new Error(data.error), { name: data.errorName ?? "Error" });
+          if (data.errorStack) error.stack = data.errorStack;
+          pending.reject(error);
+        }
         else pending.resolve(data.value);
       };
       this.worker.onerror = (event) => this.terminate(new Error(`Recording import worker failed: ${event.message}`));
-      this.opening = this.send("open", { recording: this.recording, score: this.score }, signal).then(() => undefined).catch((error: unknown) => {
+      this.opening = this.send<InferenceBackendRecord>("open", { recording: this.recording, score: this.score }, signal).then((backend) => {
+        this.reportBackend(backend);
+      }).catch((error: unknown) => {
         this.terminate(error instanceof Error ? error : new Error(String(error))); throw error;
       });
     }
