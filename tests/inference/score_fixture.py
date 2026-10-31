@@ -1,4 +1,4 @@
-"""Record public score-model inputs and greedy output for local browser parity."""
+"""Record score-model inputs and greedy output for local browser parity."""
 
 import argparse
 import json
@@ -32,7 +32,8 @@ def main():
     expected = {name: (value[:, 0].long() if name == 'pad' else value.argmax(-1)).tolist()
                 for name, value in result.items()}
     fixture = {'source': {name: value.tolist() for name, value in streams.items()}, 'expected': expected,
-               'reference_ms': 1000 * (time.perf_counter() - started), 'source_notes': streams['pitch'].shape[1]}
+               'reference_ms': 1000 * (time.perf_counter() - started), 'source_notes': streams['pitch'].shape[1],
+               'decoder_layers': model.dec_config.num_hidden_layers}
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(fixture))
     print(f'{fixture["source_notes"]} input notes, {sum(expected["pad"])} output notes, {fixture["reference_ms"]:.0f} ms')

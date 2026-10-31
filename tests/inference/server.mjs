@@ -3,6 +3,9 @@ import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 
 const recordingDirectory = process.env.PIANO_RECORDING_MODEL_DIR ?? ".cache/models/recording-transcription/onnx-fp32";
+const scoreDirectory = process.env.PIANO_SCORE_MODEL_DIR ?? ".cache/m2st/onnx-public";
+const scoreFixture = process.env.PIANO_SCORE_FIXTURE ?? ".cache/m2st/score-fixture.json";
+const recordingPcm = process.env.PIANO_RECORDING_PCM ?? ".cache/browser-inference/recording.pcm";
 const paths = {
   "/runner.mjs": "tests/inference/browser-runner.mjs",
   "/worker.mjs": "tests/inference/browser-worker.mjs",
@@ -19,12 +22,12 @@ const paths = {
   "/models/local-fixture/graph.onnx": ".cache/browser-inference/transcription.onnx",
   "/models/local-fixture/recording-features.onnx": `${recordingDirectory}/features.onnx`,
   "/models/local-fixture/recording-attributes.onnx": `${recordingDirectory}/attributes.onnx`,
-  "/fixtures/recording.pcm": ".cache/browser-inference/recording.pcm",
-  "/models/score/encoder.onnx": ".cache/m2st/onnx-public/encoder.onnx",
-  "/models/score/decoder-first.onnx": ".cache/m2st/onnx-public/decoder-first.onnx",
-  "/models/score/decoder-context.onnx": ".cache/m2st/onnx-public/decoder-context.onnx",
-  "/models/score/decoder-step.onnx": ".cache/m2st/onnx-public/decoder-step.onnx",
-  "/fixtures/score-fixture.json": ".cache/m2st/score-fixture.json",
+  "/fixtures/recording.pcm": recordingPcm,
+  "/models/score/encoder.onnx": `${scoreDirectory}/encoder.onnx`,
+  "/models/score/decoder-first.onnx": `${scoreDirectory}/decoder-first.onnx`,
+  "/models/score/decoder-context.onnx": `${scoreDirectory}/decoder-context.onnx`,
+  "/models/score/decoder-step.onnx": `${scoreDirectory}/decoder-step.onnx`,
+  "/fixtures/score-fixture.json": scoreFixture,
   "/fixtures/aria.json": ".cache/models/aria/onnx-int4-block64/parity.json",
 };
 

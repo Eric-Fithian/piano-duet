@@ -9,9 +9,8 @@ import type { ModelAsset } from "../src/browser-inference";
 const INPUTS = { offset: 145, downbeat: 146, duration: 97, pitch: 128, accidental: 7, keysignature: 16,
   grace: 2, trill: 2, staccato: 2, voice: 9, stem: 4, hand: 3 };
 const ORDER = ["offset", "downbeat", "duration", "pitch", "accidental", "keysignature", "velocity", "grace", "trill", "staccato", "voice", "stem", "hand", "pad"];
-const CACHES = Array.from({ length: 4 }, (_, index) => ["self_key", "self_value", "cross_key", "cross_value"].map((kind) => `${kind}_${index}`)).flat();
 const WHITE = [0, 2, 4, 5, 7, 9, 11];
-type Fixture = { source: Record<string, number[][][]> & { pad: number[][] }; expected: Record<string, number[]>; source_notes: number; reference_ms: number };
+type Fixture = { source: Record<string, number[][][]> & { pad: number[][] }; expected: Record<string, number[]>; source_notes: number; reference_ms: number; decoder_layers: number };
 
 ort.env.wasm.numThreads = crossOriginIsolated ? navigator.hardwareConcurrency : 1;
 ort.env.wasm.wasmPaths = { wasm: new URL(wasmUrl, location.origin).href, mjs: new URL(wasmModuleUrl, location.origin).href };
@@ -61,6 +60,8 @@ async function verifyScore(base: string, provider: "webgpu" | "wasm", notes?: Sc
     const response = await fetch(`${base}/fixtures/score-fixture.json`);
     if (!response.ok) throw new Error("Score fixture is unavailable");
     const fixture = await response.json() as Fixture;
+    if (!Number.isInteger(fixture.decoder_layers) || fixture.decoder_layers < 1) throw new Error("Score fixture is missing its decoder layer count");
+    const CACHES = Array.from({ length: fixture.decoder_layers }, (_, index) => ["self_key", "self_value", "cross_key", "cross_value"].map((kind) => `${kind}_${index}`)).flat();
     const outputs = Object.fromEntries(CACHES.map((name) => [`present_${name}`, "gpu-buffer"])) as Record<string, "gpu-buffer">;
     const executionProviders = provider === "webgpu" ? ["webgpu", "wasm"] : ["wasm"];
     const encoder = await ort.InferenceSession.create(`${base}/models/score/encoder.onnx`, { executionProviders,

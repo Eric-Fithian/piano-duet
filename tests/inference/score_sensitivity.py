@@ -11,21 +11,26 @@ from bisect import bisect_right
 from collections import Counter
 from pathlib import Path
 
-DIRECTORY = Path('.cache/m2st/score-sensitivity')
+ROOT = Path('.cache/m2st')
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--worker', action='store_true')
+    parser.add_argument('--checkpoint', type=Path, default=ROOT / 'MIDI2ScoreTF.ckpt')
+    parser.add_argument('--fixture', type=Path, default=ROOT / 'score-fixture.json')
+    parser.add_argument('--browser-tokens', type=Path, default=ROOT / 'browser-score-tokens.json')
+    parser.add_argument('--notes', type=Path, default=ROOT / 'recording-notes.json')
+    parser.add_argument('--output', type=Path, default=ROOT / 'score-sensitivity')
     args = parser.parse_args()
     if args.worker:
-        write_scores()
+        write_scores(args)
         return
     from piano_duet.notes import Note, midi_bytes
     from piano_duet.score_import import parse_musicxml
 
-    DIRECTORY.mkdir(parents=True, exist_ok=True)
-    notes = json.loads(Path('.cache/m2st/recording-notes.json').read_text())
+    args.output.mkdir(parents=True, exist_ok=True)
+    notes = json.loads(args.notes.read_text())
     for seed in range(4):
         rng = random.Random(seed)
         perturbed = []
@@ -33,12 +38,13 @@ def main():
             start = max(0, note['start'] + rng.choice((-0.00002, 0.00002)))
             duration = note['start'] + note['duration'] - start
             perturbed.append(Note(**{**note, 'start': start, 'duration': duration}))
-        (DIRECTORY / f'jitter-{seed}.mid').write_bytes(midi_bytes(perturbed))
-    subprocess.run(['.cache/m2st/venv/bin/python', '-I', str(Path(__file__)), '--worker'], check=True)
-    scores = {name: parse_musicxml((DIRECTORY / f'{name}.musicxml').read_bytes())
+        (args.output / f'jitter-{seed}.mid').write_bytes(midi_bytes(perturbed))
+    subprocess.run([str(ROOT / 'venv/bin/python'), '-I', str(Path(__file__)), '--worker', '--checkpoint', str(args.checkpoint),
+                    '--fixture', str(args.fixture), '--browser-tokens', str(args.browser_tokens), '--output', str(args.output)], check=True)
+    scores = {name: parse_musicxml((args.output / f'{name}.musicxml').read_bytes())
               for name in ('reference', 'browser', *(f'jitter-{seed}' for seed in range(4)))}
     reference = scores['reference']
-    comparisons = {name: compare_scores(reference, score, name) for name, score in scores.items() if name != 'reference'}
+    comparisons = {name: compare_scores(reference, score, name, args.output) for name, score in scores.items() if name != 'reference'}
     jitter = [comparisons[f'jitter-{seed}']['muster']['NewMeanER'] for seed in range(4)]
     jitter_f1 = [comparisons[f'jitter-{seed}']['aligned_pitch_f1'] for seed in range(4)]
     ceiling = max(jitter)
@@ -49,28 +55,28 @@ def main():
               'jitter_muster_new_mean_error_range': [min(jitter), ceiling], 'browser_within_jitter_spread': passed,
               'jitter_aligned_pitch_f1_range': [min(jitter_f1), max(jitter_f1)],
               'comparisons': comparisons, 'detokenizer': 'Python reference for both outputs'}
-    (DIRECTORY / 'comparison.json').write_text(json.dumps(result, indent=2) + '\n')
+    (args.output / 'comparison.json').write_text(json.dumps(result, indent=2) + '\n')
     print(json.dumps(result, indent=2))
     if not passed:
         raise AssertionError('Browser score agreement is outside Python onset-jitter sensitivity')
 
 
-def write_scores():
+def write_scores(args):
     import torch
 
     sys.path.insert(0, '.cache/m2st/repo/midi2scoretransformer')
     namespace = runpy.run_path('src/piano_duet/midi_to_score.py')
-    model = namespace['Roformer'].load_from_checkpoint('.cache/m2st/MIDI2ScoreTF.ckpt', map_location='cpu').eval()
+    model = namespace['Roformer'].load_from_checkpoint(str(args.checkpoint), map_location='cpu').eval()
     torch.set_num_threads(4)
-    reference = json.loads(Path('.cache/m2st/score-fixture.json').read_text())['expected']
-    browser = json.loads(Path('.cache/m2st/browser-score-tokens.json').read_text())
-    write_score(namespace, model, token_tensors(reference, model), DIRECTORY / 'reference.musicxml')
-    write_score(namespace, model, token_tensors(browser, model), DIRECTORY / 'browser.musicxml')
+    reference = json.loads(args.fixture.read_text())['expected']
+    browser = json.loads(args.browser_tokens.read_text())
+    write_score(namespace, token_tensors(reference, model), args.output / 'reference.musicxml')
+    write_score(namespace, token_tensors(browser, model), args.output / 'browser.musicxml')
     for seed in range(4):
-        source = namespace['MultistreamTokenizer'].tokenize_midi(str(DIRECTORY / f'jitter-{seed}.mid'))
+        source = namespace['MultistreamTokenizer'].tokenize_midi(str(args.output / f'jitter-{seed}.mid'))
         torch.manual_seed(0)
         result = namespace['infer'](model, source, 'cpu')
-        write_score(namespace, model, result, DIRECTORY / f'jitter-{seed}.musicxml')
+        write_score(namespace, result, args.output / f'jitter-{seed}.musicxml')
 
 
 def token_tensors(values, model):
@@ -87,13 +93,13 @@ def token_tensors(values, model):
     return output
 
 
-def write_score(namespace, model, tokens, path):
+def write_score(namespace, tokens, path):
     fixed = namespace['match_key_to_spelling'](tokens)
     score = namespace['MultistreamTokenizer'].detokenize_mxl(fixed)
     namespace['postprocess_score'](score, inPlace=True).write('musicxml', fp=str(path), makeNotation=False)
 
 
-def compare_scores(reference, actual, name):
+def compare_scores(reference, actual, name, directory):
     def rows(score):
         return Counter((note['pitch'], round(note['beat'], 4), round(note['length'], 4), note['staff'],
                         bisect_right(score['measures'], note['beat'] + 1e-7) - 1) for note in score['notes'])
@@ -106,7 +112,7 @@ def compare_scores(reference, actual, name):
     f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0
     command = ['.cache/muster/venv/bin/python', '-c',
                'from muster import muster; import json,sys; print(json.dumps(muster(sys.argv[1], sys.argv[2])))',
-               str(DIRECTORY / f'{name}.musicxml'), str(DIRECTORY / 'reference.musicxml')]
+               str(directory / f'{name}.musicxml'), str(directory / 'reference.musicxml')]
     result = subprocess.run(command, check=True, capture_output=True, text=True)
     muster = json.loads(result.stdout)
     if any(not isinstance(value, (int, float)) or not math.isfinite(value) for value in muster.values()):

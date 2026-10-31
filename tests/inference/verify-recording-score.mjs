@@ -27,7 +27,7 @@ try {
   await page.waitForFunction(() => typeof window.verifyRecordingScore === "function");
   result = await page.evaluate(({ base, assets }) => window.verifyRecordingScore(base, assets), { base, assets });
   if (!result.score.tokens) throw new Error("The browser did not return score tokens");
-  await writeFile(".cache/m2st/browser-score-tokens.json", JSON.stringify(result.score.tokens));
+  await writeFile(process.env.PIANO_SCORE_TOKEN_OUTPUT ?? ".cache/m2st/browser-score-tokens.json", JSON.stringify(result.score.tokens));
   const { tokens, ...summary } = result.score;
   console.log(JSON.stringify({ ...result, score: summary }, null, 2));
 } finally {
