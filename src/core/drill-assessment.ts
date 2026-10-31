@@ -6,8 +6,9 @@ import type { MusicalKey } from "./musical-key.ts";
 import { mean, median, roundEven } from "./numeric.ts";
 import { comparePerformance } from "./performance-comparison.ts";
 
+export type DrillConfig = { drill: DrillId; variant: string; tonic: number; hands: string; octaves: number; inversion: number };
 export type DrillPrompt = { target: DrillNote[]; bpm: number; challenge: number; key: MusicalKey;
-  drill: { drill: DrillId; practice: string; per_beat: number; config_key: string; title: string } };
+  drill: DrillConfig & { practice: string; per_beat: number; config_key: string; title: string } };
 type Quality = { usable: boolean; [key: string]: unknown };
 type Evidence = { skill: string; facet: string; label: string; value: number; weight: number; challenge: number };
 const CLEAN = { pitch: 90, evenness: 80, drift: 8 };

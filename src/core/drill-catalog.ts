@@ -1520,3 +1520,163 @@ export const DRILL_CATALOG = {
     }
   }
 } as const;
+
+export const DRILL_MILESTONES = {
+  "five_finger": [
+    [
+      1,
+      100,
+      "RCM Preparatory A"
+    ]
+  ],
+  "scale": [
+    [
+      2,
+      60,
+      "RCM Preparatory B"
+    ],
+    [
+      2,
+      69,
+      "RCM Level 1"
+    ],
+    [
+      2,
+      80,
+      "RCM Level 2"
+    ],
+    [
+      2,
+      92,
+      "RCM Level 4"
+    ],
+    [
+      2,
+      104,
+      "RCM Level 5"
+    ],
+    [
+      4,
+      60,
+      "RCM Level 6"
+    ],
+    [
+      4,
+      76,
+      "RCM Level 7"
+    ],
+    [
+      4,
+      88,
+      "RCM Level 8"
+    ],
+    [
+      4,
+      104,
+      "RCM Level 9"
+    ],
+    [
+      4,
+      120,
+      "RCM Level 10"
+    ]
+  ],
+  "chromatic": [
+    [
+      2,
+      104,
+      "RCM Level 4"
+    ]
+  ],
+  "arpeggio": [
+    [
+      2,
+      72,
+      "RCM Level 4"
+    ],
+    [
+      2,
+      80,
+      "RCM Level 5"
+    ],
+    [
+      2,
+      92,
+      "RCM Level 6"
+    ],
+    [
+      4,
+      60,
+      "RCM Level 7"
+    ],
+    [
+      4,
+      69,
+      "RCM Level 8"
+    ],
+    [
+      4,
+      84,
+      "RCM Level 9"
+    ],
+    [
+      4,
+      92,
+      "RCM Level 10"
+    ]
+  ],
+  "seventh_arpeggio": [
+    [
+      2,
+      88,
+      "RCM Level 6"
+    ]
+  ],
+  "broken_chord": [
+    [
+      3,
+      50,
+      "RCM Level 1"
+    ],
+    [
+      3,
+      60,
+      "RCM Level 2"
+    ],
+    [
+      3,
+      69,
+      "RCM Level 3"
+    ]
+  ],
+  "block_chord": [
+    [
+      1,
+      100,
+      "RCM Level 1"
+    ],
+    [
+      1,
+      112,
+      "RCM Level 2"
+    ],
+    [
+      1,
+      120,
+      "RCM Level 3"
+    ]
+  ],
+  "cadence": [],
+  "hanon": [
+    [
+      4,
+      60,
+      "Hanon's starting mark"
+    ],
+    [
+      4,
+      108,
+      "Hanon's goal"
+    ]
+  ]
+} as const;

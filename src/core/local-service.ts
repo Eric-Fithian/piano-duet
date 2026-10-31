@@ -20,6 +20,10 @@ import { scoreXp } from "./reading-rewards.ts";
 import { measureLandings } from "./reading-fluency.ts";
 import type { PositionChange } from "./reading-fluency.ts";
 import { LIBRARY_CATALOG } from "./library-catalog.ts";
+import { DRILL_CATALOG } from "./drill-catalog.ts";
+import { drillProgress } from "./drill-progress.ts";
+import type { DrillAttempt } from "./drill-progress.ts";
+import { drillLevels } from "./drill-levels.ts";
 
 export type LocalJsonValue = null | boolean | number | string | LocalJsonValue[] | { [key: string]: LocalJsonValue };
 export interface LocalEventStore {
@@ -82,6 +86,11 @@ export class LocalService {
         return Response.json({ detail: "Saved songs are not available yet" }, { status: 501 });
       }
       return Response.json({ songs: [], catalog: LIBRARY_CATALOG });
+    }
+    if (method === "GET" && url.pathname === "/api/drills") {
+      const attempts = attemptsFromEvents(await this.store.list());
+      const { progress, streak_days } = drillProgress(attempts as unknown as DrillAttempt[], this.now());
+      return Response.json({ catalog: DRILL_CATALOG, progress, levels: drillLevels(progress), streak_days });
     }
     if (method === "POST" && url.pathname === "/api/practice/next") {
       if (typeof options.body !== "string") return Response.json({ detail: "A practice request needs JSON" }, { status: 400 });
