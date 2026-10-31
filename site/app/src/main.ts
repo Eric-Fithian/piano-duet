@@ -27,6 +27,7 @@ import { SampleStore } from "./sample-store";
 import { BrowserRecordingImporter } from "./browser-recording-import";
 import { NativeRecordingImporter } from "./native-recording-import";
 import { recordingStage, setupRecordingUi } from "./recording-ui";
+import { setupYoutubeImport } from "./youtube-import";
 import { setupModelSettings } from "./model-settings";
 import { setupHistoryImport } from "./history-import";
 import { setupSyncUi } from "./sync-ui";
@@ -157,6 +158,9 @@ async function start(): Promise<void> {
   if (!recordingAssets || !scoreAssets) throw new Error("Recording import models are missing from the catalog");
   const importStage = (stage: string) => {
     indicator.hidden = true; recordingStage(stage);
+    const youtube = document.querySelector<HTMLDialogElement>("#youtubeDialog");
+    const youtubeStage = document.querySelector<HTMLElement>("#youtubeStage");
+    if (youtube?.open && youtubeStage) youtubeStage.textContent = stage;
   };
   const importer = native ? new NativeRecordingImporter(backend, report, importStage)
     : new BrowserRecordingImporter(recordingAssets, scoreAssets, report, importStage, (record) => reportBackend("midi-to-score", record));
@@ -165,6 +169,7 @@ async function start(): Promise<void> {
   if (import.meta.env.PROD && "serviceWorker" in navigator) await navigator.serviceWorker.register("/service-worker.js");
   const app = await import("../../../src/piano_duet/static/app.mjs");
   setupRecordingUi(importer, app.loadLibrary);
+  setupYoutubeImport(app.loadLibrary);
   setupHistoryImport(log, async () => { await app.refreshProfile(); await app.loadLibrary(); });
   void setupSyncUi(log, app.refreshSyncedData).catch((error: unknown) => {
     const panel = document.querySelector<HTMLElement>("#accountSync");

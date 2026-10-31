@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>YouTube import checks</title></head>
+<body>
+<button id="importYoutubeLink">From YouTube link</button>
+<dialog id="youtubeDialog"><button data-close="youtubeDialog">Done</button><form id="youtubeForm">
+<input id="youtubeUrl" type="url" required><input id="youtubeRights" type="checkbox" required>
+<button id="youtubeGo" type="submit">Transcribe</button><div id="youtubeProgress" hidden><span id="youtubeStage"></span><i id="youtubeFill"></i></div>
+<p id="youtubeError" hidden></p></form></dialog>
+<script type="module" src="./youtube-import.ts"></script></body></html>

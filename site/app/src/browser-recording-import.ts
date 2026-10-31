@@ -53,8 +53,8 @@ export class BrowserRecordingImporter {
   }
 
   async run(data: ArrayBuffer, signal?: AbortSignal): Promise<{ musicXml: string; notes: PianoNote[] }> {
-    this.stage("Opening the recording");
-    const [, decoded] = await Promise.all([this.prepare(signal), decodeAudioFile(data)]);
+    this.stage("Decoding audio");
+    const [, decoded] = await Promise.all([this.prepare(signal), decodeAudioFile(data, signal)]);
     signal?.throwIfAborted();
     try { return await this.send("run", { audio: decoded.audio.buffer }, signal, [decoded.audio.buffer]); }
     catch (error) { this.terminate(error instanceof Error ? error : new Error(String(error))); throw error; }
