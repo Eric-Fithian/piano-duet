@@ -28,10 +28,14 @@ export default defineConfig({
       if ((url === undefined) !== (anonKey === undefined) || (url !== undefined && (!url.trim() || !anonKey?.trim()))) {
         throw new Error("SUPABASE_URL and SUPABASE_ANON_KEY must be set together");
       }
+      const emailEnabled = process.env.SUPABASE_EMAIL_ENABLED;
+      if (emailEnabled !== undefined && emailEnabled !== "true" && emailEnabled !== "false") {
+        throw new Error("SUPABASE_EMAIL_ENABLED must be true or false");
+      }
     },
     generateBundle() {
       const { SUPABASE_URL: url, SUPABASE_ANON_KEY: anonKey } = process.env;
-      if (url && anonKey) this.emitFile({ type: "asset", fileName: "sync-config.json", source: JSON.stringify({ url, anonKey }) });
+      if (url && anonKey) this.emitFile({ type: "asset", fileName: "sync-config.json", source: JSON.stringify({ url, anonKey, emailEnabled: process.env.SUPABASE_EMAIL_ENABLED === "true" }) });
     },
   }, {
     name: "reference-interface",

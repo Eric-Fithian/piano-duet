@@ -13,7 +13,15 @@ npm ci --prefix site
 npm run dev    # app at http://127.0.0.1:5173, docs under /docs
 ```
 
-The browser app is under construction: Reading, Drills, Library recording import, Duet and Variations use the local service and the pinned model catalog; guided Practice and account sync are being integrated. The browser downloads model files when a mode first needs them. For the Python reference, run `make setup` to install its dependencies, models and browser test engines, then `make dev` to start it at `http://127.0.0.1:8765`. Python edits restart that server; browser edits refresh its page without reloading the models.
+The browser app is under construction: Reading, guided Practice, Drills, Library recording import, Duet and Variations use the local service and the pinned model catalog. The browser downloads model files when a mode first needs them. For the Python reference, run `make setup` to install its dependencies, models and browser test engines, then `make dev` to start it at `http://127.0.0.1:8765`. Python edits restart that server; browser edits refresh its page without reloading the models.
+
+## Account sign-in
+
+Account sync is implemented, but public sign-in still needs a provider. The app keeps practice history on the device while sign-in is unavailable. The choices are:
+
+- **Email link:** Choose an email provider such as Resend or Postmark and a domain you control. The domain owner must authorize the provider and add its DNS verification records; a `*.vercel.app` address cannot be verified as the sending domain. Configure [custom SMTP in Supabase](https://supabase.com/docs/guides/auth/auth-smtp) and verify delivery to a public address. Supabase's default sender is limited to project-team addresses. Only after verification, set `SUPABASE_EMAIL_ENABLED=true` for the app build. It defaults to false.
+- **Google:** Choose a Google Cloud project and authorize creation of a [Google OAuth client](https://supabase.com/docs/guides/auth/social-sign-in/auth-google), with the Supabase redirect URI, then configure it in Supabase and the app. Google sign-in does not require a sign-in email.
+- **Apple later:** Use an Apple Developer account to configure the app identifier, web Services ID, signing key and redirect for [Sign in with Apple](https://supabase.com/docs/guides/auth/social-sign-in/auth-apple), then configure it in Supabase and the app.
 
 ## Checks
 
