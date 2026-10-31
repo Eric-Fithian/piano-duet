@@ -45,13 +45,19 @@ const paths = {
   "/fixtures/aria.json": ".cache/models/aria/onnx-int4-block64/parity.json",
 };
 
-export async function startServer({ referencePort, port = 0 } = {}) {
+export async function startServer({ referencePort, port = 0, preloadScript } = {}) {
   if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error("Invalid fixture server port");
+  if (preloadScript && !referencePort) throw new Error("A preload script requires a reference server");
   const server = createServer(async (request, response) => {
     response.setHeader("Cross-Origin-Opener-Policy", "same-origin");
     response.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
     response.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
     response.setHeader("Access-Control-Allow-Origin", "*");
+    if (request.url === "/test/safari-reading-preload.js" && preloadScript) {
+      response.setHeader("Content-Type", "text/javascript");
+      response.end(preloadScript());
+      return;
+    }
     if (request.url === "/" && !referencePort) {
       response.setHeader("Content-Type", "text/html");
       response.end('<script type="module" src="/runner.mjs"></script>');
@@ -64,6 +70,7 @@ export async function startServer({ referencePort, port = 0 } = {}) {
       if (referencePort) {
         const headers = { ...request.headers, host: `127.0.0.1:${referencePort}` };
         if (headers.origin) headers.origin = `http://127.0.0.1:${referencePort}`;
+        if (preloadScript && request.url === "/") headers["accept-encoding"] = "identity";
         const upstream = httpRequest({ host: "127.0.0.1", port: referencePort, path: request.url,
           method: request.method, headers }, (upstreamResponse) => {
           const forwarded = { ...upstreamResponse.headers,
@@ -72,8 +79,21 @@ export async function startServer({ referencePort, port = 0 } = {}) {
             forwarded["content-security-policy"] = forwarded["content-security-policy"]
               .replace("script-src 'self'", "script-src 'self' 'wasm-unsafe-eval'") + "; worker-src 'self'";
           }
-          response.writeHead(upstreamResponse.statusCode, forwarded);
-          upstreamResponse.pipe(response);
+          if (preloadScript && request.url === "/") {
+            const chunks = [];
+            upstreamResponse.on("data", (chunk) => chunks.push(chunk));
+            upstreamResponse.on("end", () => {
+              const html = Buffer.concat(chunks).toString("utf8");
+              if (upstreamResponse.statusCode !== 200 || !html.includes("<head>")) throw new Error("The reference page cannot load the Safari preload script");
+              const output = html.replace("<head>", '<head><script src="/test/safari-reading-preload.js"></script>');
+              forwarded["content-length"] = Buffer.byteLength(output);
+              response.writeHead(upstreamResponse.statusCode, forwarded);
+              response.end(output);
+            });
+          } else {
+            response.writeHead(upstreamResponse.statusCode, forwarded);
+            upstreamResponse.pipe(response);
+          }
         });
         upstream.on("error", (error) => { throw error; });
         request.pipe(upstream);
