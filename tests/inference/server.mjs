@@ -7,6 +7,9 @@ const scoreDirectory = process.env.PIANO_SCORE_MODEL_DIR ?? ".cache/m2st/onnx-pu
 const scoreFixture = process.env.PIANO_SCORE_FIXTURE ?? ".cache/m2st/score-fixture.json";
 const recordingPcm = process.env.PIANO_RECORDING_PCM ?? ".cache/browser-inference/recording.pcm";
 const recordingWav = process.env.PIANO_RECORDING_WAV ?? ".cache/browser-inference/recording-three-minutes.wav";
+const phraseModel = process.env.PIANO_PHRASE_MODEL ?? ".cache/models/transcription/piano_crnn.onnx";
+const phraseSplitDirectory = process.env.PIANO_PHRASE_SPLIT_DIR ?? ".cache/browser-inference";
+const ariaDirectory = process.env.PIANO_ARIA_MODEL_DIR ?? ".cache/models/aria/onnx-int4-block64";
 const paths = {
   "/runner.mjs": "tests/inference/browser-runner.mjs",
   "/worker.mjs": "tests/inference/browser-worker.mjs",
@@ -16,11 +19,15 @@ const paths = {
   "/fixtures/transcription.json": ".cache/browser-inference/transcription.json",
   "/models/aria/model.onnx": ".cache/models/aria/onnx-int4-block64/model.onnx",
   "/models/aria/model.onnx.data": ".cache/models/aria/onnx-int4-block64/model.onnx.data",
-  "/models/local-fixture/model.onnx": ".cache/models/aria/onnx-int4-block64/model.onnx",
-  "/models/local-fixture/model.onnx.data": ".cache/models/aria/onnx-int4-block64/model.onnx.data",
+  "/models/local-fixture/model.onnx": `${ariaDirectory}/model.onnx`,
+  "/models/local-fixture/model.onnx.data": `${ariaDirectory}/model.onnx.data`,
   "/models/local-fixture/convolution.onnx": ".cache/browser-inference/transcription-convolution-fp32.onnx",
   "/models/local-fixture/recurrent.onnx": ".cache/browser-inference/transcription-recurrent.onnx",
   "/models/local-fixture/graph.onnx": ".cache/browser-inference/transcription.onnx",
+  "/models/local-fixture/piano_crnn.onnx": phraseModel,
+  "/models/local-fixture/phrase-convolution.onnx": `${phraseSplitDirectory}/phrase-convolution.onnx`,
+  "/models/local-fixture/phrase-recurrent.onnx": `${phraseSplitDirectory}/phrase-recurrent.onnx`,
+  "/fixtures/phrase.pcm": ".cache/browser-inference/phrase.pcm",
   "/models/local-fixture/recording-features.onnx": `${recordingDirectory}/features.onnx`,
   "/models/local-fixture/recording-attributes.onnx": `${recordingDirectory}/attributes.onnx`,
   "/fixtures/recording.pcm": recordingPcm,

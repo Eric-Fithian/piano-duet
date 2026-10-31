@@ -3,6 +3,7 @@ import wasmUrl from "onnxruntime-web/ort-wasm-simd-threaded.asyncify.wasm?url";
 import wasmModuleUrl from "onnxruntime-web/ort-wasm-simd-threaded.asyncify.mjs?url";
 import { decodeLiveOnsets } from "./live-onsets";
 import { transcribeRecording } from "./recording-runtime";
+import { transcribePhrase } from "./phrase-runtime";
 import { RecordingPool } from "./recording-pool";
 import { ScoreRuntime } from "./score-runtime";
 import { resample16To441 } from "../../../src/core/resample.ts";
@@ -39,7 +40,8 @@ async function open(id: number, name: ModelId, files: ModelAsset[], preference: 
   if (session || recordingPool || scoreRuntime) throw new Error("The inference session is already open");
   if (files.some((file) => file.model !== name)) throw new Error("Model catalog contains a mismatched file");
   const gpu = (navigator as Navigator & { gpu?: { requestAdapter(): Promise<unknown> } }).gpu;
-  provider = name !== "recording-transcription" && preference === "auto" && gpu && await gpu.requestAdapter() ? "webgpu" : "wasm";
+  provider = name !== "recording-transcription" && (name !== "phrase-transcription" || files.some((file) => file.role === "convolution"))
+    && preference === "auto" && gpu && await gpu.requestAdapter() ? "webgpu" : "wasm";
   const asset = async (role: ModelRole): Promise<Response> => {
     const matches = files.filter((file) => file.role === role);
     if (matches.length !== 1) throw new Error(`${name} needs exactly one ${role} file`);
@@ -58,6 +60,23 @@ async function open(id: number, name: ModelId, files: ModelAsset[], preference: 
     }
     session = await ort.InferenceSession.create(graph, options);
     resetCache();
+  } else if (name === "phrase-transcription") {
+    if (provider === "webgpu") {
+      const convolution = await (await asset("convolution")).arrayBuffer();
+      const remainder = await (await asset("recurrent")).arrayBuffer();
+      try {
+        session = await ort.InferenceSession.create(convolution, { executionProviders: ["webgpu"], graphOptimizationLevel: "disabled" });
+        recurrent = await ort.InferenceSession.create(remainder, { executionProviders: ["wasm"], graphOptimizationLevel: "disabled" });
+      } catch (error) {
+        await session?.release(); session = undefined;
+        provider = "wasm";
+        console.info(`Phrase transcription is using WASM: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+    if (provider === "wasm") {
+      const graph = await (await asset("graph")).arrayBuffer();
+      session = await ort.InferenceSession.create(graph, { executionProviders: ["wasm"], graphOptimizationLevel: "disabled" });
+    }
   } else if (name === "recording-transcription") {
     const features = await (await asset("features")).arrayBuffer();
     const attributes = await (await asset("attributes")).arrayBuffer();
@@ -118,6 +137,7 @@ async function run(input: ModelInputs[ModelId], signal: AbortSignal): Promise<un
     return { notes: await transcribeRecording(session, recurrent, audio, signal) };
   }
   if (!session) throw new Error("The inference session is not open");
+  if (model === "phrase-transcription") return transcribePhrase(session, recurrent, input as ModelInputs["phrase-transcription"], signal);
   if (model === "aria") {
     const { tokens, reset, commit = true } = input as ModelInputs["aria"];
     if (!tokens.length || tokens.some((token) => !Number.isSafeInteger(token) || token < 0)) throw new Error("Aria needs valid token IDs");

@@ -27,6 +27,15 @@ export const MODEL_CATALOG: ModelCatalog = {
     asset("live-transcription", "piano-duet-live-transcription-onnx", live, "recurrent", "recurrent.onnx", 51123832,
       "a8df05a2f3c1434a53f3c2a4414af9830fff8dba48c9e7c5415ff746e1101419"),
   ],
+  "phrase-transcription": [
+    { model: "phrase-transcription", role: "graph", name: "piano_crnn.onnx", revision: "24c14424609da2cc2c4b16d051365904327dd242", bytes: 154206740,
+      sha256: "743cf9fc88d1c24e5d4cc7a47ba55abd5c52c8623274355d79a981955fbbea99",
+      url: "https://huggingface.co/stelee/piano-transcription-onnx/resolve/24c14424609da2cc2c4b16d051365904327dd242/piano_crnn.onnx" },
+    asset("phrase-transcription", "piano-duet-live-transcription-onnx", "a9391f1876dffd1215b9f78de0429a7fa3a02e24", "convolution", "phrase-convolution.onnx", 62546926,
+      "67d33234b5f8fbabf1a21d99ed4d1e78c113b8e303d11702112b3705f8a51eed"),
+    asset("phrase-transcription", "piano-duet-live-transcription-onnx", "a9391f1876dffd1215b9f78de0429a7fa3a02e24", "recurrent", "phrase-recurrent.onnx", 73207631,
+      "332c9050ec69b554e47de5f0a9c047cf709a9caa1cae3ad9ba62364e7d8b5892"),
+  ],
   "recording-transcription": [
     asset("recording-transcription", "piano-duet-recording-transcription-onnx", recording, "features", "features.onnx", 53313300,
       "8c9d550d34662cd89d9271711cf59e5cd53820861e1f706c1766df3eb7388757"),

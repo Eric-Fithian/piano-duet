@@ -1,4 +1,4 @@
-export type ModelId = "aria" | "live-transcription" | "recording-transcription" | "midi-to-score";
+export type ModelId = "aria" | "live-transcription" | "phrase-transcription" | "recording-transcription" | "midi-to-score";
 export type AssetId = ModelId | "piano-samples";
 
 export interface PianoNote {
@@ -18,6 +18,7 @@ export interface LiveOnset {
 export interface ModelInputs {
   aria: { tokens: number[]; reset: boolean; commit?: boolean };
   "live-transcription": { audio: Float32Array; sampleRate: 16000; threshold: number };
+  "phrase-transcription": { audio: Float32Array; sampleRate: 16000; threshold: number };
   "recording-transcription": { audio: Float32Array; sampleRate: 16000 | 44100 };
   "midi-to-score": { notes: PianoNote[] };
 }
@@ -25,6 +26,8 @@ export interface ModelInputs {
 export interface ModelOutputs {
   aria: { logits: Float32Array };
   "live-transcription": { notes: LiveOnset[] };
+  "phrase-transcription": { notes: PianoNote[]; quality: { usable: boolean; onset_support: number | null; supported_fraction: number;
+    note_support: number[]; reason: string } };
   "recording-transcription": { notes: PianoNote[] };
   "midi-to-score": { musicXml: string };
 }
