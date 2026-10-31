@@ -22,6 +22,18 @@ export default defineConfig({
   preview: { host: "127.0.0.1", headers, proxy: {} },
   worker: { format: "es" },
   plugins: [{
+    name: "sync-configuration",
+    buildStart() {
+      const { SUPABASE_URL: url, SUPABASE_ANON_KEY: anonKey } = process.env;
+      if ((url === undefined) !== (anonKey === undefined) || (url !== undefined && (!url.trim() || !anonKey?.trim()))) {
+        throw new Error("SUPABASE_URL and SUPABASE_ANON_KEY must be set together");
+      }
+    },
+    generateBundle() {
+      const { SUPABASE_URL: url, SUPABASE_ANON_KEY: anonKey } = process.env;
+      if (url && anonKey) this.emitFile({ type: "asset", fileName: "sync-config.json", source: JSON.stringify({ url, anonKey }) });
+    },
+  }, {
     name: "reference-interface",
     transformIndexHtml: {
       order: "pre",
@@ -54,7 +66,7 @@ export default defineConfig({
   }, {
     name: "offline-app-shell",
     generateBundle(_options, bundle) {
-      const files = Object.keys(bundle).filter((name) => !name.endsWith(".map")).sort();
+      const files = Object.keys(bundle).filter((name) => !name.endsWith(".map") && name !== "sync-config.json").sort();
       const digest = createHash("sha256");
       digest.update(readFileSync(new URL("../src/piano_duet/static/index.html", import.meta.url)));
       for (const name of files) {
