@@ -195,7 +195,8 @@ Object.assign(window, {
     const model = await ScoreRuntime.open({ encoder: `${base}/models/score/encoder.onnx`, first: `${base}/models/score/decoder-first.onnx`,
       context: `${base}/models/score/decoder-context.onnx`, step: `${base}/models/score/decoder-step.onnx` }, provider);
     const started = performance.now();
-    const tokens = await model.generate(streams);
+    const tokens = await model.generate(streams, undefined, undefined,
+      (progress) => console.info(`score-progress ${JSON.stringify({ ...progress, elapsedMs: performance.now() - started })}`));
     const mismatches = Object.fromEntries(ORDER.map((name) => {
       if (tokens[name].length !== fixture.expected[name].length) throw new Error(`Score length differs for ${name}`);
       return [name, tokens[name].reduce((sum, value, index) => sum + Number(value !== fixture.expected[name][index]), 0)];

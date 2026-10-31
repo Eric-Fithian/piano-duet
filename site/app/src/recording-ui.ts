@@ -1,5 +1,6 @@
 import { localFetch } from "../../../src/piano_duet/static/practice.mjs";
-import type { BrowserRecordingImporter } from "./recording-import";
+
+type RecordingImporter = { prepare(signal?: AbortSignal): Promise<void> };
 
 export function recordingStage(value: string): void {
   const status = document.querySelector<HTMLElement>("#recordingImportStatus"), dialog = document.querySelector<HTMLElement>("#recordingStage");
@@ -7,7 +8,7 @@ export function recordingStage(value: string): void {
   status.textContent = value; dialog.textContent = value;
 }
 
-export function setupRecordingUi(importer: BrowserRecordingImporter, refresh: () => Promise<void>): void {
+export function setupRecordingUi(importer: RecordingImporter, refresh: () => Promise<void>): void {
   const get = <T extends HTMLElement>(selector: string): T => {
     const element = document.querySelector<T>(selector);
     if (!element) throw new Error(`Recording import is missing ${selector}`);
