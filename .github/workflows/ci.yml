@@ -92,6 +92,10 @@ jobs:
     name: Browser storage
     runs-on: macos-latest
     timeout-minutes: 20
+    env:
+      PIANO_BROWSER_PROFILE: .cache/browser-inference/model-profile
+      PIANO_SITE_PORT: "5180"
+      PIANO_MODEL_PORT: "5181"
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -153,6 +157,9 @@ jobs:
           PIANO_PHRASE_MODEL: .cache/ci-models/phrase-transcription/piano_crnn.onnx
           PIANO_PHRASE_SPLIT_DIR: .cache/ci-models/phrase-transcription
           PIANO_ARIA_MODEL_DIR: .cache/ci-models/aria
+      - name: Remove temporary model browser profile
+        if: always()
+        run: rm -rf .cache/browser-inference/model-profile
 
   site:
     name: Website
