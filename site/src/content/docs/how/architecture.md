@@ -3,7 +3,15 @@ title: Architecture
 description: The local-first browser foundation and the Python reference implementation.
 ---
 
-The browser rebuild is in progress. Its app lives at `/`, and these docs live under `/docs`. The browser reuses the interface in `src/piano_duet/static/`; its API requests go through an injectable local service. A dedicated worker keeps an append-only event log in SQLite using OPFS; model files and piano samples are cached on the device by version and digest. Reading uses Aria and live transcription; Drills use Transkun for recorded takes; Library imports MIDI, MusicXML and recordings. Duet and Variations use full-phrase transcription and Aria through the same local service; their complete browser flows are being validated. Guided Practice, sync and the iOS shell remain incomplete. [Inference measurements](/docs/how/performance/) include real Safari on a Mac; iPhone measurements are pending.
+The browser rebuild is in progress. Its app lives at `/`, and these docs live under `/docs`. The browser reuses the interface in `src/piano_duet/static/`; its API requests go through an injectable local service. A dedicated worker keeps an append-only event log in SQLite using OPFS; model files and piano samples are cached on the device by version and digest. Guided Practice and Reading use the shared curriculum and local inference; Drills use Transkun for recorded takes; Library imports MIDI, MusicXML and recordings. Duet and Variations use full-phrase transcription and Aria. Account sync exchanges the event log with Supabase and rebuilds progress on each device; Google sign-in is configured, with its first real account test pending. The iOS shell remains incomplete. [Inference measurements](/docs/how/performance/) include real Safari on a Mac; iPhone measurements are pending.
+
+```text
+ Shared interface ──▶ local service ──▶ TypeScript curriculum, scoring and library
+       │                    │
+       │                    ├──▶ inference workers ──▶ device models
+       │                    └──▶ SQLite event-log worker ──▶ optional Supabase sync
+       └──▶ microphone and piano playback
+```
 
 The existing Python app remains the reference implementation. It serves a browser page from a server bound to `127.0.0.1` and runs its models on the Mac:
 
@@ -24,7 +32,7 @@ The existing Python app remains the reference implementation. It serves a browse
 - **Audio:** `audio.mjs` captures microphone audio with an AudioWorklet, counts attacks in the browser for drills, and plays the sampled piano.
 - **Notation:** `notation.mjs` quantizes notes into a score model. `engraving.mjs` lays out systems with VexFlow, and `score_view.mjs` is the one score viewer every mode uses, with zoom, layout, following and overlays.
 
-## The server
+## The reference server
 
 `server.py` serves the page and a JSON API, and refuses non-GET requests that don't come from its own origin. The main pieces:
 

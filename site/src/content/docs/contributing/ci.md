@@ -14,7 +14,7 @@ GitHub Actions runs [`ci.yml`](https://github.com/Eric-Fithian/piano-duet/blob/m
 | **JavaScript tests** | Ubuntu | `node --test` on the browser modules |
 | **TypeScript core and Python parity** | macOS (Apple Silicon) | Type-checks the shared core, compares it with Python and checks the native inference protocol |
 | **Published model parity** | macOS (Apple Silicon) | Downloads pinned model files and checks them against reference fixtures |
-| **Browser storage** | macOS (Apple Silicon) | Chromium and WebKit storage, audio decoding and model checks, plus synthetic-microphone Drills, Duet and Variations |
+| **Browser storage** | macOS (Apple Silicon) | Chromium and WebKit storage, audio decoding and model checks, plus synthetic-microphone Practice and Drills and timestamped synthetic capture for Duet and Variations |
 | **Website** | Ubuntu | `astro check` and a production build of `site/` |
 
 The model jobs cache their downloads by the pinned catalog; a newer push to the same pull-request branch cancels the run in progress. The Simulator and TestFlight checks are not implemented yet.
