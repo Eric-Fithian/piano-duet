@@ -39,6 +39,7 @@ export async function setupSyncUi(log: EventLog, refresh: () => Promise<void>): 
   const providers = panel.querySelector<HTMLElement>("#syncProviders")!;
   let sync: SyncClient | undefined;
   let currentUser: string | undefined;
+  let signInError: string | undefined;
   let running: Promise<void> | undefined;
   let requested = false;
 
@@ -73,7 +74,7 @@ export async function setupSyncUi(log: EventLog, refresh: () => Promise<void>): 
     providers.hidden = Boolean(userId);
     signOut.hidden = !userId;
     syncNow.hidden = !userId;
-    status.textContent = userId ? `Signed in${email ? ` as ${email}` : ""}` : "Not signed in";
+    status.textContent = userId ? `Signed in${email ? ` as ${email}` : ""}` : signInError ?? "Not signed in";
     if (userId) void exchange();
   }
 
@@ -95,6 +96,7 @@ export async function setupSyncUi(log: EventLog, refresh: () => Promise<void>): 
     button.className = "secondary";
     button.textContent = `Continue with ${provider === "apple" ? "Apple" : "Google"}`;
     button.addEventListener("click", () => {
+      signInError = undefined;
       void remote.auth.signInWithOAuth({ provider, options: { redirectTo: location.origin, ...(provider === "google" ? { scopes: "openid email profile" } : {}) } }).then(({ error }) => {
         if (error) status.textContent = `Sign-in failed: ${error.message}`;
       });
@@ -115,5 +117,8 @@ export async function setupSyncUi(log: EventLog, refresh: () => Promise<void>): 
   window.setInterval(() => { void exchange(); }, 30000);
   remote.auth.onAuthStateChange((_event, value) => { session(value?.user.id, value?.user.email); });
   const { error } = await remote.auth.initialize();
-  if (error) status.textContent = `Sign-in failed: ${error.message}`;
+  if (error) {
+    signInError = `Sign-in failed: ${error.message}`;
+    status.textContent = signInError;
+  }
 }

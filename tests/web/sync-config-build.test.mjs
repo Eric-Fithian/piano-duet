@@ -138,6 +138,11 @@ test('production build serves optional sync configuration and rejects partial co
           assert.equal(tokenExchanges, 1, 'callback exchanges its PKCE code');
           assert.ok(syncRequests > 0, 'the returned session starts account sync');
           assert.equal(await page.locator('#syncSignOut').isVisible(), true);
+          await page.evaluate(() => localStorage.clear());
+          await page.goto(`${origin}/?error=access_denied&error_description=Google%20sign-in%20was%20cancelled`);
+          await page.waitForFunction(() => document.querySelector('#syncStatus')?.textContent.includes('Sign-in failed: Google sign-in was cancelled'));
+          await page.locator('#openSettings').click();
+          assert.ok((await page.locator('#syncStatus').innerText()).includes('Sign-in failed: Google sign-in was cancelled'));
         }
       } finally {
         await context.close();
