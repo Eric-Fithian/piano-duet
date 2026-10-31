@@ -1,21 +1,21 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { mkdtemp, rm, stat } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { stat } from "node:fs/promises";
 import { chromium } from "playwright";
 import { startServer } from "./server.mjs";
 import { startTestServer } from "../web/server.mjs";
+import { browserProfile } from "./browser-profile.mjs";
 
-const models = await startServer();
-const site = await startTestServer();
-const profile = await mkdtemp(join(tmpdir(), "piano-duet-generation-"));
-const browser = await chromium.launchPersistentContext(profile, { channel: "chrome", headless: true });
+const profile = await browserProfile();
+const models = await startServer({ port: Number(process.env.PIANO_MODEL_PORT ?? 0) });
+const site = await startTestServer(false, Number(process.env.PIANO_SITE_PORT ?? 0));
+let browser;
 try {
+  browser = await chromium.launchPersistentContext(profile.path, { channel: "chrome", headless: true });
   const files = [];
   for (const [role, name] of [["graph", "model.onnx"], ["weights", "model.onnx.data"]]) {
-    const path = `.cache/models/aria/onnx-int4-block64/${name}`, hash = createHash("sha256");
+    const path = `${process.env.PIANO_ARIA_MODEL_DIR ?? ".cache/models/aria/onnx-int4-block64"}/${name}`, hash = createHash("sha256");
     for await (const chunk of createReadStream(path)) hash.update(chunk);
     files.push({ model: "aria", role, name, revision: "local-fixture", sha256: hash.digest("hex"), bytes: (await stat(path)).size,
       url: `http://127.0.0.1:${models.address().port}/models/local-fixture/${name}` });
@@ -32,8 +32,8 @@ try {
   assert.deepEqual(result.reply, [...result.reply].sort((a, b) => a.start - b.start));
   console.log(JSON.stringify({ provider: result.provider, notes: result.reply.length, elapsedMs: result.elapsedMs }));
 } finally {
-  await browser.close();
-  await rm(profile, { recursive: true, force: true });
+  await browser?.close();
+  await profile.cleanup();
   site.server.kill("SIGTERM");
   await new Promise((resolve) => models.close(resolve));
 }

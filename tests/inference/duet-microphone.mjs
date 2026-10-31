@@ -1,23 +1,24 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import { chromium } from "playwright";
 import { MODEL_CATALOG } from "../../site/app/src/model-catalog.ts";
 import { startServer } from "./server.mjs";
 import { startTestServer } from "../web/server.mjs";
+import { browserProfile } from "./browser-profile.mjs";
 
 const sample = await readFile(".cache/browser-inference/C4.mp3");
 const entry = { pitch: 60, file: "C4.mp3", sha256: "a265c8cfd4140cf27b55054b4953b6c691fce3523530ca8ae0faed5e4cd39063", bytes: 239164 };
 assert.equal(sample.length, entry.bytes);
 assert.equal(createHash("sha256").update(sample).digest("hex"), entry.sha256);
-const models = await startServer();
-const site = await startTestServer();
-const profile = await mkdtemp(join(tmpdir(), "piano-duet-microphone-"));
-const browser = await chromium.launchPersistentContext(profile, { channel: "chrome", headless: true, permissions: ["microphone"],
-  args: ["--use-fake-ui-for-media-stream", "--autoplay-policy=no-user-gesture-required"] });
+const profile = await browserProfile();
+const models = await startServer({ port: Number(process.env.PIANO_MODEL_PORT ?? 0) });
+const site = await startTestServer(false, Number(process.env.PIANO_SITE_PORT ?? 0));
+let browser;
 try {
+  browser = await chromium.launchPersistentContext(profile.path, { channel: "chrome", headless: true, permissions: ["microphone"],
+    args: ["--use-fake-ui-for-media-stream", "--autoplay-policy=no-user-gesture-required"] });
   const base = `http://127.0.0.1:${models.address().port}`;
   const local = (model) => MODEL_CATALOG[model].map((asset) => ({ ...asset, revision: "local-fixture", url: `${base}/models/local-fixture/${asset.name}` }));
   const catalog = { ...MODEL_CATALOG, aria: local("aria"), "phrase-transcription": local("phrase-transcription") };
@@ -97,8 +98,8 @@ try {
   assert.ok(again.recent.length >= 2 && again.recent.slice(0, 2).every((attempt) => attempt.mode === "duet" && attempt.note_count >= 3));
   console.log(JSON.stringify({ providers: result.providers, notes: result.attempt.note_count, cold: result.timing, warm: again.timing }));
 } finally {
-  await browser.close();
-  await rm(profile, { recursive: true, force: true });
+  await browser?.close();
+  await profile.cleanup();
   site.server.kill("SIGTERM");
   await new Promise((resolve) => models.close(resolve));
 }

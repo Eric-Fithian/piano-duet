@@ -45,7 +45,8 @@ const paths = {
   "/fixtures/aria.json": ".cache/models/aria/onnx-int4-block64/parity.json",
 };
 
-export async function startServer({ referencePort } = {}) {
+export async function startServer({ referencePort, port = 0 } = {}) {
+  if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error("Invalid fixture server port");
   const server = createServer(async (request, response) => {
     response.setHeader("Cross-Origin-Opener-Policy", "same-origin");
     response.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
@@ -86,6 +87,6 @@ export async function startServer({ referencePort } = {}) {
     response.setHeader("Content-Type", path.endsWith(".mjs") ? "text/javascript" : path.endsWith(".wasm") ? "application/wasm" : "application/octet-stream");
     createReadStream(path).pipe(response);
   });
-  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  await new Promise((resolve) => server.listen(port, "127.0.0.1", resolve));
   return server;
 }

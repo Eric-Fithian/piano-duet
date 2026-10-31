@@ -3,11 +3,15 @@ import { get } from "node:http";
 import { createServer } from "node:net";
 import { resolve } from "node:path";
 
-export async function startTestServer(preview = false) {
-  const probe = createServer();
-  await new Promise((ready) => probe.listen(0, "127.0.0.1", ready));
-  const port = probe.address().port;
-  await new Promise((closed) => probe.close(closed));
+export async function startTestServer(preview = false, requestedPort = 0) {
+  if (!Number.isInteger(requestedPort) || requestedPort < 0 || requestedPort > 65535) throw new Error("Invalid test server port");
+  let port = requestedPort;
+  if (!port) {
+    const probe = createServer();
+    await new Promise((ready) => probe.listen(0, "127.0.0.1", ready));
+    port = probe.address().port;
+    await new Promise((closed) => probe.close(closed));
+  }
   const args = ["node_modules/vite/bin/vite.js", ...(preview ? ["preview"] : []), "--config", "vite.config.ts", "--port", String(port), "--strictPort"];
   const server = spawn(process.execPath, args, { cwd: resolve("site"), stdio: ["ignore", "pipe", "pipe"],
     env: { ...process.env, NO_COLOR: "1", FORCE_COLOR: "0" } });

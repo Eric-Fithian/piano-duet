@@ -1,12 +1,11 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { readFile, stat } from "node:fs/promises";
 import { chromium } from "playwright";
 import { startServer } from "./server.mjs";
 import { startTestServer } from "../web/server.mjs";
+import { browserProfile } from "./browser-profile.mjs";
 
 const path = process.env.PIANO_PHRASE_MODEL ?? ".cache/models/transcription/piano_crnn.onnx";
 const split = process.argv.includes("--split");
@@ -17,11 +16,12 @@ for await (const chunk of createReadStream(path)) hash.update(chunk);
 assert.equal((await stat(path)).size, bytes);
 assert.equal(hash.digest("hex"), sha256);
 const expected = JSON.parse(await readFile(".cache/browser-inference/phrase-reference.json", "utf8"));
-const models = await startServer();
-const site = await startTestServer();
-const profile = await mkdtemp(join(tmpdir(), "piano-duet-phrase-"));
-const browser = await chromium.launchPersistentContext(profile, { channel: "chrome", headless: true });
+const profile = await browserProfile();
+const models = await startServer({ port: Number(process.env.PIANO_MODEL_PORT ?? 0) });
+const site = await startTestServer(false, Number(process.env.PIANO_SITE_PORT ?? 0));
+let browser;
 try {
+  browser = await chromium.launchPersistentContext(profile.path, { channel: "chrome", headless: true });
   const page = await browser.newPage();
   page.on("console", (message) => process.stderr.write(`${message.text()}\n`));
   await page.goto(`http://127.0.0.1:${site.port}/test/phrase-transcription.html`);
@@ -49,8 +49,8 @@ try {
   assert.deepEqual(result.quality, expected.quality);
   console.log(JSON.stringify({ provider: result.provider, notes: result.notes.length, browserMs: result.elapsedMs, pythonMs: expected.elapsedMs }));
 } finally {
-  await browser.close();
-  await rm(profile, { recursive: true, force: true });
+  await browser?.close();
+  await profile.cleanup();
   site.server.kill("SIGTERM");
   await new Promise((resolve) => models.close(resolve));
 }
