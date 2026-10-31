@@ -18,7 +18,8 @@ async function diagnostic(condition) {
   return `${condition}; elapsed ${Math.round(performance.now() - started)} ms; ${JSON.stringify(state)}`;
 }
 const provider = process.env.PIANO_CREATIVE_PROVIDER ?? "webgpu";
-if (!["webgpu", "wasm"].includes(provider)) throw new Error("Choose webgpu or wasm for the creative microphone test");
+const phraseProvider = process.env.PIANO_CREATIVE_PHRASE_PROVIDER ?? provider;
+if (![provider, phraseProvider].every((value) => ["webgpu", "wasm"].includes(value))) throw new Error("Choose webgpu or wasm for the creative microphone test");
 const sample = await readFile(".cache/browser-inference/C4.mp3");
 const entry = { pitch: 60, file: "C4.mp3", sha256: "a265c8cfd4140cf27b55054b4953b6c691fce3523530ca8ae0faed5e4cd39063", bytes: 239164 };
 assert.equal(sample.length, entry.bytes, await diagnostic("Piano sample size differs"));
@@ -43,8 +44,8 @@ try {
   const errors = [];
   page.on("pageerror", (error) => errors.push(String(error)));
   page.on("console", (message) => process.stderr.write(`Page ${message.type()}: ${message.text()}\n`));
-  await page.addInitScript((selectedProvider) => {
-    window.__duetTest = { audio: null, destination: null, providers: [], progress: 0 };
+  await page.addInitScript(({ selectedProvider, selectedPhraseProvider }) => {
+    window.__duetTest = { audio: null, destination: null, providers: [], captures: [], progress: 0 };
     document.addEventListener("DOMContentLoaded", () => {
       const input = document.querySelector("#length");
       if (!input) throw new Error("The reply length control is missing");
@@ -56,13 +57,23 @@ try {
       constructor(...args) {
         super(...args);
         this.addEventListener("message", ({ data }) => {
-          if (data.value?.provider) window.__duetTest.providers.push(data.value.provider);
+          if (data.value?.provider) window.__duetTest.providers.push({ model: this.model, provider: data.value.provider });
+          if (this.model === "phrase-transcription" && data.value?.notes) console.info(`Phrase notes: ${JSON.stringify(data.value.notes)}`);
           if (data.progress || data.value?.provider || data.value?.logits || data.value?.notes) window.__duetTest.progress++;
         });
       }
       postMessage(message, ...args) {
-        if (selectedProvider === "wasm" && message.action === "open" && ["aria", "phrase-transcription"].includes(message.model)) {
-          message = { ...message, preference: "wasm" };
+        if (message.action === "open") {
+          this.model = message.model;
+          if ((message.model === "aria" && selectedProvider === "wasm")
+              || (message.model === "phrase-transcription" && selectedPhraseProvider === "wasm")) message = { ...message, preference: "wasm" };
+        }
+        if (this.model === "phrase-transcription" && message.action === "run") {
+          const audio = message.input.audio, rms = Math.sqrt(audio.reduce((sum, value) => sum + value * value, 0) / audio.length);
+          const capture = { samples: audio.length, sampleRate: message.input.sampleRate, seconds: audio.length / message.input.sampleRate,
+            rms, expected: window.__duetTest.expected };
+          window.__duetTest.captures.push(capture);
+          console.info(`Phrase PCM: ${JSON.stringify(capture)}`);
         }
         return super.postMessage(message, ...args);
       }
@@ -75,7 +86,7 @@ try {
       return destination.stream;
     };
     navigator.mediaDevices.enumerateDevices = async () => [];
-  }, provider);
+  }, { selectedProvider: provider, selectedPhraseProvider: phraseProvider });
   await page.goto(`http://127.0.0.1:${site.port}/`);
   await page.waitForFunction(() => document.querySelector("#practiceTitle")?.textContent === "C major scale", null, { timeout: 30000 });
   await page.locator("#duetMode").click();
@@ -85,6 +96,13 @@ try {
   await page.locator('[data-close="settingsDialog"]').click();
   await page.locator("#start").click();
   await page.waitForFunction(() => window.__duetTest.audio && window.__duetTest.destination);
+  const waitForListening = async (label) => {
+    await page.waitForFunction(() => document.querySelector("#status")?.textContent.startsWith("Your turn"), null, { timeout: 30000 });
+    await page.waitForTimeout(250);
+    const status = await page.locator("#status").textContent();
+    assert.ok(status?.startsWith("Your turn"), await diagnostic(`${label}: microphone-ready signal did not remain visible`));
+    process.stderr.write(`${label}: microphone-ready signal ${JSON.stringify(status)}\n`);
+  };
   const staticBase = `/@fs${resolve("src/piano_duet/static")}`;
   const waitForProgress = (label, kind, turn) => waitForCreativeProgress({ label, diagnostic, errors,
     pause: () => page.waitForTimeout(1000), read: () => page.evaluate(({ kind, turn }) => {
@@ -95,14 +113,22 @@ try {
           done: kind === "duet" ? document.querySelector("#turnCount")?.textContent.includes(`${turn} EXCHANGES`)
             : kind === "idea" ? status === "Your turn. Play back the target." : !document.querySelector("#learningResult").hidden };
     }, { kind, turn }) });
-  const play = async (pitches = [60, 64, 67, 72]) => page.evaluate(async ({ path, pitches }) => {
-    const { PianoSound } = await import(`${path}/audio.mjs`);
-    const { audio, destination } = window.__duetTest;
-    const piano = new PianoSound(audio);
-    await piano.load();
-    const start = audio.currentTime + 2;
-    for (const [index, pitch] of pitches.entries()) piano.play({ pitch, start: 0, duration: 0.35, velocity: 90 }, start + index * 0.5, audio, destination);
-  }, { path: staticBase, pitches });
+  const play = async (pitches = [60, 64, 67, 72]) => {
+    const scheduled = await page.evaluate(async ({ path, pitches }) => {
+      const { PianoSound } = await import(`${path}/audio.mjs`);
+      const { audio, destination } = window.__duetTest;
+      const piano = new PianoSound(audio);
+      await piano.load();
+      const status = document.querySelector("#status")?.textContent;
+      if (!status?.startsWith("Your turn")) throw new Error(`Microphone was not ready when piano playback was scheduled: ${status}`);
+      const start = audio.currentTime + 0.5;
+      window.__duetTest.expected = { pitches, performanceSeconds: (pitches.length - 1) * 0.5 + 0.35, sampleRate: 16000 };
+      for (const [index, pitch] of pitches.entries()) piano.play({ pitch, start: 0, duration: 0.35, velocity: 90 }, start + index * 0.5, audio, destination);
+      return { scheduled: start, audioTime: audio.currentTime, status, pitches };
+    }, { path: staticBase, pitches });
+    process.stderr.write(`Scheduled synthetic piano: ${JSON.stringify(scheduled)}\n`);
+  };
+  await waitForListening("First Duet phrase");
   await play();
   process.stderr.write(`Waiting for first Duet exchange at ${Math.round(performance.now() - started)} ms\n`);
   await waitForProgress("First Duet exchange", "duet", "01");
@@ -116,11 +142,12 @@ try {
   if (result.error) throw new Error(result.error);
   assert.deepEqual(errors, [], await diagnostic("Duet page raised an exception"));
   assert.ok(result.turn.includes("01 EXCHANGES"), await diagnostic("First Duet exchange was not shown"));
-  assert.ok(result.providers.length >= 2 && result.providers.every((actual) => actual === provider),
+  assert.ok(result.providers.some((actual) => actual.model === "aria" && actual.provider === provider)
+    && result.providers.some((actual) => actual.model === "phrase-transcription" && actual.provider === phraseProvider),
     await diagnostic(`Duet used unexpected inference providers ${JSON.stringify(result.providers)}`));
   assert.equal(result.attempt?.mode, "duet", await diagnostic(`First Duet attempt was not saved: ${JSON.stringify(result.attempt)}`));
   assert.ok(result.attempt.note_count >= 3, await diagnostic(`First Duet take has too few notes: ${JSON.stringify(result.attempt)}`));
-  await page.waitForFunction(() => document.querySelector("#status")?.textContent.startsWith("Your turn"), null, { timeout: 30000 });
+  await waitForListening("Second Duet phrase");
   await play();
   process.stderr.write(`Waiting for second Duet exchange at ${Math.round(performance.now() - started)} ms\n`);
   await waitForProgress("Second Duet exchange", "duet", "02");
@@ -134,8 +161,9 @@ try {
   assert.ok(again.turn.includes("02 EXCHANGES"), await diagnostic("Second Duet exchange was not shown"));
   assert.ok(again.recent.length >= 2 && again.recent.slice(0, 2).every((attempt) => attempt.mode === "duet" && attempt.note_count >= 3),
     await diagnostic(`Duet attempts were not saved with enough notes: ${JSON.stringify(again.recent.slice(0, 2))}`));
-  await page.waitForFunction(() => document.querySelector("#status")?.textContent.startsWith("Your turn"), null, { timeout: 30000 });
+  await waitForListening("Variations mode switch");
   await page.locator("#learningMode").click();
+  await waitForListening("Variations idea");
   await play([60, 67]);
   process.stderr.write(`Waiting for Variations idea at ${Math.round(performance.now() - started)} ms\n`);
   await waitForProgress("Variations idea", "idea");
@@ -143,6 +171,7 @@ try {
     analysis: document.querySelectorAll("#surpriseRows tr").length }));
   if (idea.error) throw new Error(idea.error);
   assert.ok(idea.analysis >= 2, await diagnostic(`Variations idea has too few analyzed notes: ${JSON.stringify(idea)}`));
+  await waitForListening("Variations playback");
   await play([60, 67]);
   process.stderr.write(`Waiting for Variations playback at ${Math.round(performance.now() - started)} ms\n`);
   await waitForProgress("Variations playback", "score");
