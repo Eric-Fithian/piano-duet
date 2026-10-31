@@ -10,6 +10,7 @@ import { browserProfile } from "./browser-profile.mjs";
 
 const engineName = process.argv[2];
 if (!["chromium", "webkit"].includes(engineName)) throw new Error("Choose chromium or webkit");
+const wasmOnly = process.argv.includes("--wasm");
 const sample = await readFile(".cache/browser-inference/C4.mp3");
 const entry = { pitch: 60, file: "C4.mp3", sha256: "a265c8cfd4140cf27b55054b4953b6c691fce3523530ca8ae0faed5e4cd39063", bytes: 239164 };
 assert.equal(sample.length, entry.bytes);
@@ -22,8 +23,10 @@ try {
   const engine = engineName === "chromium" ? chromium : webkit;
   browser = await engine.launchPersistentContext(profile.path, { headless: true,
     ...(engineName === "chromium" ? { channel: "chrome", args: ["--use-fake-ui-for-media-stream", "--autoplay-policy=no-user-gesture-required"] } : {}) });
+  await browser.grantPermissions(["microphone"], { origin: `http://127.0.0.1:${site.port}` });
   const base = `http://127.0.0.1:${models.address().port}`;
-  const assets = MODEL_CATALOG["phrase-transcription"].map((asset) => ({ ...asset, revision: "local-fixture", url: `${base}/models/local-fixture/${asset.name}` }));
+  const assets = MODEL_CATALOG["phrase-transcription"].filter((asset) => !wasmOnly || asset.role === "graph")
+    .map((asset) => ({ ...asset, revision: "local-fixture", url: `${base}/models/local-fixture/${asset.name}` }));
   await browser.route("**/src/model-catalog.ts", (route) => route.fulfill({ contentType: "text/javascript",
     body: `export const MODEL_CATALOG = ${JSON.stringify({ ...MODEL_CATALOG, "phrase-transcription": assets })};` }));
   await browser.route("**/src/piano-samples.ts", (route) => route.fulfill({ contentType: "text/javascript",
@@ -34,25 +37,40 @@ try {
   page.on("pageerror", (error) => errors.push(String(error)));
   await page.addInitScript(() => {
     if (!sessionStorage.getItem("practice-test-reload")) localStorage.setItem("piano-duet.mode", "practice");
-    window.__practiceTest = { task: null, audio: null, destination: null };
+    window.__practiceTest = { task: null, audio: null, destination: null, ready: null, requested: false };
     const json = Response.json.bind(Response);
     Response.json = (value, options) => {
       if (value?.family === "technique" && Array.isArray(value.target)) window.__practiceTest.task = value;
       return json(value, options);
     };
-    navigator.mediaDevices.getUserMedia = async () => {
+    document.addEventListener("click", (event) => {
+      if (!event.target.closest("#start") || window.__practiceTest.audio) return;
       const audio = new AudioContext({ sampleRate: 16000 }), destination = audio.createMediaStreamDestination();
-      await audio.resume();
+      Object.assign(window.__practiceTest, { audio, destination, ready: audio.resume() });
+    }, true);
+    Object.defineProperty(Object.getPrototypeOf(navigator.mediaDevices), "getUserMedia", { configurable: true, value: async () => {
+      window.__practiceTest.requested = true;
+      const { audio, destination, ready } = window.__practiceTest;
+      if (!audio || !destination || !ready) throw new Error("The fake microphone needs a start gesture");
+      await ready;
       if (audio.state !== "running") throw new Error("The fake microphone did not start");
-      Object.assign(window.__practiceTest, { audio, destination });
       return destination.stream;
-    };
-    navigator.mediaDevices.enumerateDevices = async () => [];
+    } });
+    Object.defineProperty(Object.getPrototypeOf(navigator.mediaDevices), "enumerateDevices", { configurable: true, value: async () => [] });
   });
   await page.goto(`http://127.0.0.1:${site.port}/`);
   await page.waitForFunction(() => window.__practiceTest.task && !document.querySelector("#start").disabled, null, { timeout: 30000 });
   await page.locator("#start").click();
-  await page.waitForFunction(() => window.__practiceTest.audio && window.__practiceTest.destination);
+  await page.waitForFunction(() => window.__practiceTest.requested && document.querySelector("#start").getAttribute("aria-pressed") === "true"
+    || !document.querySelector("#error").hidden,
+    null, { timeout: 30000 }).catch(async (error) => {
+    const state = await page.evaluate(() => ({ requested: window.__practiceTest.requested, status: document.querySelector("#status")?.textContent,
+      message: document.querySelector("#message")?.textContent, error: document.querySelector("#error")?.textContent }));
+    throw new Error(`${error}: ${JSON.stringify({ state, errors })}`);
+  });
+  const startup = await page.evaluate(() => ({ requested: window.__practiceTest.requested,
+    error: document.querySelector("#error").hidden ? null : document.querySelector("#error").textContent }));
+  if (startup.error) throw new Error(`Microphone startup failed: ${JSON.stringify(startup)}`);
   const staticBase = `/@fs${resolve("src/piano_duet/static")}`;
   await page.evaluate(async (path) => {
     const { PianoSound } = await import(`${path}/audio.mjs`);
