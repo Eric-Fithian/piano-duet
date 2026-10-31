@@ -1,7 +1,7 @@
 import type { MusicalKey } from "./musical-key.ts";
 import { median, roundDecimal, roundEven } from "./numeric.ts";
 
-export type DrillNote = { pitch: number; start: number; velocity: number; hand?: string; finger?: number | null };
+export type DrillNote = { pitch: number; start: number; velocity: number; hand?: string; finger?: number | null; accent?: boolean };
 type Alignment = { expected: number[]; played: number[] }[];
 type Attack = { index: number; expected: number; played: number | null; velocity: number | null; missed: number[]; extra: number[];
   inserted: number[][]; pitches: number[]; bar: number; ratio?: number | null; tempo?: number | null; deviation_ms?: number; flag?: string };
@@ -90,7 +90,7 @@ function crossing(previous: DrillNote, note: DrillNote): boolean {
   return previous.hand === "right" ? (fingers > 0) !== (pitches > 0) : (fingers > 0) === (pitches > 0);
 }
 
-function namingKey(key: MusicalKey): MusicalKey {
+export function namingKey(key: MusicalKey): MusicalKey {
   if (key.mode !== "minor") return key;
   const pitch_classes = [...key.pitch_classes], scale_names = [...key.scale_names];
   for (const step of [5, 6]) {
@@ -101,7 +101,7 @@ function namingKey(key: MusicalKey): MusicalKey {
   return { ...key, pitch_classes, scale_names };
 }
 
-function pitchName(pitch: number, key: MusicalKey): string {
+export function pitchName(pitch: number, key: MusicalKey): string {
   const index = key.pitch_classes.indexOf(pitch % 12);
   if (index >= 0) {
     const name = key.scale_names[index], natural = ["C", "D", "E", "F", "G", "A", "B"].indexOf(name[0]);

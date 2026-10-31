@@ -16,22 +16,24 @@ from piano_duet.drills import (
 from piano_duet.learning import compare_performance
 from piano_duet.notes import Note
 
-SCENARIOS = ('clean', 'drift', 'uneven', 'missed', 'extra', 'loudness')
+SCENARIOS = ('clean', 'drift', 'uneven', 'missed', 'extra', 'loudness', 'demonstration', 'uncertain')
 
 
 def main():
     fixtures = []
     for drill, spec in tqdm(DRILLS.items(), desc='Synthetic drill plans'):
-        for variant, tonic, hands in ((spec['variants'][0], 0, spec['hands'][0]),
-                                      (spec['variants'][-1], 1, 'together' if 'together' in spec['hands'] else spec['hands'][0])):
+        accent = next((practice for practice in spec['practices'] if practice.startswith('accent')), spec['practices'][-1])
+        for variant, tonic, hands, practice in ((spec['variants'][0], 0, spec['hands'][0], 'even'),
+                                               (spec['variants'][-1], 1, 'together' if 'together' in spec['hands'] else spec['hands'][0], 'even'),
+                                               (spec['variants'][0], 7, spec['hands'][0], accent)):
             config = {'drill': drill, 'variant': variant, 'tonic': tonic, 'hands': hands,
-                      'octaves': spec['octaves'][0], 'inversion': 0, 'practice': 'even'}
+                      'octaves': spec['octaves'][0], 'inversion': 0, 'practice': practice}
             task = build_task(config, rung_of(drill, *spec['start']))
             task['id'] = f'synthetic-{drill}-{tonic}'
             for scenario in SCENARIOS:
                 notes = synthetic_take(task['target'], scenario)
-                context = {'source': 'microphone'}
-                quality = {'usable': True, 'reason': 'Synthetic input'}
+                context = {'source': 'demonstration' if scenario == 'demonstration' else 'microphone'}
+                quality = {'usable': scenario != 'uncertain', 'reason': 'Synthetic input'}
                 played = [Note.model_validate(note) for note in notes]
                 assessment = assess_drill(task, played, context, quality)
                 raw = unique_target(task['target'])
@@ -55,7 +57,7 @@ def synthetic_take(target, scenario):
             start += 0.22 * start * start / end
         elif scenario == 'uneven' and index % 4 == 2:
             start += 0.15
-        velocity = 45 if scenario == 'loudness' and index % 2 else 85
+        velocity = 45 if scenario == 'loudness' and index % 2 else original['velocity'] if original.get('accent') else 85
         notes.append({'pitch': original['pitch'], 'start': start + 0.5,
                       'duration': original['duration'], 'velocity': velocity})
     if scenario == 'extra':
