@@ -236,6 +236,8 @@ for (const [engineName, engine] of [['chromium', chromium], ['webkit', webkit]])
       await resizeScore(width, height); await capture(`${name}-reading`);
       await page.locator('#modeMenuButton').click();
       await checkLayout(page, `${engineName} ${name}-mode-menu`);
+      const [selectedInk, otherInk] = await page.evaluate(() => ['#readingMode', '#drillsMode'].map(id => getComputedStyle(document.querySelector(id)).color));
+      assert.equal(selectedInk, otherInk, `${name}: the selected mode keeps the ink colour`);
       await page.locator('#modeMenuButton').click();
       await page.getByRole('button', {name: 'Score controls', exact: true}).click();
       await checkLayout(page, `${engineName} ${name}-score-controls`);
