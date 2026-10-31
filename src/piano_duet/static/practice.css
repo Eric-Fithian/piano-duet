@@ -204,3 +204,6 @@
 .session-choices>span { font-size:12px; color:var(--muted); }
 .session-choices button { padding:8px 12px; font-size:12px; }
 @media(max-width:650px) { .drill-session { padding-inline:6px; } }
+
+.review-only .profile-panel > :not(#attemptDetail) { display:none; }
+.review-only .attempt-detail { margin-top:0; }

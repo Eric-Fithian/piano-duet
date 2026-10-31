@@ -93,6 +93,8 @@ export function renderSongHud(song, stats, progress, onJump) {
       button.addEventListener('click', () => onJump(section.start));
       return button;
     }));
+    $('songSectionSelect').replaceChildren(...stats.sections.map((section, index) => new Option(section.label, String(index))));
+    $('songSectionSelect').onchange = event => onJump(stats.sections[Number(event.target.value)].start);
     strip.dataset.song = song.id;
   }
   stats.sections.forEach((section, i) => {
@@ -103,6 +105,8 @@ export function renderSongHud(song, stats, progress, onJump) {
     button.style.setProperty('--at', here ? `${100 * (ordinal - section.start) / (section.end - section.start)}%` : '0%');
     button.title = `${section.label} · ${section.accuracy === null ? 'not played yet' : `${section.accuracy}% first try`}`;
     button.setAttribute('aria-label', `Jump to ${button.title}`);
+    $('songSectionSelect').options[i].textContent = button.title;
+    if (here) $('songSectionSelect').value = String(i);
   });
   const accuracy = sessionAccuracy(progress);
   $('songAccuracy').querySelector('b').textContent = accuracy === null ? '—' : `${accuracy}%`;

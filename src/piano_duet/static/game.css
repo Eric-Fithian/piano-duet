@@ -410,3 +410,29 @@ dialog::backdrop { background: #05080cc4; backdrop-filter: blur(8px); }
   .piano-app[data-mode=drills] .drill-bar { padding-left:195px; min-height:46px; }
   .piano-app[data-mode=drills] .score-controls { right:125px; }
 }
+@media (max-height:500px) and (orientation:landscape) {
+  .piano-app[data-mode=drills] .level-meta { display:none; }
+}
+
+.edit-more-button { display:none; }
+.edit-options { display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px; flex:1; }
+@media (max-width:900px), (max-height:500px) {
+  .song-edit-bar { position:relative; z-index:4; gap:6px; padding:4px 8px; }
+  .edit-more-button { display:block; min-height:44px; color:var(--text); background:#202a38; }
+  .edit-options { display:none; position:absolute; top:100%; left:0; right:0; max-height:60dvh; overflow:auto; padding:12px; background:#141a23; border:1px solid var(--line-strong); border-radius:8px; box-shadow:0 12px 30px #0008; }
+  .edit-more-button[aria-expanded=true] + .edit-options { display:flex; }
+  .edit-options input, .edit-options select, .edit-options button, .edit-actions button { min-height:44px; }
+  .edit-bars button { min-width:44px; }
+  .edit-hint { display:none; }
+  .song-hud .icon-button, .song-hud .quiet-button { min-width:44px; min-height:44px; }
+}
+
+#songSectionSelect { display:none; }
+@media (max-width:900px), (max-height:500px) {
+  .song-hud #songSections { display:none; }
+  .song-hud #songSectionSelect { display:block; grid-column:1 / -1; grid-row:2; width:100%; min-height:44px; margin:0; }
+  .piano-app.song-editing #songSectionSelect { display:none; }
+}
+@media (max-height:500px) and (orientation:landscape) {
+  .song-hud #songSectionSelect { flex:0 1 180px; min-width:0; }
+}

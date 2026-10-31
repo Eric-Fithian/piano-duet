@@ -41,6 +41,7 @@
         <section id="songHud" class="reading-hud song-hud" aria-label="Current song" hidden>
           <div class="hud-stage"><button id="songBack" class="icon-button" aria-label="Back to library"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button><span class="song-title"><strong id="songTitle"></strong><small id="songArtist"></small></span></div>
           <div id="songSections" class="song-sections" role="group" aria-label="Sections"></div>
+          <select id="songSectionSelect" aria-label="Jump to section"></select>
           <div class="hud-right">
             <span id="songWrong" class="hud-wrong" role="status" hidden></span>
             <span id="songAccuracy" class="hud-session"><b>—</b><small>First try</small></span>
@@ -50,12 +51,16 @@
           </div>
         </section>
         <section id="songEditBar" class="song-edit-bar" aria-label="Edit song" hidden>
+          <button id="editMore" class="edit-more-button" aria-expanded="false" aria-controls="editOptions">Score settings</button>
+          <div id="editOptions" class="edit-options">
           <label>Tempo <input id="editTempo" type="number" min="30" max="240" step="1" aria-label="Tempo in quarter notes per minute"></label>
           <label>Meter <select id="editMeter"></select></label>
           <label>Key <select id="editKey"></select></label>
           <span class="edit-bars" role="group" aria-label="Move the bar lines"><span>Bar lines</span><button id="barsEarlier" class="icon-button" title="Move the bar lines one step earlier" aria-label="Move the bar lines one step earlier">◀</button><button id="barsLater" class="icon-button" title="Move the bar lines one step later" aria-label="Move the bar lines one step later">▶</button></span>
           <small class="edit-hint">Click a note to select it · Delete removes it · ↑↓ a semitone, ⇧ an octave · double-click a staff to add a note</small>
-          <span class="edit-actions"><button id="editUndo" class="quiet-button">Undo</button><button id="editRevert" class="quiet-button">Revert to transcription</button><button id="editCancel" class="quiet-button">Cancel</button><button id="editSave" class="primary">Save</button></span>
+          <button id="editUndo" class="quiet-button">Undo</button><button id="editRevert" class="quiet-button">Revert to transcription</button>
+          </div>
+          <span class="edit-actions"><button id="editCancel" class="quiet-button">Cancel</button><button id="editSave" class="primary">Save</button></span>
         </section>
         <section id="drillPanel" class="drill-panel" aria-label="Drill" hidden>
           <div class="drill-bar">

@@ -312,6 +312,7 @@ async function openEditor() {
   songEditor = new SongEditor(song);
   document.body.classList.add('song-editing');
   $('songEditBar').hidden = false;
+  $('editMore').setAttribute('aria-expanded', 'false');
   sheet.use('editor', SCORE_VIEWS.editor);
   editPhrase = sheet.add('target', songEditor.draft.notes, {bpm: songEditor.draft.bpm, key: songEditor.key, title: song.title,
     exact: true, meter: songEditor.draft.meter});
@@ -456,6 +457,9 @@ function celebrate(before, after) {
 
 function openReview(id) {
   reading.interrupt();
+  const reviewOnly = !ENABLED_MODES.includes('practice');
+  $('profileDialog').classList.toggle('review-only', reviewOnly);
+  $('profileTitle').textContent = reviewOnly ? 'Your score' : 'Your progress';
   $('profileDialog').showModal();
   inspectAttempt(id).catch(fail);
 }
@@ -1553,6 +1557,10 @@ $('editKey').addEventListener('change', () => editAction(() => {
 }));
 $('barsEarlier').addEventListener('click', () => editAction(() => songEditor.moveBarLines(1)));
 $('barsLater').addEventListener('click', () => editAction(() => songEditor.moveBarLines(-1)));
+$('editMore').addEventListener('click', () => {
+  const button = $('editMore');
+  button.setAttribute('aria-expanded', button.getAttribute('aria-expanded') !== 'true');
+});
 $('editUndo').addEventListener('click', () => editAction(() => songEditor.undo()));
 $('editSave').addEventListener('click', () => saveEdits().catch(fail));
 $('editRevert').addEventListener('click', () => revertEdits().catch(fail));
@@ -1560,6 +1568,13 @@ $('editCancel').addEventListener('click', cancelEdits);
 $('sheetMusic').addEventListener('click', event => editClick(event, false));
 $('sheetMusic').addEventListener('dblclick', event => editClick(event, true));
 document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && $('editMore').getAttribute('aria-expanded') === 'true') {
+    $('editMore').setAttribute('aria-expanded', 'false');
+    $('editMore').focus();
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    return;
+  }
   if (!songEditor || typing(event) || document.querySelector('dialog[open]')) return;
   const octave = event.shiftKey ? 12 : 1;
   const actions = {
@@ -1596,12 +1611,17 @@ $('drillMore').addEventListener('click', () => {
 document.addEventListener('click', event => {
   if (!event.target.closest('#modeMenu, #modeMenuButton')) $('modeMenuButton').setAttribute('aria-expanded', 'false');
   if (!event.target.closest('#drillExtra, #drillMore')) $('drillMore').setAttribute('aria-expanded', 'false');
+  if (!event.target.closest('#editOptions, #editMore')) $('editMore').setAttribute('aria-expanded', 'false');
 });
-document.addEventListener('scroll', () => $('drillMore').setAttribute('aria-expanded', 'false'), true);
+document.addEventListener('scroll', event => {
+  $('drillMore').setAttribute('aria-expanded', 'false');
+  if (!$('editOptions').contains(event.target)) $('editMore').setAttribute('aria-expanded', 'false');
+}, true);
 document.addEventListener('keydown', event => {
   if (event.key === 'Escape') {
     $('modeMenuButton').setAttribute('aria-expanded', 'false');
     $('drillMore').setAttribute('aria-expanded', 'false');
+    $('editMore').setAttribute('aria-expanded', 'false');
   }
 });
 $('nextPractice').addEventListener('click', () => loadPractice().catch(fail));
@@ -1638,6 +1658,8 @@ $('openProfile').addEventListener('click', () => {
   if (mode === 'reading') { openCareer(); return; }
   if (mode === 'drills' && !ENABLED_MODES.includes('practice')) { openLevels().catch(fail); return; }
   if (!ENABLED_MODES.includes('practice')) return;
+  $('profileDialog').classList.remove('review-only');
+  $('profileTitle').textContent = 'Your progress';
   $('profileDialog').showModal(); $('profileDialog').scrollTop = 0;
 });
 $('allProgress').addEventListener('click', () => { $('readingProgressDialog').close(); $('profileDialog').showModal(); });

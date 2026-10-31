@@ -68,4 +68,4 @@ Models, samples and the notation library live in `.cache/`, not in Git. Setup pi
 rm -rf ~/.piano-duet ~/.local/bin/piano-duet
 ```
 
-This also deletes your learner history. Copy `~/.piano-duet/.local/learner.sqlite3` first if you want to keep it, or use **Progress → Export history** in the app.
+This also deletes your learner history. Copy `~/.piano-duet/.local/learner.sqlite3` first if you want to keep it.

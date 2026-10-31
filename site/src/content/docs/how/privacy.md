@@ -15,9 +15,9 @@ In the Mac reference app, audio is processed in memory and sent only to a server
 
 In the Mac reference app, every completed transcription produces an attempt: the full recognized performance, exact prompt and target, mode, help used, familiarity, audio signal metadata, recognition support, observations, and derived skill evidence. The original inputs and versioned assessment are stored separately in **`.local/learner.sqlite3`**, outside the model cache and ignored by Git. The app saves recognized notes, not audio recordings. Incomplete or empty recognition does not establish ability. AI replies are never treated as user performances.
 
-Your history stays in `.local/learner.sqlite3` inside the install folder (`~/.piano-duet` by default). **Progress → Export history** downloads it as JSON, and deleting the folder deletes it.
+Your history stays in `.local/learner.sqlite3` inside the install folder (`~/.piano-duet` by default). Deleting the folder deletes it.
 
-To bring Mac app history into the browser, first quit the Mac app so its database is fully saved. In the browser, open **Progress → All piano skills → Import history from the Mac app** and select `.local/learner.sqlite3` from the install folder. The file is read on your device and merged into browser storage; importing the same file again adds no duplicates. Keep the Mac database until you have checked your progress and songs in the browser.
+To bring Mac app history into the browser, first quit the Mac app so its database is fully saved. In the browser, open **Settings → Import history from the Mac app** and select `.local/learner.sqlite3` from the install folder. The file is read on your device and merged into browser storage; importing the same file again adds no duplicates. Keep the Mac database until you have checked your progress and songs in the browser.
 
 ## The local server
 

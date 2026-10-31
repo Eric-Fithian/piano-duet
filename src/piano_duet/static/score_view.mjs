@@ -181,7 +181,7 @@ export class ScoreView {
   }
 
   get scale() {
-    const scale = this.name === 'reading' && matchMedia('(max-width: 600px)').matches ? 1 : this.profile.scale;
+    const scale = this.name === 'reading' && matchMedia('(max-width: 600px), (max-height: 500px)').matches ? 1 : this.profile.scale;
     return scale * this.preferences.zoom;
   }
 

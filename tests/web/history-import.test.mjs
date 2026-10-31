@@ -17,7 +17,7 @@ before(async () => {
 }, {timeout: 120000});
 after(async () => { server?.kill('SIGTERM'); if (directory) await rm(directory, {recursive: true, force: true}); });
 for (const [name, engine] of [['Chromium', chromium], ['WebKit', webkit]]) {
-  test(`${name} imports Mac history through the profile and skips a second import`, {timeout: 120000}, async () => {
+  test(`${name} imports Mac history through Settings and skips a second import`, {timeout: 120000}, async () => {
     const profile = await mkdtemp('.local/history-browser-profile-');
     const browser = await engine.launchPersistentContext(profile, {headless: true});
     try {
@@ -33,7 +33,8 @@ for (const [name, engine] of [['Chromium', chromium], ['WebKit', webkit]]) {
       const page = await browser.newPage();
       await page.goto(`http://127.0.0.1:${port}/`);
       await page.waitForFunction(() => document.querySelector('#practiceTitle')?.textContent === 'C major scale', null, {timeout: 30000});
-      await page.locator('#openProfile').click();
+      await page.locator('#openSettings').click();
+      await page.locator('.history-import summary').click();
       await page.locator('#historyFile').setInputFiles(path);
       await page.waitForFunction(() => /Imported \d+ new events/.test(document.querySelector('#historyImportStatus')?.textContent ?? ''), null, {timeout: 30000});
       assert.match(await page.locator('#historyImportStatus').textContent(), /12 attempts/);
