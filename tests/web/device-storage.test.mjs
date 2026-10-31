@@ -25,6 +25,8 @@ for (const [name, engine] of [["Chromium", chromium], ["WebKit", webkit]]) {
       const initial = await page.evaluate(async () => {
         window.log = window.createEventLog();
         const { deviceId } = await window.log.open();
+        let notifications = 0;
+        window.log.addEventListener("append", () => { notifications++; });
         const first = await window.log.append("setting", { volume: 0.5 });
         const remote = { id: "remote-attempt", deviceId: "other-device", clock: 8,
           createdAt: "2026-01-01T00:00:00.000Z", kind: "attempt", payload: { score: 95 } };
@@ -36,12 +38,13 @@ for (const [name, engine] of [["Chromium", chromium], ["WebKit", webkit]]) {
           await window.log.merge([{ ...remote, id: "must-rollback", clock: 9 },
             { ...remote, payload: { score: 0 } }]);
         } catch (error) { conflict = error.message; }
-        return { deviceId, first, added, repeated, next, conflict, events: await window.log.list() };
+        return { deviceId, first, added, repeated, next, conflict, notifications, events: await window.log.list() };
       });
       assert.equal(initial.first.deviceId, initial.deviceId);
       assert.equal(initial.first.clock, 1);
       assert.equal(initial.added, 1);
       assert.equal(initial.repeated, 0);
+      assert.equal(initial.notifications, 3);
       assert.equal(initial.next.clock, 9);
       assert.ok(initial.conflict.includes("Conflicting event"));
       assert.deepEqual(initial.events.map((event) => event.id), [initial.first.id, "remote-attempt", initial.next.id]);

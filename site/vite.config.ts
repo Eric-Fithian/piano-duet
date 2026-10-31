@@ -22,6 +22,18 @@ export default defineConfig({
   preview: { host: "127.0.0.1", headers, proxy: {} },
   worker: { format: "es" },
   plugins: [{
+    name: "sync-configuration",
+    buildStart() {
+      const { SUPABASE_URL: url, SUPABASE_ANON_KEY: anonKey } = process.env;
+      if ((url === undefined) !== (anonKey === undefined) || (url !== undefined && (!url.trim() || !anonKey?.trim()))) {
+        throw new Error("SUPABASE_URL and SUPABASE_ANON_KEY must be set together");
+      }
+    },
+    generateBundle() {
+      const { SUPABASE_URL: url, SUPABASE_ANON_KEY: anonKey } = process.env;
+      if (url && anonKey) this.emitFile({ type: "asset", fileName: "sync-config.json", source: JSON.stringify({ url, anonKey }) });
+    },
+  }, {
     name: "reference-interface",
     transformIndexHtml: {
       order: "pre",
@@ -41,6 +53,7 @@ export default defineConfig({
         replace('id="openYoutube" class=', 'id="openYoutube" hidden class=');
         replace('        <p class="profile-explanation">', `        <div class="history-import"><label class="secondary">Import history from the Mac app <input id="historyFile" type="file" accept=".sqlite3,.sqlite,.db"></label><p>Quit the Mac app before selecting its .local/learner.sqlite3 file, so all history is saved in the file.</p><progress id="historyImportProgress" aria-label="Importing history" hidden></progress><p id="historyImportStatus" aria-live="polite"></p></div>
         <p class="profile-explanation">`);
+        replace('      <h3>Listening</h3>', '      <h3>Account and sync</h3><section id="accountSync" aria-label="Account and sync"></section>\n      <h3>Listening</h3>');
         replace('        <div class="song-table" role="table" aria-label="Your songs">',
           `        <div class="recording-import" aria-label="Recording import"><button id="importAudio" class="secondary" type="button">Import audio</button><button id="recordAudio" class="secondary" type="button">Record audio</button><p id="recordingImportStatus" aria-live="polite"></p></div>
         <dialog id="recordingDialog" class="settings-dialog" aria-labelledby="recordingTitle"><div class="dialog-heading"><h2 id="recordingTitle">Import a recording</h2><button id="recordingClose" class="quiet-button" type="button">Done</button></div>
@@ -55,7 +68,7 @@ export default defineConfig({
   }, {
     name: "offline-app-shell",
     generateBundle(_options, bundle) {
-      const files = Object.keys(bundle).filter((name) => !name.endsWith(".map")).sort();
+      const files = Object.keys(bundle).filter((name) => !name.endsWith(".map") && name !== "sync-config.json").sort();
       const digest = createHash("sha256");
       digest.update(readFileSync(new URL("../src/piano_duet/static/index.html", import.meta.url)));
       for (const name of files) {

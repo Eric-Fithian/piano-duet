@@ -7,6 +7,7 @@ import {TEMPO_LIMITS, renderCareer, renderLevel, renderReadingHud, showBanner, s
 import {currentOrdinal, renderLibrary, renderSongHud, sessionAccuracy} from './library.mjs';
 import {DrillPicker, attackPlan, followPosition, heardAttacks, planSession, playedGap, streakText, takeEnded, tempoLabel} from './drills.mjs';
 import {METERS, SongEditor, musicalKey} from './song_editor.mjs';
+import {readLearnerSetting, refreshLearnerSettings, writeLearnerSetting} from './learner-settings.mjs';
 
 const $ = id => document.getElementById(id);
 const EMPTY_SCORE = '<span aria-hidden="true">𝄞</span><p>Start with a few notes.</p><small>Your music will appear here.</small>';
@@ -149,7 +150,7 @@ function changeTempo(direction) {
   const task = practice.task;
   if (mode !== 'reading' || !task?.reading?.rhythm_required || !reading.progress) return;
   readingTempo = Math.min(TEMPO_LIMITS[1], Math.max(TEMPO_LIMITS[0], task.reading.minimum_bpm ?? 0, tempoFor(task) + direction * TEMPO_STEP));
-  localStorage.setItem('piano-duet.reading-tempo', readingTempo);
+  void writeLearnerSetting('piano-duet.reading-tempo', String(readingTempo)).catch(fail);
   reading.progress.setTempo(tempoFor(task));
   readingReady();
 }
@@ -510,6 +511,17 @@ export async function refreshProfile() {
   renderProfile(profile, id => inspectAttempt(id).catch(fail));
   if (profile.recent.length) lastAttempt = profile.recent.find(attempt => attempt.note_count > 0 && attempt.context.interaction !== 'step_by_step')?.id || null;
   $('savePieceForm').hidden = !lastAttempt;
+}
+
+export async function refreshSyncedData() {
+  await initialized;
+  await refreshLearnerSettings();
+  await applyLearnerSettings();
+  await Promise.all([refreshProfile(), loadPieces(), drills.refresh(), loadLibrary()]);
+  if ($('drillLogDialog').open) {
+    drills.renderLevels(drill => { $('drillLogDialog').close(); loadDrill({focus: drill}); });
+    drills.renderLog(config => { $('drillLogDialog').close(); drills.adopt(config); loadDrill(config); });
+  }
 }
 
 async function inspectAttempt(id) {
@@ -878,12 +890,12 @@ function clearLearning() {
   learningReady();
 }
 
-async function selectMode(value) {
+async function selectMode(value, persist = true) {
   if (value === mode) return;
   if (mode === 'library') await closeSong();
   reading.pause();
   mode = value;
-  localStorage.setItem('piano-duet.mode', mode);
+  if (persist) await writeLearnerSetting('piano-duet.mode', mode);
   updateModeControls();
   reset();
   if (isPracticeMode()) await loadPractice();
@@ -1030,14 +1042,14 @@ async function fail(error) {
 }
 
 async function initialize() {
-  const savedThreshold = localStorage.getItem('piano-duet.note-confidence');
+  const savedThreshold = readLearnerSetting('piano-duet.note-confidence');
   if (savedThreshold !== null) {
     const value = Number(savedThreshold);
     if (!Number.isFinite(value) || value < 0.1 || value > 0.99) throw new Error('Saved note confidence must be between 0.10 and 0.99.');
     $('threshold').value = value;
     $('thresholdValue').textContent = value.toFixed(2);
   }
-  const savedTempo = localStorage.getItem('piano-duet.reading-tempo');
+  const savedTempo = readLearnerSetting('piano-duet.reading-tempo');
   if (savedTempo !== null) {
     readingTempo = Number(savedTempo);
     if (!Number.isFinite(readingTempo) || readingTempo < TEMPO_LIMITS[0] || readingTempo > TEMPO_LIMITS[1]) throw new Error(`Saved reading tempo must be between ${TEMPO_LIMITS[0]} and ${TEMPO_LIMITS[1]} BPM.`);
@@ -1047,19 +1059,18 @@ async function initialize() {
     replayStage = Number(savedStage);
     if (!Number.isInteger(replayStage) || replayStage < 1) throw new Error('The saved reading stage is invalid.');
   }
-  const savedFlow = localStorage.getItem('piano-duet.drill-flow');
+  const savedFlow = readLearnerSetting('piano-duet.drill-flow');
   if (savedFlow !== null) {
     if (!['build', 'mix'].includes(savedFlow)) throw new Error('The saved drill flow is invalid.');
     $('drillFlow').value = savedFlow;
   }
-  const savedMode = localStorage.getItem('piano-duet.mode') || 'practice';
+  const savedMode = readLearnerSetting('piano-duet.mode') || 'practice';
   if (!['practice', 'reading', 'drills', 'library', 'duet', 'learning'].includes(savedMode)) throw new Error('The saved playing mode is invalid.');
   const response = await localFetch('/api/status');
   if (!response.ok) throw new Error('The local piano server is not available. Restart Piano Duet.');
   await Promise.all([piano.load(), sheet.ready()]);
   ready = true;
-  $('autoReply').checked = false;
-  $('pause').disabled = true;
+  await applyLearnerSettings(false);
   $('demo').hidden = true;
   $('answer').innerHTML = 'Finish attempt <kbd>space</kbd>';
   await Promise.all([refreshProfile(), loadPieces()]);
@@ -1565,7 +1576,7 @@ for (const id of ['drillKind', 'drillVariant', 'drillKey', 'drillHands', 'drillO
 }
 $('drillAuto').addEventListener('click', () => loadDrill({}));
 $('drillNext').addEventListener('click', () => loadDrill(drills.next()));
-$('drillFlow').addEventListener('change', () => localStorage.setItem('piano-duet.drill-flow', $('drillFlow').value));
+$('drillFlow').addEventListener('change', () => { void writeLearnerSetting('piano-duet.drill-flow', $('drillFlow').value).catch(fail); });
 $('drillLevel').addEventListener('click', () => openLevels().catch(fail));
 $('drillSession').addEventListener('click', openSessionDialog);
 for (const button of document.querySelectorAll('[data-session]')) {
@@ -1631,7 +1642,7 @@ $('excludePractice').addEventListener('click', () => excludeAttempt(practice.att
 $('savePieceForm').addEventListener('submit', event => savePiece(event).catch(fail));
 $('replayTarget').addEventListener('click', () => replayTarget().catch(fail));
 $('newRound').addEventListener('click', () => { clearLearning(); detector.reset(); buttons(); });
-$('autoReply').addEventListener('change', () => { $('pause').disabled = !$('autoReply').checked; automaticPause[mode] = $('autoReply').checked; });
+$('autoReply').addEventListener('change', () => { $('pause').disabled = !$('autoReply').checked; automaticPause[mode] = $('autoReply').checked; void writeLearnerSetting(`piano-duet.autoReply.${mode}`, String($('autoReply').checked)).catch(fail); });
 for (const view of ['sheet', 'roll']) {
   $(`${view}View`).addEventListener('click', () => {
     $('sheetPanel').hidden = view !== 'sheet';
@@ -1684,9 +1695,36 @@ for (const [id, format] of Object.entries(labels)) {
   $(id).addEventListener('input', () => {
     $(`${id}Value`).textContent = format($(id).value);
     if (id === 'volume') piano.gain.gain.setTargetAtTime(Number($(id).value) / 100, context.currentTime, 0.03);
-    if (id === 'threshold') localStorage.setItem('piano-duet.note-confidence', $(id).value);
   });
 }
+for (const id of ['threshold', 'pause', 'length', 'difficulty', 'temperature', 'surprise', 'scoreTempo', 'scoreBpm', 'scoreMeter', 'scoreAccidentals']) {
+  $(id).addEventListener('change', () => { void writeLearnerSetting(`piano-duet.${id === 'threshold' ? 'note-confidence' : id}`, $(id).value).catch(fail); });
+}
+async function applyLearnerSettings(selectSavedMode = true) {
+  for (const id of ['threshold', 'pause', 'length', 'difficulty', 'temperature', 'surprise', 'scoreTempo', 'scoreBpm', 'scoreMeter', 'scoreAccidentals']) {
+    const value = readLearnerSetting(`piano-duet.${id === 'threshold' ? 'note-confidence' : id}`);
+    if (value === null) continue;
+    $(id).value = value;
+    if (labels[id]) $(`${id}Value`).textContent = labels[id](value);
+  }
+  for (const name of Object.keys(automaticPause)) {
+    const value = readLearnerSetting(`piano-duet.autoReply.${name}`);
+    if (value !== null) automaticPause[name] = value === 'true';
+  }
+  $('autoReply').checked = automaticPause[mode];
+  $('pause').disabled = !$('autoReply').checked;
+  const tempo = readLearnerSetting('piano-duet.reading-tempo');
+  if (tempo !== null) readingTempo = Number(tempo);
+  const flow = readLearnerSetting('piano-duet.drill-flow');
+  if (flow !== null) $('drillFlow').value = flow;
+  if (drills.catalog && drills.saved()) drills.sync(drills.saved());
+  $('bpmLabel').hidden = $('scoreTempo').value !== 'manual';
+  sheet.configure({tempo: $('scoreTempo').value, bpm: Number($('scoreBpm').value), meter: $('scoreMeter').value,
+    flats: $('scoreAccidentals').value === 'auto' ? null : $('scoreAccidentals').value === 'flats'});
+  const selected = readLearnerSetting('piano-duet.mode');
+  if (selectSavedMode && selected && selected !== mode) await selectMode(selected, false);
+}
 window.addEventListener('pagehide', () => { controller?.abort(); microphone?.getTracks().forEach(track => track.stop()); piano.stop(); });
-initialize().catch(fail);
+const initialized = initialize();
+initialized.catch(fail);
 draw();

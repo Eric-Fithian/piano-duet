@@ -2,13 +2,14 @@ import type { EventKind, JsonValue, PracticeEvent } from "./events";
 
 type Pending = { resolve: (value: unknown) => void; reject: (error: Error) => void };
 
-export class EventLog {
+export class EventLog extends EventTarget {
   private worker = new Worker(new URL("./event-log-worker.ts", import.meta.url), { type: "module" });
   private pending = new Map<number, Pending>();
   private sequence = 0;
   private closed = false;
 
   constructor() {
+    super();
     this.worker.onmessage = ({ data }: MessageEvent<{ id: number; value?: unknown; error?: string }>) => {
       const request = this.pending.get(data.id);
       if (!request) throw new Error(`Unexpected event log response ${data.id}`);
@@ -34,16 +35,36 @@ export class EventLog {
     }
   }
 
-  append(kind: EventKind, payload: JsonValue, eventId?: string): Promise<PracticeEvent> {
-    return this.send("append", { kind, payload, eventId });
+  async append(kind: EventKind, payload: JsonValue, eventId?: string): Promise<PracticeEvent> {
+    const event = await this.send<PracticeEvent>("append", { kind, payload, eventId });
+    this.dispatchEvent(new Event("append"));
+    return event;
   }
 
-  merge(events: PracticeEvent[]): Promise<number> {
-    return this.send("merge", { events });
+  async merge(events: PracticeEvent[]): Promise<number> {
+    const added = await this.send<number>("merge", { events });
+    if (added) this.dispatchEvent(new Event("append"));
+    return added;
   }
 
   list(): Promise<PracticeEvent[]> {
     return this.send("list");
+  }
+
+  unsynced(userId: string, limit: number): Promise<PracticeEvent[]> {
+    return this.send("unsynced", { userId, limit });
+  }
+
+  acknowledge(userId: string, ids: string[]): Promise<void> {
+    return this.send("acknowledge", { userId, ids });
+  }
+
+  cursor(userId: string): Promise<number> {
+    return this.send("cursor", { userId });
+  }
+
+  applyRemote(userId: string, events: PracticeEvent[], cursor: number): Promise<number> {
+    return this.send("applyRemote", { userId, events, cursor });
   }
 
   async close(): Promise<void> {

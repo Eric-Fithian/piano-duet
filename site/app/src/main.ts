@@ -26,6 +26,8 @@ import { BrowserRecordingImporter } from "./browser-recording-import";
 import { NativeRecordingImporter } from "./native-recording-import";
 import { recordingStage, setupRecordingUi } from "./recording-ui";
 import { setupHistoryImport } from "./history-import";
+import { setupSyncUi } from "./sync-ui";
+import { initializeLearnerSettings } from "../../../src/piano_duet/static/learner-settings.mjs";
 import "./style.css";
 
 Object.assign(window, { VexFlow });
@@ -67,6 +69,7 @@ async function start(): Promise<void> {
   const log = new EventLog();
   await requestPersistentStorage();
   await log.open();
+  await initializeLearnerSettings(log);
   const native = (window as Window & { webkit?: { messageHandlers?: { pianoInference?: WebKitMessageHandler } } }).webkit?.messageHandlers?.pianoInference;
   const backend = native ? new NativeInference(new WebKitInferenceTransport(native, window)) : new BrowserInference(MODEL_CATALOG);
   const settings = document.querySelector<HTMLElement>("#settingsDialog");
@@ -152,6 +155,11 @@ async function start(): Promise<void> {
   const app = await import("../../../src/piano_duet/static/app.mjs");
   setupRecordingUi(importer, app.loadLibrary);
   setupHistoryImport(log, async () => { await app.refreshProfile(); await app.loadLibrary(); });
+  void setupSyncUi(log, app.refreshSyncedData).catch((error: unknown) => {
+    const panel = document.querySelector<HTMLElement>("#accountSync");
+    if (!panel) throw new Error("The interface has no account panel");
+    panel.textContent = `Account sync unavailable: ${error instanceof Error ? error.message : String(error)}`;
+  });
 }
 
 start().catch((error: unknown) => {

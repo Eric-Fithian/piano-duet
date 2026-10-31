@@ -10,5 +10,6 @@ __pycache__/
 node_modules/
 /site/dist/
 /site/.astro/
+/site/app/sync-config.json
 .vercel
 .env*
