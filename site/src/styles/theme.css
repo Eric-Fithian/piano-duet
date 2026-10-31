@@ -80,6 +80,7 @@
   margin-bottom: 0.25rem;
 }
 .pipeline strong { display: block; color: var(--brand-text); }
+.card { --sl-card-border: var(--brand-border); --sl-card-bg: var(--brand-surface); }
 .sl-link-button { border-radius: 4px; }
 .sl-link-button.primary {
   background: var(--brand-action);

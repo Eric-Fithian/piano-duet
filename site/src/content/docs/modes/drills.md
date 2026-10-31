@@ -3,7 +3,7 @@ title: Drills
 description: Scales, arpeggios, chords and Hanon, judged against your own steady tempo.
 ---
 
-![A C major broken-chord drill in triplets, with fingering and the drill's options.](../../../assets/screenshots/drills.png)
+![A C major five-finger drill with fingering and tempo controls.](../../../assets/screenshots/drills.png)
 
 **Drills** is for mechanics: the technical work that the ABRSM, RCM and Trinity syllabi, Hanon, and common teaching methods agree on. The bar at the top shows the drill, its level, its tempo, **▶** (hear it played, highlighting each note), the beat, the last take, next drill, **Session** and instructions. Click the drill's name to change the drill, type, key, hands, range, practice pattern or repeat count, or to **Choose for me**. Every option has a **Random** choice. **Each take** is either **Build** (the same drill every take; **⏭** rolls a new one) or **Mix** (Random choices re-rolled every take).
 
@@ -20,7 +20,7 @@ Each take is one run-through of the drill as written, start to finish. Press **S
 
 ## Results
 
-![Drill results: meters for notes, evenness, tempo and loudness beside a note-by-note timeline of tempo, timing and loudness.](../../../assets/screenshots/drill-results.png)
+![A completed five-finger drill with feedback on notes, timing and loudness.](../../../assets/screenshots/drill-results.png)
 
 Instead of a transcription of what you played, each take shows a compact panel. On the left, a meter for each measure fills from 0 to 100 with a tick at what a clean take needs, green when it is met and amber when not: notes, evenness (onsets against your own steady tempo), loudness evenness, and, where they apply, how close together the hands landed and how well accents stood out. Tempo and thumb crossings are centred meters, with a shaded band for what a clean take allows. On the right, a note-by-note timeline of the take, with bar numbers, shows the tempo you held as a line that turns amber where it leaves the band around your opening tempo, each note's timing (late notes rise in orange, early ones dip in blue, a red ✕ marks a missed note), and each note's loudness against your typical note, with notes much louder or softer than the rest in amber. Hover over a note for its bar, pitch, timing, tempo and loudness. The list below it names what happened, for example "Pause before B♭4 in bar 2: 360 ms late", "Played E4 + G4 + B4 first, then corrected it to E4 + G4 + C5", "Caught B4 beside C5" or "Played C4 twice". **Review notes** opens the heard notes, where a misheard take can be excluded.
 

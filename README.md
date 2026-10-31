@@ -20,7 +20,7 @@
   <img src="https://img.shields.io/badge/macOS-14%2B%20·%20Apple%20Silicon-286b4c" alt="macOS 14+ on Apple Silicon">
 </p>
 
-![Reading mode: a four-bar score with played notes in green, a late note in red, and the cursor on the next note.](site/src/assets/screenshots/reading.png)
+![Reading mode with a highlighted note and a score fitted to the page.](site/src/assets/screenshots/reading.png)
 
 Play an acoustic or digital piano into your device's microphone. There's no on-screen keyboard and no MIDI cable. Piano Duet listens, writes fresh sheet music for you to read, and coaches your technique. Models run on your device.
 
@@ -64,6 +64,8 @@ make site    # the website at http://localhost:4321
 ```
 
 Python edits restart the server, and HTML, CSS and JavaScript edits refresh the browser without reloading the models. CI runs lint, the Python tests on Apple Silicon, the JavaScript tests and the website build on every pull request. Vercel posts a preview of any website change. Read [CONTRIBUTING.md](CONTRIBUTING.md) and the [architecture overview](https://piano-duet.vercel.app/docs/how/architecture/) to get started.
+
+Regenerate the documentation screenshots from the production browser build with `node site/scripts/capture-product-screenshots.mjs` after installing the JavaScript dependencies, the `uv` environment, and Playwright's Chromium and WebKit browsers. The script downloads the pinned piano sample and transcription model, uses a simulated microphone for a real drill take, and saves additional light, dark and Night page captures under `/private/tmp/piano-rebrand/site/`. Pass `--qa-only` to capture there without replacing documentation images. This does not test a physical piano or microphone.
 
 ## Credits
 

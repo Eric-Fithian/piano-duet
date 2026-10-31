@@ -14,8 +14,8 @@ export default defineConfig({
   integrations: [
     starlight({
       title: 'Piano Duet',
-      description: 'Learn piano with your own acoustic piano and an AI partner that runs entirely on your Mac.',
-      logo: {light: './src/assets/logo.svg', dark: './src/assets/logo-dark.svg'},
+      description: 'Practice real music at your piano with listening and feedback on your device.',
+      logo: {light: '../design/brand/assets/wordmark-horizontal-header-light.svg', dark: '../design/brand/assets/wordmark-horizontal-header-dark.svg', replacesTitle: true},
       favicon: '/favicon.svg',
       social: [{icon: 'github', label: 'GitHub', href: repository}],
       editLink: {baseUrl: `${repository}/edit/main/site/`},

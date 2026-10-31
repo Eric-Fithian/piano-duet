@@ -3,15 +3,15 @@ title: Reading
 description: Endless sight-reading composed for you, from first notes to advanced grand-staff scores.
 ---
 
-![Reading mode mid-score: played notes in green, a late note in red, and the cursor on the next note.](../../../assets/screenshots/reading.png)
+![Reading mode with a highlighted note and a score fitted to the page.](../../../assets/screenshots/reading.png)
 
-**Reading mode** progresses from first notes to advanced piano scores. Enable the microphone and play the highlighted note or chord. Correct notes turn green and advance the cursor. A wrong press appears in red beside the expected notes; the cursor waits for correction. A held note counts once, and repeated written notes require separate attacks. The score follows you, keeping the music ahead in view; the score you just finished stays faded above, and the next one is already waiting below. Upcoming scores are prepared in advance and stay unchanged once shown; completed attempts save in the background without restarting microphone recognition. Early stages use a single staff; later stages use the grand staff. Your selected mode is remembered in this browser.
+**Reading mode** progresses from first notes to advanced piano scores. Enable the microphone and play the highlighted note or chord. Correct notes get a check and advance the cursor. A wrong press gets a ring and × beside the expected notes; the cursor waits for correction. A held note counts once, and repeated written notes require separate attacks. The score follows you, keeping the music ahead in view. A label tells you when the next score is ready. Upcoming scores are prepared in advance and stay unchanged once shown; completed attempts save in the background without restarting microphone recognition. Early stages use a single staff; later stages use the grand staff. Your selected mode is remembered in this browser.
 
 Recognition details are in [How Piano Duet listens](/docs/how/listening/).
 
 ## The curriculum
 
-The reading curriculum has **24 stages**. Every score is four bars long, two bars per line at the default size. Each score moves the hand to a new position at least once; other bars stay put about two times in three. A numbered finger marks each landing in the early stages. Rests have no standalone stage: early phrases keep moving, while occasional rests enter with ties and offbeats in later music. In alternating-clef scores, the inactive hand still shows its written rests.
+The reading curriculum has **24 stages**. Every score is four bars long. The default view fits as much music as the screen can show at a readable size, and you can adjust the zoom. Each score moves the hand to a new position at least once; other bars stay put about two times in three. A numbered finger marks each landing in the early stages. Rests have no standalone stage: early phrases keep moving, while occasional rests enter with ties and offbeats in later music. In alternating-clef scores, the inactive hand still shows its written rests.
 
 - **1–6, Beginner:** first notes, steps and skips, fourths, fifths, long notes, eighth notes.
 - **7–11, Developing:** one sharp or flat, minor melodies and raised leading notes, dyads, alternating clefs, hands together over held bass.
