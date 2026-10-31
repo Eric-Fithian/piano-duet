@@ -1,6 +1,6 @@
 ---
 title: Library
-description: Import MIDI or MusicXML and play with a cursor that waits for you.
+description: Import a score or piano recording and play with a cursor that waits for you.
 ---
 
 **Library** holds full songs. Import a MIDI (`.mid`) or MusicXML (`.musicxml`, `.xml`, `.mxl`) file with **Import**, by dropping it on the list, or with **Import file** on a catalogue entry, which links to the composer's official store. MuseScore exports both formats; PDF scores are not supported yet. One time signature per piece is supported. Rhythms are written on sixteenths or, in simple meters, triplet eighths, chosen per beat; finer values such as 32nds and sextuplets are rounded onto them. MusicXML keeps the written staves; a two-track MIDI file maps its lower track to the left hand, and other MIDI files split at middle C. The browser keeps songs and plays in its local SQLite database. Open a song and press **Space**: the cursor waits for each note or chord, and if your last three attacks match another passage it moves there. Sections of eight bars (four in short pieces) are coloured by recent first-try accuracy; click one to jump. **▶** previews from the cursor. Pausing or finishing saves the play; the list shows plays, recent and best first-try accuracy, how much of the piece you have covered, and when you last played it. Song plays do not award XP yet.
@@ -11,7 +11,9 @@ Transcriptions can get the tempo, meter, key or bar lines wrong, or mishear note
 
 ## Recording import
 
-The browser app will replace YouTube import with audio-file and microphone-recording import, using Transkun and MIDI2ScoreTransformer to write a score. The same rights confirmation will apply. Score writing from recordings is unavailable in the browser while redistribution permission for the score model is pending. The target is under 60 seconds for a song, with two minutes as the worst-case budget.
+Choose **Import audio** to select a recording, or **Record audio** to capture one with your microphone. Confirm that you own the recording or have the rights holder's permission to transcribe it, and that the score is for your own practice. The app downloads its models on first use and shows download progress. Transcription and score writing then run on your device; audio is not uploaded or saved. The resulting song is saved in your local Library, where you can listen, practise and edit it.
+
+The browser can import WAV and common compressed formats including MP3, M4A/AAC, FLAC and WebM/Opus when the browser supports the codec. **Transkun 2.0** finds piano notes; Eric Fithian's score model, based on MIDI2ScoreTransformer by Beyer and Dai, writes the notation. Solo piano works best. Transcriptions can have errors, so use **Edit** to correct the result. The score model is licensed CC BY-NC-SA 4.0; see [credits](/docs/credits/). The [performance page](/docs/how/performance/) records measured import times and the devices still to test.
 
 ## From YouTube in the Mac app
 
