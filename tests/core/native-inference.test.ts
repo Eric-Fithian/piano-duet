@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { NativeInference } from "../../site/app/src/native-inference.ts";
+import { NativeRecordingImporter } from "../../site/app/src/native-recording-import.ts";
 import type { NativeInferenceTransport } from "../../site/app/src/native-inference.ts";
 
 test("native inference uses the shared model interface and little-endian float messages", async () => {
@@ -52,4 +53,39 @@ test("native sessions reject concurrent work, malformed output and aborted reque
   abort.abort();
   await assert.rejects(session.run({ tokens: [0], reset: true }, abort.signal), { name: "AbortError" });
   await session.close();
+});
+
+test("native recording import sends decoded audio and notes through the native sessions", async () => {
+  const requests: Record<string, unknown>[] = [], stages: string[] = [];
+  const notes = [{ pitch: 60, start: 0.5, duration: 1, velocity: 90 }];
+  const transport: NativeInferenceTransport = { async request(message) {
+    requests.push(message);
+    if (message.action === "open") return { session: message.model };
+    if (message.session === "recording-transcription") return { notes };
+    if (message.session === "midi-to-score") return { musicXml: "<score-partwise/>" };
+    throw new Error("Unexpected native request");
+  } };
+  const importer = new NativeRecordingImporter(new NativeInference(transport), () => {}, (stage) => stages.push(stage),
+    async () => ({ audio: new Float32Array([1, -2]), backend: "test" }));
+  await importer.prepare();
+  assert.deepEqual(await importer.run(new ArrayBuffer(0)), { musicXml: "<score-partwise/>", notes });
+  assert.deepEqual(stages, ["Opening the recording", "Finding the notes", "Writing the score"]);
+  assert.deepEqual(requests.map((request) => request.action), ["open", "open", "run", "run"]);
+  assert.deepEqual(requests[2].input, { audio: { $type: "float32-le", data: "AACAPwAAAMA=" }, sampleRate: 44100 });
+  assert.deepEqual(requests[3].input, { notes });
+});
+
+test("native recording import closes a partially opened session and can retry", async () => {
+  const requests: Record<string, unknown>[] = [];
+  let failScore = true;
+  const transport: NativeInferenceTransport = { async request(message) {
+    requests.push(message);
+    if (message.model === "midi-to-score" && failScore) { failScore = false; throw new Error("Score model unavailable"); }
+    return message.action === "open" ? { session: message.model } : {};
+  } };
+  const importer = new NativeRecordingImporter(new NativeInference(transport), () => {}, () => {});
+  await assert.rejects(importer.prepare(), { message: "Score model unavailable" });
+  assert.deepEqual(requests[2], { action: "close", session: "recording-transcription" });
+  await importer.prepare();
+  assert.deepEqual(requests.map((request) => request.action), ["open", "open", "close", "open", "open"]);
 });

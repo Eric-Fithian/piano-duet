@@ -21,7 +21,8 @@ import type { DownloadProgress, InferenceSession } from "./inference";
 import { EventLog, requestPersistentStorage } from "./event-log";
 import { PIANO_SAMPLES } from "./piano-samples";
 import { SampleStore } from "./sample-store";
-import { BrowserRecordingImporter } from "./recording-import";
+import { BrowserRecordingImporter } from "./browser-recording-import";
+import { NativeRecordingImporter } from "./native-recording-import";
 import { recordingStage, setupRecordingUi } from "./recording-ui";
 import "./style.css";
 
@@ -124,9 +125,11 @@ async function start(): Promise<void> {
   };
   const recordingAssets = MODEL_CATALOG["recording-transcription"], scoreAssets = MODEL_CATALOG["midi-to-score"];
   if (!recordingAssets || !scoreAssets) throw new Error("Recording import models are missing from the catalog");
-  const importer = new BrowserRecordingImporter(recordingAssets, scoreAssets, report, (stage) => {
+  const importStage = (stage: string) => {
     indicator.hidden = true; recordingStage(stage);
-  });
+  };
+  const importer = native ? new NativeRecordingImporter(backend, report, importStage)
+    : new BrowserRecordingImporter(recordingAssets, scoreAssets, report, importStage);
   setLocalService(new LocalService(log, transcriber, undefined, new SampleStore(report), random, phrase, recordingTranscriber, importer,
     phraseTranscriber, duetGenerator, variationAnalyzer));
   if (import.meta.env.PROD && "serviceWorker" in navigator) await navigator.serviceWorker.register("/service-worker.js");
