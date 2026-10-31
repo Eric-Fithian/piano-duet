@@ -110,9 +110,25 @@ export class RecordingAssembler {
     }
   }
 
+  completedBefore(nextSegmentStart: number): RecordingNote[] {
+    if (!Number.isFinite(nextSegmentStart) || nextSegmentStart < 0) throw new Error("Invalid next segment start");
+    let cutoff = Math.max(0, nextSegmentStart / RECORDING_RATE - 8);
+    for (const [pitch, track] of this.byPitch) {
+      const last = track.at(-1);
+      if (pitch > 0 && last && (!last.hasOffset || last.end > cutoff)) cutoff = Math.min(cutoff, last.start);
+    }
+    // Leave a millisecond of headroom because score inputs are sorted after MIDI tick rounding.
+    return this.notes(false).filter((note) => note.start < cutoff - 0.001);
+  }
+
   finish(): RecordingNote[] {
-    for (const track of this.byPitch.values()) if (track.length) track[track.length - 1].hasOffset = true;
-    const events = [...this.byPitch.values()].flat().filter((event) => event.hasOffset)
+    return this.notes(true);
+  }
+
+  private notes(finish: boolean): RecordingNote[] {
+    const tracks = [...this.byPitch.values()].map((track) => track.map((event) => ({ ...event })));
+    if (finish) for (const track of tracks) if (track.length) track[track.length - 1].hasOffset = true;
+    const events = tracks.flat().filter((event) => event.hasOffset)
       .sort((a, b) => a.start - b.start || a.end - b.end || a.pitch - b.pitch);
     const previous = new Map<number, RecordingEvent>();
     for (const event of events) {

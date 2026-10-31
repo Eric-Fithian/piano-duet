@@ -60,7 +60,7 @@ export class RecordingPool {
     }
   }
 
-  async run(audio: Float32Array, signal: AbortSignal): Promise<PianoNote[]> {
+  async run(audio: Float32Array, signal: AbortSignal, onCompleted?: (notes: PianoNote[]) => void): Promise<PianoNote[]> {
     if (this.closed) throw new Error("Recording pool is closed");
     if (!audio.length || audio.some((sample) => !Number.isFinite(sample))) throw new Error("Recording transcription needs finite audio");
     const assembly = new RecordingAssembler(audio.length);
@@ -86,6 +86,7 @@ export class RecordingPool {
         const segment = await worker.send<ReturnType<typeof recordingEvents>>({ action: "decode", positions: assembly.positions });
         assembly.accept(index * RECORDING_STEP, segment);
         if (index + count < length) schedule(index + count);
+        if (onCompleted && index + 1 < length) onCompleted(assembly.completedBefore((index + 1) * RECORDING_STEP));
       }
       signal.throwIfAborted();
       return assembly.finish();

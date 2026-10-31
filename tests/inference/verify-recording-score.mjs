@@ -25,7 +25,9 @@ let result;
 try {
   await page.goto(`http://127.0.0.1:${site.port}/test/score-inference.html`);
   await page.waitForFunction(() => typeof window.verifyRecordingScore === "function");
-  result = await page.evaluate(({ base, assets }) => window.verifyRecordingScore(base, assets), { base, assets });
+  result = await page.evaluate(({ base, assets, overlap, workers }) => overlap
+    ? window.verifyRecordingScoreOverlap(base, assets, workers) : window.verifyRecordingScore(base, assets),
+  { base, assets, overlap: process.env.PIANO_SCORE_OVERLAP === "1", workers: Number(process.env.PIANO_RECORDING_WORKERS ?? 4) });
   if (!result.score.tokens) throw new Error("The browser did not return score tokens");
   await writeFile(process.env.PIANO_SCORE_TOKEN_OUTPUT ?? ".cache/m2st/browser-score-tokens.json", JSON.stringify(result.score.tokens));
   const { tokens, ...summary } = result.score;

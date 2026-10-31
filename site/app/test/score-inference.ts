@@ -5,6 +5,7 @@ import { scoreInput } from "../../../src/core/score-input.ts";
 import type { ScoreInputNote } from "../../../src/core/score-input.ts";
 import { BrowserInference } from "../src/browser-inference";
 import type { ModelAsset } from "../src/browser-inference";
+import { RecordingPool } from "../src/recording-pool";
 
 const INPUTS = { offset: 145, downbeat: 146, duration: 97, pitch: 128, accidental: 7, keysignature: 16,
   grace: 2, trill: 2, staccato: 2, voice: 9, stem: 4, hand: 3 };
@@ -56,7 +57,8 @@ function contextInput(history: Record<string, number[]>): Record<string, ort.Ten
   return tokens;
 }
 
-async function verifyScore(base: string, provider: "webgpu" | "wasm", notes?: ScoreInputNote[], includeTokens = false) {
+async function verifyScore(base: string, provider: "webgpu" | "wasm", notes?: ScoreInputNote[], includeTokens = false,
+  streaming?: { first: Promise<ScoreInputNote[]>; complete: Promise<ScoreInputNote[]>; ready?: () => void }) {
     const response = await fetch(`${base}/fixtures/score-fixture.json`);
     if (!response.ok) throw new Error("Score fixture is unavailable");
     const fixture = await response.json() as Fixture;
@@ -70,11 +72,9 @@ async function verifyScore(base: string, provider: "webgpu" | "wasm", notes?: Sc
     const first = await ort.InferenceSession.create(`${base}/models/score/decoder-first.onnx`, options);
     const context = await ort.InferenceSession.create(`${base}/models/score/decoder-context.onnx`, options);
     const step = await ort.InferenceSession.create(`${base}/models/score/decoder-step.onnx`, options);
-    const converted = notes ? scoreInput(notes) : null;
-    const n = converted ? converted.pad.length : fixture.source_notes;
-    const inputDifferences = converted && n === fixture.source_notes ? Object.fromEntries(
-      Object.entries({ onset: converted.onset, duration: converted.duration, pitch: converted.pitch, velocity: converted.velocity }).map(([name, values]) =>
-        [name, values.reduce((sum, value, index) => sum + Number(value !== fixture.source[name][0][index].indexOf(1)), 0)])) : null;
+    streaming?.ready?.();
+    let converted = streaming ? scoreInput(await streaming.first) : notes ? scoreInput(notes) : null;
+    let n = converted ? converted.pad.length : fixture.source_notes;
     const result: Record<string, number[]> = Object.fromEntries(ORDER.map((name) => [name, []]));
     const started = performance.now();
     let chunks = 0;
@@ -133,8 +133,20 @@ async function verifyScore(base: string, provider: "webgpu" | "wasm", notes?: Sc
       }
       for (const value of [...Object.values(token), ...Object.values(cache), ...Object.values(source), encoded]) value.dispose();
       chunks++;
+      if (streaming && chunks === 1) {
+        const complete = scoreInput(await streaming.complete);
+        if (!converted || Object.keys(complete).some((name) => {
+          const key = name as keyof typeof complete;
+          return converted![key].slice(0, Math.min(512, n)).some((value, index) => value !== complete[key][index]);
+        })) throw new Error("The completed transcription changed the first score input chunk");
+        converted = complete;
+        n = complete.pad.length;
+      }
     }
     const elapsedMs = performance.now() - started;
+    const inputDifferences = converted && n === fixture.source_notes ? Object.fromEntries(
+      Object.entries({ onset: converted.onset, duration: converted.duration, pitch: converted.pitch, velocity: converted.velocity }).map(([name, values]) =>
+        [name, values.reduce((sum, value, index) => sum + Number(value !== fixture.source[name][0][index].indexOf(1)), 0)])) : null;
     const mismatches = Object.fromEntries(ORDER.map((name) => {
       if (result[name].length !== fixture.expected[name].length) throw new Error(`Score length differs for ${name}`);
       return [name, result[name].reduce((sum, value, index) => sum + Number(value !== fixture.expected[name][index]), 0)];
@@ -160,5 +172,41 @@ Object.assign(window, {
     const elapsedMs = performance.now() - started;
     await session.close();
     return { transcriptionMs, score, elapsedMs, recordingProvider: session.provider };
+  },
+  async verifyRecordingScoreOverlap(base: string, assets: ModelAsset[], workers = 4) {
+    const preparationStarted = performance.now();
+    const response = await fetch(`${base}/fixtures/recording.pcm`);
+    if (!response.ok) throw new Error("Recording fixture is unavailable");
+    const audio = new Float32Array(await response.arrayBuffer());
+    const buffers = await Promise.all(assets.map(async (asset) => {
+      const result = await fetch(asset.url);
+      if (!result.ok) throw new Error(`Could not load ${asset.name}`);
+      return result.arrayBuffer();
+    }));
+    const pool = await RecordingPool.open(buffers[0], buffers[1], workers, 3);
+    let resolveFirst!: (notes: ScoreInputNote[]) => void;
+    let rejectFirst!: (error: unknown) => void;
+    const first = new Promise<ScoreInputNote[]>((resolve, reject) => { resolveFirst = resolve; rejectFirst = reject; });
+    let resolveComplete!: (notes: ScoreInputNote[]) => void;
+    let rejectComplete!: (error: unknown) => void;
+    const complete = new Promise<ScoreInputNote[]>((resolve, reject) => { resolveComplete = resolve; rejectComplete = reject; });
+    let resolveReady!: () => void;
+    const ready = new Promise<void>((resolve) => { resolveReady = resolve; });
+    const scoring = verifyScore(base, "webgpu", undefined, true, { first, complete, ready: resolveReady });
+    await Promise.race([ready, scoring.then(() => { throw new Error("Score completed before transcription began"); })]);
+    const started = performance.now();
+    let firstMs: number | undefined;
+    const transcription = pool.run(audio, new AbortController().signal, (completed) => {
+      if (firstMs === undefined && completed.length >= 512 && scoreInput(completed).pad.length >= 512) {
+        firstMs = performance.now() - started;
+        resolveFirst(completed);
+      }
+    });
+    transcription.then((completed) => { if (firstMs === undefined) resolveFirst(completed); resolveComplete(completed); },
+      (error) => { if (firstMs === undefined) rejectFirst(error); else rejectComplete(error); });
+    const score = await scoring;
+    const elapsedMs = performance.now() - started;
+    pool.close();
+    return { preparationMs: started - preparationStarted, firstMs, score, elapsedMs, workers, threads: 3, recordingProvider: "wasm" };
   },
 });

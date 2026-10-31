@@ -96,3 +96,19 @@ print(json.dumps({"hashes": hashes, "paths": paths, "velocity": velocity.flatten
     assert.ok(Math.abs(note.start - target.start) < 1e-9 && Math.abs(note.duration - target.duration) < 1e-9);
   }
 });
+
+test("completed recording notes remain a prefix after later segments stitch open notes", () => {
+  const assembler = new RecordingAssembler(30 * 44100);
+  const event = (pitch: number, start: number, end: number, hasOnset = true, hasOffset = true): RecordingEvent =>
+    ({ pitch, start, end, velocity: 80, hasOnset, hasOffset });
+  const positions = Array(90).fill(0);
+  assembler.accept(0, { events: [event(60, 8.1, 8.4), event(62, 10, 16, true, false), event(64, 11, 11.3)], lastPositions: positions });
+  assert.deepEqual(assembler.completedBefore(RECORDING_STEP), []);
+  assembler.accept(RECORDING_STEP, { events: [event(62, 0, 9, false, false)], lastPositions: positions });
+  const prefix = assembler.completedBefore(2 * RECORDING_STEP);
+  assert.equal(prefix.length, 1);
+  assert.equal(prefix[0].pitch, 60);
+  assembler.accept(2 * RECORDING_STEP, { events: [event(62, 0, 1.1, false, true), event(67, 0.2, 0.5)], lastPositions: positions });
+  assert.deepEqual(assembler.finish().slice(0, prefix.length), prefix);
+  assert.deepEqual(assembler.completedBefore(3 * RECORDING_STEP).slice(0, prefix.length), prefix);
+});
