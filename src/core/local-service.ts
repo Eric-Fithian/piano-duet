@@ -1,5 +1,12 @@
 import { learnerProfile } from "./learner-profile.ts";
-import { initialPracticeTask } from "./initial-practice.ts";
+import { generatePracticeTask, practiceSequence } from "./practice-task.ts";
+import type { GeneratedPracticeTask, PracticePiece } from "./practice-task.ts";
+import { assessPractice } from "./practice-assessment.ts";
+import type { PracticePrompt } from "./practice-assessment.ts";
+import { choosePracticeFocus } from "./practice-selection.ts";
+import type { SelectionProfile } from "./practice-selection.ts";
+import { parseJsonBody, validateAid, validateExclusion, validateMidi, validatePathUuid, validatePiece,
+  validatePracticeQuery, validatePracticeRequest } from "./practice-request.ts";
 import { attemptsFromEvents } from "./reading-events.ts";
 import type { ReadingLogEvent } from "./reading-events.ts";
 import { readingProgress } from "./reading-progress.ts";
@@ -37,6 +44,8 @@ import { ScoreError } from "./score-midi.ts";
 import { editSong, revertSong, songAttacks, songStats, songSummary, songVersion } from "./library.ts";
 import type { Song, SongNote } from "./library.ts";
 import { libraryFromEvents } from "./library-events.ts";
+import { practiceTasksFromEvents } from "./practice-task-events.ts";
+import { exportMidi } from "./midi-export.ts";
 import { DuetService } from "./duet-service.ts";
 import type { LocalPhraseTranscriber, LocalDuetGenerator } from "./duet-service.ts";
 export type { LocalPhraseTranscriber, LocalDuetGenerator } from "./duet-service.ts";
@@ -46,7 +55,7 @@ import type { LocalVariationAnalyzer } from "./variation-service.ts";
 export type LocalJsonValue = null | boolean | number | string | LocalJsonValue[] | { [key: string]: LocalJsonValue };
 export interface LocalEventStore {
   list(): Promise<ReadingLogEvent[]>;
-  append?(kind: "attempt" | "exclusion" | "song" | "edit", payload: LocalJsonValue, eventId?: string): Promise<ReadingLogEvent>;
+  append?(kind: "attempt" | "exclusion" | "song" | "edit" | "setting", payload: LocalJsonValue, eventId?: string): Promise<ReadingLogEvent>;
 }
 export interface LocalTranscriber {
   run(input: { audio: Float32Array; sampleRate: 16000; threshold: number }, signal?: AbortSignal): Promise<{ notes: unknown[] }>;
@@ -59,14 +68,15 @@ export interface LocalRecordingImporter {
 }
 export interface LocalAssets { fetch(path: string, options?: RequestInit): Promise<Response> }
 type ReadingTask = ReadingScore & { id: string; family: "reading"; purpose: string; shape: string; cue: string; even: boolean; dynamics: null;
-  context: { notation_visible: boolean; hearings: number; reveals: number; hints: number; familiar: boolean; interaction: string; introduction: boolean } };
-type PracticeTask = ReturnType<typeof initialPracticeTask> | ReadingTask | ReturnType<typeof buildDrillTask>;
+  context: { notation_visible: boolean; hearings: number; reveals: number; hints: number; familiar: boolean; interaction?: string; introduction?: boolean } };
+type PracticeTask = GeneratedPracticeTask | ReadingTask | ReturnType<typeof buildDrillTask>;
 
 export class LocalService {
   private readingBusy = false;
   private responseBusy = false;
   private readonly store: LocalEventStore;
   private readonly transcriber?: LocalTranscriber;
+  private readonly phraseTranscriber?: LocalPhraseTranscriber;
   private readonly now: () => number;
   private readonly assets?: LocalAssets;
   private readonly rng: ComposerRandom & FoundationRandom;
@@ -76,6 +86,7 @@ export class LocalService {
   private readonly duetService: DuetService;
   private readonly variationService: VariationService;
   private readonly tasks = new Map<string, { task: PracticeTask; completed: boolean }>();
+  private taskLoading?: Promise<void>;
   private completionBusy = false;
 
   constructor(store: LocalEventStore, transcriber?: LocalTranscriber, now: () => number = () => Date.now() / 1000, assets?: LocalAssets,
@@ -84,6 +95,7 @@ export class LocalService {
     duetGenerator?: LocalDuetGenerator, variationAnalyzer?: LocalVariationAnalyzer) {
     this.store = store;
     this.transcriber = transcriber;
+    this.phraseTranscriber = phraseTranscriber;
     this.now = now;
     this.assets = assets;
     this.rng = rng;
@@ -98,9 +110,11 @@ export class LocalService {
 
   async fetch(path: string, options: RequestInit = {}): Promise<Response> {
     options.signal?.throwIfAborted();
+    await this.loadTasks();
     const url = new URL(path, "http://piano.local");
     if (url.origin !== "http://piano.local") throw new Error("Local service requests must use a local path");
     const method = (options.method ?? "GET").toUpperCase();
+    if (method === "POST" && url.pathname === "/api/respond" && url.searchParams.get("mode") === "practice") return this.respondPractice(url, options);
     if (url.pathname.startsWith("/samples/")) {
       if (!this.assets) return Response.json({ detail: "Piano samples are not available yet" }, { status: 501 });
       return this.assets.fetch(url.pathname, options);
@@ -112,10 +126,39 @@ export class LocalService {
     if (method === "GET" && url.pathname === "/api/profile") {
       return Response.json(learnerProfile(attemptsFromEvents(await this.store.list()), this.now()));
     }
-    if (method === "GET" && url.pathname === "/api/pieces") {
+    if (method === "POST" && url.pathname === "/api/export") {
+      const body = parseJsonBody(options.body);
+      if (body.errors.length) return Response.json({ detail: body.errors }, { status: 422 });
+      const { value: notes, errors } = validateMidi(body.value);
+      if (errors.length) return Response.json({ detail: errors }, { status: 422 });
+      return new Response(exportMidi(notes).buffer as ArrayBuffer,
+        { headers: { "Content-Type": "audio/midi", "Content-Disposition": 'attachment; filename="piano-duet.mid"' } });
+    }
+    if (method === "GET" && url.pathname === "/api/profile/export") {
       const events = await this.store.list();
-      const pieces = events.filter((event) => event.kind === "song" && isPiece(event.payload)).map((event) => (event.payload as { piece: unknown }).piece);
-      return Response.json(pieces);
+      return Response.json({ format: 1, attempts: attemptsFromEvents(events), pieces: piecesFromEvents(events) },
+        { headers: { "Content-Disposition": 'attachment; filename="piano-learning-history.json"' } });
+    }
+    if (method === "GET" && url.pathname === "/api/pieces") {
+      return Response.json(piecesFromEvents(await this.store.list()));
+    }
+    if (method === "POST" && url.pathname === "/api/pieces") {
+      const body = parseJsonBody(options.body);
+      if (body.errors.length) return Response.json({ detail: body.errors }, { status: 422 });
+      const { value: request, errors } = validatePiece(body.value);
+      if (errors.length) return Response.json({ detail: errors }, { status: 422 });
+      const title = request.title.trim();
+      if (!title) return Response.json({ detail: "Give the piece a name" }, { status: 400 });
+      const attempt = attemptsFromEvents(await this.store.list()).find((item) => item.id === request.attempt);
+      if (!attempt || !attempt.notes.length) return Response.json({ detail: "No recognized performance to save" }, { status: 404 });
+      if (!this.store.append) return Response.json({ detail: "Saving pieces is not available yet" }, { status: 501 });
+      const notes = attempt.notes as { pitch: number; start: number; duration: number; velocity: number }[];
+      const origin = Math.min(...notes.map((note) => note.start));
+      const piece = { id: crypto.randomUUID(), title, challenge: 1, notes: notes.map((note) => ({ pitch: note.pitch,
+        start: note.start - origin, duration: note.duration, velocity: note.velocity })),
+        key: new KeyTracker().observe(notes), bpm: null };
+      await this.store.append("song", { type: "piece", piece }, piece.id);
+      return Response.json(piece);
     }
     if (method === "GET" && url.pathname === "/api/library") {
       const { songs, plays } = libraryFromEvents(await this.store.list());
@@ -209,26 +252,57 @@ export class LocalService {
       }
     }
     if (method === "POST" && url.pathname === "/api/practice/next") {
-      if (typeof options.body !== "string") return Response.json({ detail: "A practice request needs JSON" }, { status: 400 });
-      const request = JSON.parse(options.body) as { focus?: string; step_by_step?: boolean; piece?: string | null; stage?: number | null; after?: string | null };
-      const focus = request.focus ?? "guided";
+      const body = parseJsonBody(options.body);
+      if (body.errors.length) return Response.json({ detail: body.errors }, { status: 422 });
+      const { value: request, errors } = validatePracticeRequest(body.value, READING_STAGES.length);
+      if (errors.length) return Response.json({ detail: errors }, { status: 422 });
+      if (this.responseBusy) return Response.json({ detail: "Finish the current performance first" }, { status: 409 });
+      const focus = request.focus;
       if (request.step_by_step && focus !== "reading") return Response.json({ detail: "Step-by-step practice requires the reading focus" }, { status: 400 });
-      const attempts = attemptsFromEvents(await this.store.list());
-      if (focus === "reading" && request.step_by_step) return this.nextReading(request, attempts as unknown as ProgressAttempt[]);
-      if ((focus === "guided" || focus === "technique") && !attempts.length && !request.piece && !request.stage && !request.after) {
-        const task = initialPracticeTask(crypto.randomUUID(), focus);
-        this.tasks.set(task.id, { task, completed: false });
-        return Response.json(task);
+      if (request.after) {
+        const preceding = this.tasks.get(request.after);
+        if (!preceding) return Response.json({ detail: "Unknown preceding reading score" }, { status: 404 });
+        if (!request.step_by_step || focus !== "reading" || preceding.task.family !== "reading" || preceding.task.context.interaction !== "step_by_step") {
+          return Response.json({ detail: "A preview requires a preceding step-by-step reading score" }, { status: 400 });
+        }
       }
-      return Response.json({ detail: "This practice selection is not available yet" }, { status: 501 });
+      if (request.stage != null && focus !== "reading") return Response.json({ detail: "Only reading practice can replay a stage" }, { status: 400 });
+      const events = await this.store.list(), attempts = attemptsFromEvents(events);
+      if (!this.store.append) return Response.json({ detail: "Saving practice is not available yet" }, { status: 501 });
+      const pieces = piecesFromEvents(events);
+      if (request.piece && !pieces.some((piece) => piece.id === request.piece)) return Response.json({ detail: "Unknown practice piece" }, { status: 404 });
+      const profile = learnerProfile(attempts, this.now());
+      const [family, purpose] = focus === "guided" ? choosePracticeFocus(profile as unknown as SelectionProfile, this.now()) : [focus, "Explore"];
+      if (family === "reading") return this.nextReading(request, attempts as unknown as ProgressAttempt[], !!request.step_by_step, purpose);
+      if (family === "repertoire" && !pieces.length) {
+        if (!this.store.append) return Response.json({ detail: "Saving pieces is not available yet" }, { status: 501 });
+        const piece: PracticePiece = { id: crypto.randomUUID(), title: "First steps", key: musicalKey(0, "major"), challenge: 1,
+          bpm: 60, notes: practiceSequence([60, 62, 64, 62, 60, 64, 62, 60], 60) };
+        await this.store.append("song", { type: "piece", piece } as unknown as LocalJsonValue, piece.id);
+        pieces.push(piece);
+      }
+      const task = generatePracticeTask(profile as unknown as Parameters<typeof generatePracticeTask>[0],
+        focus as Parameters<typeof generatePracticeTask>[1], crypto.randomUUID(), this.rng, this.now(), pieces,
+        attempts as unknown as Parameters<typeof generatePracticeTask>[6], request.piece);
+      await this.saveTask(task);
+      return Response.json(task);
     }
     const parts = url.pathname.split("/").filter(Boolean);
     if (parts[0] === "api" && parts[1] === "library" && parts.length >= 3 && parts.length <= 4) {
       return this.libraryRequest(method, parts, options);
     }
     if (parts[0] === "api" && parts[1] === "attempts" && parts.length >= 3 && parts.length <= 4) {
+      const path = validatePathUuid(parts[2], "attempt_id");
+      let excluded: boolean | undefined;
+      if (method === "POST" && parts.length === 4 && parts[3] === "exclude") {
+        const body = parseJsonBody(options.body);
+        const result = body.errors.length ? { value: false, errors: body.errors } : validateExclusion(body.value);
+        if (path.errors.length || result.errors.length) return Response.json({ detail: [...path.errors, ...result.errors] }, { status: 422 });
+        excluded = result.value;
+      }
+      if (path.errors.length) return Response.json({ detail: path.errors }, { status: 422 });
       const attempts = attemptsFromEvents(await this.store.list());
-      const attempt = attempts.find((item) => item.id === parts[2]);
+      const attempt = attempts.find((item) => item.id === path.value);
       if (!attempt) return Response.json({ detail: "Unknown performance" }, { status: 404 });
       if (method === "GET" && parts.length === 3) {
         if (attempt.prompt.family !== "reading") return Response.json(attempt);
@@ -238,21 +312,25 @@ export class LocalService {
       }
       if (method === "POST" && parts.length === 4 && parts[3] === "exclude") {
         if (!this.store.append) return Response.json({ detail: "Saving practice is not available yet" }, { status: 501 });
-        if (typeof options.body !== "string") return Response.json({ detail: "An exclusion needs JSON" }, { status: 400 });
-        const request = JSON.parse(options.body) as { excluded?: unknown };
-        if (typeof request.excluded !== "boolean") return Response.json({ detail: "Invalid exclusion" }, { status: 422 });
-        await this.store.append("exclusion", { attemptId: attempt.id, excluded: request.excluded });
+        if (excluded === undefined) throw new Error("Missing validated exclusion");
+        await this.store.append("exclusion", { attemptId: attempt.id, excluded });
         return Response.json(learnerProfile(attemptsFromEvents(await this.store.list()), this.now()));
       }
     }
     if (method === "POST" && parts.length === 4 && parts[0] === "api" && parts[1] === "practice" && parts[3] === "aid") {
-      const entry = this.tasks.get(parts[2]);
+      const path = validatePathUuid(parts[2], "task_id"), body = parseJsonBody(options.body);
+      const result = body.errors.length ? { value: "hints" as const, errors: body.errors } : validateAid(body.value);
+      if (path.errors.length || result.errors.length) return Response.json({ detail: [...path.errors, ...result.errors] }, { status: 422 });
+      const kind = result.value;
+      if (this.responseBusy) return Response.json({ detail: "Finish the current performance first" }, { status: 409 });
+      const entry = this.tasks.get(path.value!);
       if (!entry || entry.completed) return Response.json({ detail: "Choose an unfinished exercise first" }, { status: 409 });
       const { task } = entry;
-      if (typeof options.body !== "string") return Response.json({ detail: "An aid request needs JSON" }, { status: 400 });
-      const request = JSON.parse(options.body) as { kind?: "hearings" | "reveals" | "hints" };
-      if (request.kind !== "hearings" && request.kind !== "reveals" && request.kind !== "hints") return Response.json({ detail: "Invalid aid" }, { status: 422 });
-      task.context[request.kind]++;
+      if (!("drill" in task)) {
+        if (!this.store.append) return Response.json({ detail: "Saving practice is not available yet" }, { status: 501 });
+        await this.store.append("setting", { type: "practice-aid", taskId: task.id, kind });
+      }
+      task.context[kind]++;
       return Response.json(task);
     }
     if (method === "POST" && url.pathname === "/api/reading/listen") return this.listen(url, options);
@@ -261,6 +339,19 @@ export class LocalService {
     if (method === "POST" && url.pathname === "/api/respond" && (url.searchParams.get("mode") ?? "duet") === "duet") return this.duetService.respond(url, options);
     if (method === "POST" && url.pathname === "/api/respond" && url.searchParams.get("mode") === "learning") return this.variationService.respond(url, options);
     return Response.json({ detail: `Local service does not yet implement ${method} ${url.pathname}` }, { status: 501 });
+  }
+
+  private async loadTasks(): Promise<void> {
+    this.taskLoading ??= this.store.list().then((events) => {
+      for (const [id, entry] of practiceTasksFromEvents<PracticeTask>(events)) this.tasks.set(id, entry);
+    });
+    await this.taskLoading;
+  }
+
+  private async saveTask(task: ReadingTask | GeneratedPracticeTask): Promise<void> {
+    if (!this.store.append) throw new Error("Saving practice is not available");
+    await this.store.append("setting", { type: "practice-task", task: structuredClone(task) } as unknown as LocalJsonValue);
+    this.tasks.set(task.id, { task, completed: false });
   }
 
   private async libraryRequest(method: string, parts: string[], options: RequestInit): Promise<Response> {
@@ -312,7 +403,7 @@ export class LocalService {
     return Response.json({ detail: `Local service does not yet implement ${method} /${parts.join("/")}` }, { status: 501 });
   }
 
-  private async nextReading(request: { stage?: number | null; after?: string | null }, attempts: ProgressAttempt[]): Promise<Response> {
+  private async nextReading(request: { stage?: number | null; after?: string | null }, attempts: ProgressAttempt[], stepByStep: boolean, selectedPurpose: string): Promise<Response> {
     const progress = readingProgress(attempts);
     if (request.stage != null) {
       if (!Number.isInteger(request.stage) || request.stage < 1 || request.stage > READING_STAGES.length) return Response.json({ detail: "Invalid reading stage" }, { status: 422 });
@@ -331,7 +422,7 @@ export class LocalService {
     const profile = learnerProfile(attempts as unknown as Parameters<typeof learnerProfile>[0], this.now());
     const skill = profile.skills.find((item) => item.id === "reading.pitch");
     if (!skill) throw new Error("The profile has no reading skill");
-    const purpose = skill.accuracy !== null && skill.accuracy < 70 ? "Repair" : "Explore";
+    const purpose = skill.accuracy !== null && skill.accuracy < 70 ? "Repair" : selectedPurpose;
     const past = [...attempts].reverse().find((item) => !item.excluded && item.context.source === "microphone"
       && (item as ProgressAttempt & { mode: string }).mode === "practice" && item.prompt.reading)?.prompt as unknown as FoundationCandidate | undefined;
     const seen = new Set([...this.tasks.values()].filter((entry) => entry.task.family === "reading").map((entry) => readingFingerprint(entry.task as ReadingTask)));
@@ -352,16 +443,17 @@ export class LocalService {
     for (let variation = 0; variation < 200; variation++) {
       candidate = progress.curriculum.target_number >= 3
         ? await composeReading(READING_STAGES[progress.curriculum.target_number - 1], progress, this.rng, this.phrase, context)
-        : await readingFoundation(progress, this.rng, this.phrase, (previous as FoundationCandidate | undefined) ?? past ?? null, variation, purpose === "Repair", true, context);
+        : await readingFoundation(progress, this.rng, this.phrase, (previous as FoundationCandidate | undefined) ?? past ?? null, variation, purpose === "Repair", stepByStep, context);
       if (!seen.has(readingFingerprint(candidate))) break;
       candidate = undefined;
     }
     if (!candidate) throw new Error("Could not generate an unseen reading exercise");
     const task: ReadingTask = { id: crypto.randomUUID(), family: "reading", meter: "4/4", key: musicalKey(0, "major"), purpose,
       ...candidate, shape: "melody", cue: "", even: false, dynamics: null,
-      instruction: `${candidate.instruction} There is no time limit; the score waits for the right note.`,
-      context: { notation_visible: true, hearings: 0, reveals: 0, hints: 0, familiar: false, interaction: "step_by_step", introduction: candidate.reading.introduce !== null } };
-    this.tasks.set(task.id, { task, completed: false });
+      instruction: candidate.instruction + (stepByStep ? " There is no time limit; the score waits for the right note." : ""),
+      context: { notation_visible: true, hearings: 0, reveals: 0, hints: 0, familiar: false,
+        ...(stepByStep ? { interaction: "step_by_step", introduction: candidate.reading.introduce !== null } : {}) } };
+    await this.saveTask(task);
     return Response.json(task);
   }
 
@@ -391,6 +483,80 @@ export class LocalService {
       entry.completed = true;
       return Response.json({ id: request.attempt, assessment, xp: scoreXp(task, assessment, context) });
     } finally { this.completionBusy = false; }
+  }
+
+  private async respondPractice(url: URL, options: RequestInit): Promise<Response> {
+    const { value: request, errors } = validatePracticeQuery(url.searchParams);
+    if (errors.length) return Response.json({ detail: errors }, { status: 422 });
+    if (this.responseBusy || this.readingBusy) return Response.json({ detail: "The previous response is still finishing. Please retry." }, { status: 409 });
+    const { session, task: taskId, attempt: attemptId, source, threshold } = request;
+    if (url.searchParams.has("listening")) return Response.json({ detail: "Only drill takes carry what the live attack counter heard" }, { status: 400 });
+    const entry = taskId ? this.tasks.get(taskId) : undefined;
+    if (!entry || entry.completed) return Response.json({ detail: "Choose an unfinished exercise before playing" }, { status: 409 });
+    if ("drill" in entry.task) return Response.json({ detail: "Drills are played in drill mode, and only drills are" }, { status: 400 });
+    const task = entry.task;
+    if (task.family === "ear" && !task.context.hearings) return Response.json({ detail: "Hear the melody before playing it back" }, { status: 400 });
+    if (!this.phraseTranscriber) return Response.json({ detail: "Phrase transcription is not available yet" }, { status: 501 });
+    if (!this.store.append) return Response.json({ detail: "Saving practice is not available yet" }, { status: 501 });
+    const body = options.body;
+    if (!(body instanceof ArrayBuffer) && !ArrayBuffer.isView(body)) return Response.json({ detail: "Expected mono float32 PCM at 16 kHz" }, { status: 400 });
+    const bytes = body instanceof ArrayBuffer ? new Uint8Array(body) : new Uint8Array(body.buffer, body.byteOffset, body.byteLength);
+    if (bytes.byteLength < 6400 || bytes.byteLength % 4) return Response.json({ detail: "Expected mono float32 PCM at 16 kHz" }, { status: 400 });
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength), audio = new Float32Array(bytes.byteLength / 4);
+    let peak = 0, squares = 0;
+    for (let index = 0; index < audio.length; index++) {
+      const value = view.getFloat32(index * 4, true);
+      if (!Number.isFinite(value)) return Response.json({ detail: "The microphone supplied non-finite audio samples. Re-enable the microphone and try again." }, { status: 400 });
+      audio[index] = value; peak = Math.max(peak, Math.abs(value)); squares += value * value;
+    }
+    if (peak > 1) for (let index = 0; index < audio.length; index++) audio[index] /= peak;
+    if ((await this.store.list()).some((event) => event.id === attemptId)) return Response.json({ detail: "This performance has already been saved" }, { status: 409 });
+    if (this.responseBusy || this.readingBusy) return Response.json({ detail: "The previous response is still finishing. Please retry." }, { status: 409 });
+    if (entry.completed) return Response.json({ detail: "This exercise was completed while the audio was being received" }, { status: 409 });
+    this.responseBusy = true;
+    const abort = new AbortController(), externalSignal = options.signal;
+    const relay = () => abort.abort();
+    externalSignal?.addEventListener("abort", relay, { once: true });
+    if (externalSignal?.aborted) abort.abort();
+    const transcriber = this.phraseTranscriber, store = this.store;
+    const audioContext = { seconds: audio.length / 16000, peak, rms: roundDecimal(Math.sqrt(squares / audio.length), 6), note_threshold: threshold };
+    const encoder = new TextEncoder();
+    let open = true;
+    const stream = new ReadableStream<Uint8Array>({
+      start: (controller) => {
+        const emit = (event: unknown) => { if (open) controller.enqueue(encoder.encode(JSON.stringify(event) + "\n")); };
+        const run = async () => {
+          try {
+            abort.signal.throwIfAborted();
+            emit({ type: "transcribing", progress: 0 });
+            const started = performance.now();
+            const { notes, quality } = await transcriber.run({ audio, sampleRate: 16000, threshold }, abort.signal);
+            const transcriptionMs = roundEven(performance.now() - started);
+            abort.signal.throwIfAborted();
+            emit({ type: "transcribing", progress: 1 });
+            const context = { ...task.context, source, family: task.family, audio: audioContext, session,
+              estimated_key: notes.length ? new KeyTracker().observe(notes) : null };
+            const assessment = assessPractice(task as PracticePrompt, notes, context, quality);
+            const payload = { mode: "practice", prompt: { ...task, completed: false }, notes, context, recognition: quality, assessment };
+            await store.append!("attempt", payload as unknown as LocalJsonValue, attemptId);
+            if (notes.length) entry.completed = true;
+            emit({ type: "attempt", id: attemptId, assessment });
+            emit({ type: "heard", notes, key: task.key, transcription_ms: transcriptionMs });
+            emit({ type: "assessment", id: attemptId, assessment });
+            emit({ type: "done", notes: 0, stage: notes.length ? "complete" : "practice", empty: !notes.length });
+          } catch (error) {
+            if (!abort.signal.aborted) emit({ type: "error", message: error instanceof Error ? error.message : String(error) });
+          } finally {
+            this.responseBusy = false;
+            externalSignal?.removeEventListener("abort", relay);
+            if (open) { open = false; controller.close(); }
+          }
+        };
+        void run();
+      },
+      cancel: () => { open = false; abort.abort(); },
+    });
+    return new Response(stream, { headers: { "Content-Type": "application/x-ndjson" } });
   }
 
   private async respondDrill(url: URL, options: RequestInit): Promise<Response> {
@@ -565,4 +731,8 @@ function validSongPlay(value: unknown): value is { id: string; attacks: [number,
 function isPiece(value: unknown): boolean {
   return value !== null && typeof value === "object" && !Array.isArray(value)
     && (value as Record<string, unknown>).type === "piece" && "piece" in value;
+}
+
+function piecesFromEvents(events: ReadingLogEvent[]): PracticePiece[] {
+  return events.filter((event) => event.kind === "song" && isPiece(event.payload)).map((event) => (event.payload as { piece: PracticePiece }).piece);
 }

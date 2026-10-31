@@ -48,7 +48,11 @@ print(json.dumps({"status": status, "profile": profile, "pieces": pieces, "libra
     assert.equal(input.audio[1], 1);
     return { notes: [{ pitch: 60, start: 0.5, velocity: 80, confidence: input.audio[0] }] };
   } };
-  const service = new LocalService({ async list() { return []; } }, transcriber, () => 1700000000);
+  const events: ReadingLogEvent[] = [];
+  const service = new LocalService({ async list() { return [...events]; }, async append(kind, payload, id = crypto.randomUUID()) {
+    const event = { id, kind, payload, deviceId: "test", clock: events.length + 1, createdAt: "2024-01-01T00:00:00Z" };
+    events.push(event); return event;
+  } }, transcriber, () => 1700000000);
   const status = await (await service.fetch("/api/status")).json();
   assert.deepEqual({ ...status, model: expected.status.model }, expected.status);
   assert.deepEqual(await (await service.fetch("/api/profile")).json(), expected.profile);
@@ -144,13 +148,14 @@ print(json.dumps({"task": task, "preview": preview.json(), "events": events, "gr
     return event;
   } };
   const replay = new ReadingReplay(expected.events);
-  const service = new LocalService(store, undefined, () => 1700000000, undefined, replay);
+  let service = new LocalService(store, undefined, () => 1700000000, undefined, replay);
   const request = (path: string, body: unknown) => service.fetch(path, { method: "POST", body: JSON.stringify(body) });
   const response = await request("/api/practice/next", { focus: "reading", step_by_step: true });
   assert.equal(response.status, 200);
   const task = await response.json();
   expected.task.id = task.id;
   assert.deepEqual(task, expected.task);
+  service = new LocalService(store, undefined, () => 1700000000, undefined, replay);
   const preview = await (await request("/api/practice/next", { focus: "reading", step_by_step: true, after: task.id })).json();
   expected.preview.id = preview.id;
   assert.deepEqual(preview, expected.preview);
@@ -178,5 +183,5 @@ print(json.dumps({"task": task, "preview": preview.json(), "events": events, "gr
   const restored = await (await request(`/api/attempts/${body.attempt}/exclude`, { excluded: false })).json();
   assert.equal(restored.included_attempts, expected.restored.included_attempts);
   assert.equal(restored.reading.introductions, expected.restored.reading.introductions);
-  assert.equal((await service.fetch("/api/attempts/unknown")).status, 404);
+  assert.equal((await service.fetch("/api/attempts/unknown")).status, 422);
 });

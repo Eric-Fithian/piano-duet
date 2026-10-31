@@ -149,6 +149,22 @@ jobs:
         env:
           PIANO_PHRASE_MODEL: .cache/ci-models/phrase-transcription/piano_crnn.onnx
           PIANO_PHRASE_SPLIT_DIR: .cache/ci-models/phrase-transcription
+      - run: node tests/inference/practice-microphone.mjs chromium
+        timeout-minutes: 4
+        env:
+          PIANO_SITE_PORT: "5182"
+          PIANO_PHRASE_MODEL: .cache/ci-models/phrase-transcription/piano_crnn.onnx
+          PIANO_PHRASE_SPLIT_DIR: .cache/ci-models/phrase-transcription
+      - run: node tests/inference/practice-microphone.mjs webkit
+        timeout-minutes: 4
+        env:
+          PIANO_BROWSER_PROFILE: .cache/browser-inference/webkit-profile
+          PIANO_SITE_PORT: "5182"
+          PIANO_PHRASE_MODEL: .cache/ci-models/phrase-transcription/piano_crnn.onnx
+          PIANO_PHRASE_SPLIT_DIR: .cache/ci-models/phrase-transcription
+      - name: Remove WebKit model browser profile
+        if: always()
+        run: rm -rf .cache/browser-inference/webkit-profile
       - run: node tests/inference/drill-microphone.mjs
         timeout-minutes: 3
         env:

@@ -17,9 +17,9 @@ export function matchesReading(pitches: number[], expected: number[]): boolean {
   return expected.every((pitch) => pitches.includes(pitch)) && pitches.every((pitch) => expected.some((target) => (pitch - target) % 12 === 0));
 }
 
-export function pitchName(pitch: number, key: MusicalKey): string {
-  const index = key.pitch_classes.indexOf(pitch % 12);
-  if (index >= 0) {
+export function pitchName(pitch: number, key?: MusicalKey): string {
+  const index = key?.pitch_classes.indexOf(pitch % 12) ?? -1;
+  if (key && index >= 0) {
     const name = key.scale_names[index];
     const natural: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
     const semitone = natural[name[0]] + [...name].filter((value) => value === "#").length - [...name].filter((value) => value === "b").length;
