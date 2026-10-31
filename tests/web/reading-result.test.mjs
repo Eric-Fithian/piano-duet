@@ -3,7 +3,7 @@ import {createHash} from 'node:crypto';
 import {after, before, test} from 'node:test';
 import {mkdtemp, rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
-import {join} from 'node:path';
+import {join, resolve} from 'node:path';
 import {chromium, webkit} from 'playwright';
 import {startTestServer} from './server.mjs';
 
@@ -16,6 +16,51 @@ const sample = {pitch: 60, file: 'C4.mp3', sha256: createHash('sha256').update(b
 let server, port;
 before(async () => { ({server, port} = await startTestServer()); }, {timeout: 45000});
 after(() => server?.kill('SIGTERM'));
+
+async function assertRenderedContrast(page, selector, minimumCount) {
+  const rows = await page.locator(selector).evaluate(root => {
+    // Match numeric RGB and alpha channels in computed CSS color values.
+    const color = value => (value.match(/[\d.]+/g) || []).map(Number);
+    const blend = (front, back) => front.slice(0, 3).map((channel, i) => channel * (front[3] ?? 1) + back[i] * (1 - (front[3] ?? 1)));
+    const luminance = rgb => {
+      const [r, g, b] = rgb.map(channel => {
+        const value = channel / 255;
+        return value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4;
+      });
+      return .2126 * r + .7152 * g + .0722 * b;
+    };
+    return [root, ...root.querySelectorAll('*')].flatMap(node => {
+      if (node.closest('svg') || ![...node.childNodes].some(child => child.nodeType === Node.TEXT_NODE && child.textContent.trim())) return [];
+      const style = getComputedStyle(node);
+      if (!node.getClientRects().length || style.visibility !== 'visible') return [];
+      const ancestors = [];
+      for (let current = node; current; current = current.parentElement) ancestors.unshift(current);
+      let background = [255, 255, 255], opacity = 1;
+      for (const ancestor of ancestors) {
+        const computed = getComputedStyle(ancestor);
+        if (computed.backgroundImage !== 'none') throw new Error(`Cannot audit background image on ${ancestor.tagName}`);
+        background = blend(color(computed.backgroundColor), background);
+        opacity *= Number(computed.opacity);
+      }
+      const foreground = color(style.color);
+      foreground[3] = (foreground[3] ?? 1) * opacity;
+      const values = [luminance(blend(foreground, background)), luminance(background)].sort((a, b) => a - b);
+      return [{text: node.textContent.trim(), color: style.color, background, ratio: (values[1] + .05) / (values[0] + .05)}];
+    });
+  });
+  assert.ok(rows.length >= minimumCount, `${selector}: audited only ${rows.length} text elements`);
+  assert.deepEqual(rows.filter(row => row.ratio < 4.5), [], `${selector}: insufficient rendered text contrast`);
+}
+
+async function auditThemes(page, selector, minimumCount) {
+  const previous = await page.evaluate(() => ({theme: document.documentElement.dataset.theme, night: document.documentElement.dataset.night}));
+  for (const [theme, night] of [['light', 'false'], ['dark', 'false'], ['dark', 'true']]) {
+    await page.evaluate(({theme, night}) => { document.documentElement.dataset.theme = theme; document.documentElement.dataset.night = night; }, {theme, night});
+    await page.waitForTimeout(200);
+    await assertRenderedContrast(page, selector, minimumCount);
+  }
+  await page.evaluate(previous => { document.documentElement.dataset.theme = previous.theme; document.documentElement.dataset.night = previous.night; }, previous);
+}
 
 const captureTheme = process.env.PROGRESS_THEME ?? 'light';
 if (!['light', 'dark', 'night'].includes(captureTheme)) throw new Error(`Unknown capture theme ${captureTheme}`);
@@ -153,6 +198,7 @@ for (const [name, engine] of [['Chromium', chromium], ['WebKit', webkit]]) for (
       assert.ok((await statusAfter.innerText()).includes('heard'));
       const resultText = await page.locator('#readingResultTray').innerText();
       assert.ok(resultText.includes('expected') && resultText.includes('heard'));
+      await auditThemes(page, '#readingResultTray', 6);
       assert.equal(await page.locator('.reading-result-actions button').count(), 2);
       assert.ok((await page.getByRole('button', {name: 'Review', exact: true}).boundingBox()).height >= 44);
       const scoreBounds = await page.locator('#sheetPanel').boundingBox();
@@ -203,6 +249,54 @@ for (const [name, engine] of [['Chromium', chromium], ['WebKit', webkit]]) for (
       assert.equal(await page.locator('#openProfile').isVisible(), false);
       assert.equal(await page.locator('#noteStatus').innerText(), '');
       await page.locator('#sheetMusic .score-system svg .vf-stavenote').first().waitFor();
+      await page.evaluate(async path => {
+        const {DrillPicker} = await import(path);
+        const picker = new DrillPicker();
+        const task = {key: 'C', drill: {practice: 'normal'}, target: [{pitch: 60}, {pitch: 62}, {pitch: 64}]};
+        const timeline = [
+          {index: 0, bar: 1, tempo: 60, deviation_ms: 0, velocity: 70, flag: null, missed: false},
+          {index: 1, bar: 1, tempo: 62, deviation_ms: 60, velocity: 100, flag: 'late', missed: false},
+          {index: 2, bar: 2, tempo: 65, deviation_ms: null, velocity: null, flag: null, missed: true},
+        ];
+        const drill = {clean: false, usable: true, issues: ['Missed a note'], pitch: 75, evenness: 80,
+          drift_percent: 12, played_bpm: 62, loudness: 70, sync_ms: 20, accents: 60, crossing_ms: 50,
+          targets: {pitch: 90, evenness: 85, drift: 5}, timing_ms: 50, timeline};
+        window.testDrillResult = {picker, task, assessment: {drill, score: {missing: 1, extra: 0}, feedback: 'Keep a steady tempo'}};
+        picker.renderResults(task, window.testDrillResult.assessment, () => { window.reviewedDrill = true; }, 'Best tempo 60');
+      }, `/@fs${resolve('src/piano_duet/static/drills.mjs')}`);
+      assert.ok(await page.locator('#drillResults').isVisible());
+      assert.equal(await page.locator('.drill-meter').count(), 7);
+      await auditThemes(page, '#drillResults', 25);
+      await page.evaluate(() => {
+        document.documentElement.dataset.theme = 'light';
+        document.querySelector('#drillResults').style.backgroundColor = '#161d27';
+      });
+      await page.waitForTimeout(200);
+      // Match the contrast audit's failure for the original dark panel.
+      await assert.rejects(assertRenderedContrast(page, '#drillResults', 25), /insufficient rendered text contrast/);
+      await page.evaluate(({theme, night}) => {
+        document.querySelector('#drillResults').style.removeProperty('background-color');
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.dataset.night = String(night);
+      }, {theme, night});
+      await page.waitForTimeout(200);
+      if (process.env.PROGRESS_SCREENSHOTS) {
+        await page.screenshot({path: `${process.env.PROGRESS_SCREENSHOTS}/${captureName}-portrait-drill-result.png`});
+        await resize(1440, 900);
+        await page.screenshot({path: `${process.env.PROGRESS_SCREENSHOTS}/${captureName}-desktop-drill-result.png`});
+        await resize(393, 852);
+      }
+      await page.getByRole('button', {name: 'Review notes'}).click();
+      assert.equal(await page.evaluate(() => window.reviewedDrill), true);
+      await page.evaluate(() => {
+        const {picker, task, assessment} = window.testDrillResult;
+        assessment.drill.clean = true;
+        picker.renderResults(task, assessment, () => {});
+      });
+      await auditThemes(page, '#drillResults', 24);
+      await page.evaluate(() => window.testDrillResult.picker.renderSummary('Session complete', ['A steady rep'], () => {}));
+      await auditThemes(page, '#drillResults', 4);
+      await page.locator('#drillResults').evaluate(node => { node.hidden = true; });
       if (process.env.PROGRESS_SCREENSHOTS) await page.screenshot({path: `${process.env.PROGRESS_SCREENSHOTS}/${captureName}-portrait-drills.png`});
       await page.waitForFunction(() => !document.querySelector('#start').disabled);
       await page.locator('#start').click();
@@ -229,6 +323,24 @@ for (const [name, engine] of [['Chromium', chromium], ['WebKit', webkit]]) for (
       await page.waitForFunction(() => document.body.classList.contains('song-open'));
       assert.equal(await page.locator('#songAccuracy').evaluate(node => getComputedStyle(node).display), 'none');
       assert.equal(await page.locator('#songStreak').evaluate(node => getComputedStyle(node).display), 'none');
+      await page.evaluate(() => {
+        document.body.dataset.mode = 'practice';
+        document.querySelector('#practicePanel').hidden = false;
+        document.querySelector('#practiceScore').textContent = '85%';
+        document.querySelector('#practiceFeedback').textContent = 'Keep going';
+        document.querySelector('#drillMetrics').textContent = 'Notes 85%';
+        document.querySelector('#drillMetrics').hidden = false;
+        document.querySelector('#practiceResult').hidden = false;
+      });
+      await auditThemes(page, '#practiceResult', 4);
+      await page.evaluate(() => {
+        document.body.dataset.mode = 'learning';
+        document.querySelector('#learningPanel').hidden = false;
+        document.querySelector('#learningScore').textContent = '85 / 100';
+        document.querySelector('#learningFeedback').textContent = 'A good start';
+        document.querySelector('#learningResult').hidden = false;
+      });
+      await auditThemes(page, '#learningResult', 2);
       assert.deepEqual(errors, []);
     } finally { await context.close(); await rm(profile, {recursive: true, force: true}); }
   });

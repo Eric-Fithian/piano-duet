@@ -1019,7 +1019,7 @@ function buttons() {
     : mode === 'reading' && reading.progress?.groups.length ? 'Resume'
       : mode === 'library' && songStream.progress?.groups.length ? 'Resume' : 'Start';
   $('answer').disabled = !microphone || busy || calibrating > 0 || !detector.active;
-  $('answer').hidden = mode === 'reading' || mode === 'library' || !microphone || busy || (isPracticeMode() && (!practice.canPlay || practice.completed));
+  $('answer').hidden = mode === 'reading' || mode === 'library' || (mode === 'drills' && !detector.active) || !microphone || busy || (isPracticeMode() && (!practice.canPlay || practice.completed));
   $('nextPractice').hidden = mode === 'reading' || mode === 'library' || mode === 'drills' || !isPracticeMode() || !practice.completed || busy;
   $('stop').disabled = !microphone && !busy;
   $('stop').hidden = !busy || mode === 'library';

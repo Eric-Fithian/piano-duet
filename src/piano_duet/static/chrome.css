@@ -68,6 +68,11 @@
   .level-diamond { width:20px; height:20px; }
   .hud-session { display:none; }
 }
+@media(max-width:600px) and (min-height:501px) {
+  .transport-actions:has(#answer:not([hidden])) .transport-primary { display:contents; }
+  .transport-actions:has(#answer:not([hidden])) #start { grid-column:3; grid-row:1; justify-self:end; }
+  .transport-actions:has(#answer:not([hidden])) #answer { grid-column:1 / -1; grid-row:2; }
+}
 @media(max-width:900px), (max-height:500px) {
   .drill-bar:has(.drill-more-button[aria-expanded=true]) { flex-wrap:wrap; }
   .drill-extra { position:static; flex-basis:100%; max-width:none; box-shadow:none; background:var(--panel); border-radius:4px; }

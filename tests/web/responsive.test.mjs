@@ -232,6 +232,38 @@ for (const [engineName, engine] of [['chromium', chromium], ['webkit', webkit]])
     assert.equal(await page.locator('#drillProgress').isVisible(), false);
     assert.equal(await page.locator('#drillBest').isVisible(), false);
     await checkLayout(page, `${engineName} drills playing`);
+    await page.evaluate(async path => {
+      const {DrillPicker} = await import(path);
+      const picker = new DrillPicker();
+      const task = {key: 'C', drill: {practice: 'normal'}, target: [{pitch: 60}, {pitch: 62}, {pitch: 64}]};
+      const timeline = task.target.map((_, index) => ({index, bar: 1, tempo: 60 + index,
+        deviation_ms: index * 20, velocity: 70, flag: null, missed: false}));
+      const assessment = {score: {missing: 1, extra: 0}, feedback: 'Keep a steady tempo', drill: {
+        clean: false, usable: true, issues: ['Missed a note'], pitch: 75, evenness: 80, drift_percent: 12,
+        played_bpm: 62, loudness: 70, sync_ms: 20, accents: 60, crossing_ms: 50,
+        targets: {pitch: 90, evenness: 85, drift: 5}, timing_ms: 50, timeline,
+      }};
+      window.showResponsiveDrillResult = () => picker.renderResults(task, assessment, () => {}, 'Best tempo 60');
+    }, `/@fs${resolve('src/piano_duet/static/drills.mjs')}`);
+    for (const {name, width, height} of viewports) {
+      await resizeScore(width, height);
+      const scoreBefore = await page.locator('#sheetPanel').boundingBox();
+      await page.evaluate(() => window.showResponsiveDrillResult());
+      const score = await page.locator('#sheetPanel').boundingBox();
+      const result = await page.locator('#drillResults').boundingBox();
+      assert.ok(Math.abs(score.y - scoreBefore.y) <= 1, `${name}: result moved score down`);
+      assert.ok(score.height > 0 && result.y >= score.y + score.height - 1, `${name}: result overlaps score`);
+      assert.equal(await page.locator('#drillResults').evaluate(node => node.parentElement.classList.contains('transport')), true);
+      assert.equal(await page.locator('#start').isVisible(), true);
+      assert.equal(await page.locator('#start').getAttribute('aria-pressed'), 'true');
+      await checkLayout(page, `${engineName} ${name}-drill-result`);
+      await page.getByRole('button', {name: 'Hide results'}).click();
+    }
+    await resizeScore(393, 852);
+    await page.locator('#answer').evaluate(node => { node.hidden = false; });
+    assert.equal(await page.locator('#answer').isVisible(), true);
+    await checkLayout(page, `${engineName} active drill controls`);
+    await page.locator('#answer').evaluate(node => { node.hidden = true; });
     await page.locator('#start').click();
     for (const {name, width, height} of viewports) {
       await resizeScore(width, height); await capture(`${name}-drills`);
