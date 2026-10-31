@@ -98,9 +98,6 @@ line.score-heard { fill:none; }
 .key-caption { display: block; font-size: 8px; letter-spacing: 1.3px; color: #b0b6bf; }
 .key-follow strong { display: block; font: 18px Atkinson, sans-serif; margin-top: 8px; color: #dcdfe3; }
 .key-follow p { font-size: 10px; line-height: 1.7; margin: 8px 0 0; color: #b1b6bf; }
-.mode-switch { display:flex; align-items:center; gap:4px; padding:4px; border:1px solid var(--line); border-radius:10px; background:#141a23; max-width:100%; }
-.mode-switch button { color:#bec2c9; background:transparent; padding:9px 18px; min-width:0; }
-.mode-switch button[aria-pressed=true] { background:#2a3749; color:#e5e7ea; }
 .learning-panel { flex-shrink:0; padding:14px 22px; position:relative; background:var(--bg); color:var(--text); }
 .learning-steps { list-style:none; display:flex; flex-wrap:wrap; gap:8px 20px; margin:0; padding:0; font-size:11px; color:var(--muted); }
 .learning-steps li[aria-current=step] { color:var(--text); font-weight:700; }
@@ -118,7 +115,7 @@ line.score-heard { fill:none; }
 .changed-note { color:#f3c795; }
 .score-phrase.corrected h2 { background:#d2e5e6; color:#315b61; }
 .score-phrase.attempt h2 { background:#dce5c8; color:#435c2b; }
-@media(max-width:600px) { .learning-panel { padding:10px 14px; } .learning-steps { gap:8px; font-size:10px; } #learningInstruction { font-size:11px; } .learning-actions button { padding:6px 8px; font-size:11px; } .mode-switch button { padding-inline:10px; font-size:12px; } }
+@media(max-width:600px) { .learning-panel { padding:10px 14px; } .learning-steps { gap:8px; font-size:10px; } #learningInstruction { font-size:11px; } .learning-actions button { padding:6px 8px; font-size:11px; } }
 
 #surpriseDetails { margin:0; padding:0; border:0; }
 @media(max-height:500px) and (min-width:601px) { .learning-panel { padding:6px 16px; } #learningInstruction { margin:4px 0; } .learning-actions { position:absolute; top:0; right:12px; } .learning-steps { padding-right:320px; } }
