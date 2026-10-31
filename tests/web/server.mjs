@@ -19,21 +19,22 @@ export async function startTestServer(preview = false, requestedPort = 0) {
   server.stdout.on("data", () => {});
   await new Promise((ready, reject) => {
     const deadline = Date.now() + 30000;
+    let last = "connection refused";
     const fail = (error) => { server.kill("SIGTERM"); reject(error); };
     server.once("error", fail);
     server.once("exit", (code) => fail(new Error(`Vite exited before startup: ${code}`)));
     const poll = () => {
-      if (Date.now() >= deadline) return fail(new Error(`Vite did not respond on port ${port} within 30 seconds`));
+      if (Date.now() >= deadline) return fail(new Error(`Vite did not respond on port ${port} within 30 seconds: ${last}`));
       const request = get(`http://127.0.0.1:${port}/`, (response) => {
         response.resume();
         if (response.statusCode === 200) ready();
-        else fail(new Error(`Vite returned HTTP ${response.statusCode} during startup`));
+        else { last = `HTTP ${response.statusCode}`; setTimeout(poll, 100); }
       });
       request.on("error", (error) => {
-        if (error.code === "ECONNREFUSED") setTimeout(poll, 100);
+        if (["ECONNREFUSED", "ECONNRESET", "ETIMEDOUT"].includes(error.code)) { last = error.message; setTimeout(poll, 100); }
         else fail(error);
       });
-      request.setTimeout(1000, () => request.destroy(new Error("Vite startup request timed out")));
+      request.setTimeout(1000, () => request.destroy(Object.assign(new Error("Vite startup request timed out"), { code: "ETIMEDOUT" })));
     };
     poll();
   });
