@@ -16,7 +16,7 @@ def main():
     model = PianoTranscriber()
     outputs = model.session.run(['reg_onset', 'frame', 'velocity'], {model.input_name: audio[None]})
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    np.savez_compressed(args.output, reg_onset=outputs[0], frame=outputs[1], velocity=outputs[2])
+    np.savez_compressed(args.output, audio=audio, reg_onset=outputs[0], frame=outputs[1], velocity=outputs[2])
     print(f'{args.output}: {args.output.stat().st_size} bytes')
 
 

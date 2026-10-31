@@ -6,9 +6,9 @@ from pathlib import Path
 
 import moduleconf
 import numpy as np
+import onnx
 import onnxruntime as ort
 import torch
-from live_fixture import synthetic_audio
 from tqdm import tqdm
 from transkun.Util import makeFrame
 
@@ -21,6 +21,7 @@ FIXTURES = Path('tests/fixtures')
 def main():
     options = ort.SessionOptions()
     options.intra_op_num_threads = 4
+    options.inter_op_num_threads = 1
     options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_DISABLE_ALL
     print(json.dumps({'aria': aria_parity(options), 'live_transcription': live_parity(options),
                       'recording_transcription': recording_parity(options)}, indent=2))
@@ -60,18 +61,27 @@ def live_parity(options):
     graph = ort.InferenceSession(str(folder / 'graph.onnx'), options, providers=['CPUExecutionProvider'])
     convolution = ort.InferenceSession(str(folder / 'convolution.onnx'), options, providers=['CPUExecutionProvider'])
     recurrent = ort.InferenceSession(str(folder / 'recurrent.onnx'), options, providers=['CPUExecutionProvider'])
-    audio = synthetic_audio()[None]
+    fixture = np.load(FIXTURES / 'live-transcription.npz')
+    audio = fixture['audio'][None]
+    original = onnx.load(str(ROOT / 'live-reference/piano_crnn.onnx'))
+    dimension = original.graph.input[0].type.tensor_type.shape.dim[1]
+    if dimension.dim_value != 160000:
+        raise ValueError('Unexpected original transcription window')
+    dimension.ClearField('dim_value')
+    dimension.dim_param = 'samples'
+    reference = ort.InferenceSession(original.SerializeToString(), options, providers=['CPUExecutionProvider'])
     names = ['reg_onset', 'frame', 'velocity']
+    expected = reference.run(names, {reference.get_inputs()[0].name: audio})
     full = graph.run(names, {graph.get_inputs()[0].name: audio})
     intermediate = convolution.run(None, {convolution.get_inputs()[0].name: audio})
     split = recurrent.run(names, dict(zip([item.name for item in convolution.get_outputs()], intermediate, strict=True)))
-    expected = np.load(FIXTURES / 'live-transcription.npz')
     errors = {}
-    for name, complete, partitioned in zip(names, full, split, strict=True):
-        np.testing.assert_allclose(complete, expected[name], atol=0.00005, rtol=0.00005)
-        np.testing.assert_allclose(partitioned, expected[name], atol=0.00005, rtol=0.00005)
-        errors[name] = {'full_max': float(np.max(np.abs(complete - expected[name]))),
-                        'split_max': float(np.max(np.abs(partitioned - expected[name])))}
+    for name, original_output, complete, partitioned in zip(names, expected, full, split, strict=True):
+        np.testing.assert_allclose(complete, original_output, atol=0.00005, rtol=0.00005)
+        np.testing.assert_allclose(partitioned, original_output, atol=0.00005, rtol=0.00005)
+        errors[name] = {'full_max': float(np.max(np.abs(complete - original_output))),
+                        'split_max': float(np.max(np.abs(partitioned - original_output))),
+                        'fixture_max': float(np.max(np.abs(original_output - fixture[name])))}
     return errors
 
 

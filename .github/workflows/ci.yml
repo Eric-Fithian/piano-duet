@@ -84,7 +84,7 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: .cache/ci-models
-          key: published-models-${{ hashFiles('site/app/src/model-catalog.ts') }}
+          key: published-models-${{ hashFiles('site/app/src/model-catalog.ts', 'tests/inference/download-models.mjs') }}
       - run: node tests/inference/download-models.mjs
       - run: uv run --frozen python tests/inference/published_model_parity.py
 

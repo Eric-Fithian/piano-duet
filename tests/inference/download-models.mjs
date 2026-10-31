@@ -7,8 +7,11 @@ import { pipeline } from "node:stream/promises";
 import { MODEL_CATALOG } from "../../site/app/src/model-catalog.ts";
 
 const selected = process.argv.slice(2);
-if (selected.some((model) => !(model in MODEL_CATALOG))) throw new Error("Unknown model in download request");
+if (selected.some((model) => !(model in MODEL_CATALOG) && model !== "live-reference")) throw new Error("Unknown model in download request");
 const files = Object.entries(MODEL_CATALOG).filter(([model]) => !selected.length || selected.includes(model)).flatMap(([, assets]) => assets);
+if (!selected.length || selected.includes("live-reference")) files.push({ model: "live-reference", name: "piano_crnn.onnx",
+  url: "https://huggingface.co/stelee/piano-transcription-onnx/resolve/24c14424609da2cc2c4b16d051365904327dd242/piano_crnn.onnx",
+  bytes: 154206740, sha256: "743cf9fc88d1c24e5d4cc7a47ba55abd5c52c8623274355d79a981955fbbea99" });
 for (const file of files) {
   const path = `.cache/ci-models/${file.model}/${file.name}`;
   await mkdir(dirname(path), { recursive: true });
