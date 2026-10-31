@@ -157,7 +157,7 @@ jobs:
       - run: node tests/inference/creative-microphone.mjs
         timeout-minutes: 8
         env:
-          PIANO_CREATIVE_PROVIDER: wasm
+          PIANO_CREATIVE_PROVIDER: webgpu
           PIANO_PHRASE_MODEL: .cache/ci-models/phrase-transcription/piano_crnn.onnx
           PIANO_PHRASE_SPLIT_DIR: .cache/ci-models/phrase-transcription
           PIANO_ARIA_MODEL_DIR: .cache/ci-models/aria
