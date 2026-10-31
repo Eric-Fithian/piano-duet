@@ -45,6 +45,7 @@ for (const [name, engine] of [['Chromium', chromium], ['WebKit', webkit]]) {
       assert.equal(await page.locator('#profileDialog').evaluate(dialog => dialog.open), true);
       assert.ok((await page.locator('#profileSummary').textContent()).includes('0 included attempts'));
       await page.locator('#profileDialog').evaluate(dialog => dialog.close());
+      await page.locator('#modeMenuButton').click();
       await page.locator('#libraryMode').click();
       assert.equal(await page.locator('#importAudio').isEnabled(), true);
       assert.equal(await page.locator('#recordAudio').isEnabled(), true);
@@ -67,9 +68,11 @@ for (const [name, engine] of [['Chromium', chromium], ['WebKit', webkit]]) {
       await page.locator('#songBack').click();
       await page.reload();
       await page.getByText('Browser test song', {exact: true}).waitFor({timeout: 15000});
+      await page.locator('#modeMenuButton').click();
       await page.locator('#drillsMode').click();
       await page.waitForFunction(() => document.querySelector('#drillTitle')?.textContent?.includes('five-finger pattern'), null, {timeout: 30000});
       assert.equal(await page.locator('#error').isHidden(), true);
+      await page.locator('#modeMenuButton').click();
       await page.locator('#readingMode').click();
       await page.waitForFunction(() => document.querySelector('#practiceTitle')?.textContent?.includes('Meet'), null, {timeout: 30000});
       await page.locator('#sheetMusic svg').first().waitFor({timeout: 15000});

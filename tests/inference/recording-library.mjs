@@ -41,6 +41,7 @@ try {
   });
   await page.goto(`http://127.0.0.1:${site.port}/`);
   await page.locator("#sheetMusic svg").first().waitFor({ timeout: 30000 });
+  await page.locator("#modeMenuButton").click();
   await page.locator("#libraryMode").click();
   await page.locator("#importAudio").waitFor({ state: "visible" });
   const importOnce = async (count) => {

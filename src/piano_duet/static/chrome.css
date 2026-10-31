@@ -1,0 +1,97 @@
+.piano-app .shell { max-width:none; padding:0; }
+.piano-app .app-header { flex:none; height:48px; display:flex; flex-wrap:nowrap; align-items:center; gap:4px; padding:0 max(8px, env(safe-area-inset-right)) 0 max(8px, env(safe-area-inset-left)); border-bottom:1px solid var(--line); position:relative; }
+.brand { font:600 21px Fraunces,serif; color:var(--text); margin-right:12px; }
+.brand .mark { display:none; }
+.mode-menu-button, .settings-button, .score-controls-toggle { flex:none; min-height:44px; padding:0 8px; background:transparent; color:var(--text); border:1px solid var(--line); border-radius:4px; font-size:14px; }
+.mode-menu-button { display:inline-flex; align-items:center; gap:3px; }
+.mode-switch { display:none; flex:none; flex-wrap:wrap; gap:4px; padding:6px 8px; background:var(--panel); border-bottom:1px solid var(--line); }
+.shell:has(.mode-menu-button[aria-expanded=true]) .mode-switch { display:flex; }
+.mode-switch button { min-height:44px; text-align:left; color:var(--text); background:transparent; border-radius:4px; }
+.mode-switch button[aria-pressed=true] { background:var(--panel-2); }
+.stage-summary { flex:none; white-space:nowrap; font-size:15px; font-weight:700; }
+.header-actions { display:flex; align-items:center; gap:4px; margin-left:auto; }
+.level-badge { display:flex; align-items:center; gap:4px; padding:0 3px; min-height:44px; color:var(--text); background:transparent; }
+.level-diamond { display:grid; place-items:center; width:22px; height:22px; border:2px solid var(--folio-progress); border-radius:50%; font-size:12px; }
+.level-meta { display:block; font-size:15px; white-space:nowrap; }
+.level-caption { font-weight:700; }
+.level-xp, .level-meta .xp-track { display:none; }
+#scoreControlsSlot { width:44px; flex:none; }
+#scoreControlsSlot .score-controls { position:static; display:block; padding:0; border:0; background:transparent; color:var(--text); opacity:1; }
+#scoreControlsSlot .score-controls-toggle { display:block; width:44px; height:44px; font-size:20px; border:1px solid var(--line); border-radius:4px; background:transparent; }
+.score-options { display:none; flex:none; align-items:center; flex-wrap:wrap; gap:6px; padding:6px 8px; background:var(--bg); border-bottom:1px solid var(--line); }
+.shell:has(.score-controls.expanded) .score-options { display:flex; }
+.score-options > button { min-width:44px; min-height:44px; color:var(--text); background:var(--panel); border:1px solid var(--line); border-radius:4px; }
+.score-options .score-zoom { min-width:48px; text-align:center; font-variant-numeric:tabular-nums; }
+.score-options .score-menu { position:static; display:flex; flex:1 1 100%; flex-wrap:wrap; gap:8px; padding:8px; border:1px solid var(--line); border-radius:4px; background:var(--panel); color:var(--text); box-shadow:none; }
+.score-options .score-menu-title { color:var(--text); font-size:14px; text-transform:none; letter-spacing:normal; }
+.score-options .score-menu-choices { background:var(--panel-2); }
+.score-options .score-menu-choices button { min-height:44px; color:var(--text); }
+.score-options .score-menu-choices button[aria-checked=true] { background:var(--folio-action); color:var(--folio-onAction); }
+.score-options .score-resume { position:static; transform:none; box-shadow:none; }
+.performance { border:0; border-radius:0; background:var(--paper); }
+.reading-hud { flex:none; display:flex; align-items:center; gap:10px; min-height:32px; padding:2px 10px; color:var(--text); background:var(--bg); border-bottom:1px solid var(--line); }
+.hud-stage { display:flex; align-items:center; gap:8px; min-width:0; }
+.hud-stage strong { font-size:15px; white-space:nowrap; }
+.hud-notes { display:none; }
+.hud-right { display:flex; align-items:center; gap:8px; margin-left:auto; }
+.hud-streak, .hud-session { display:flex; align-items:baseline; gap:4px; font-size:14px; white-space:nowrap; }
+.hud-streak b, .hud-session b { font-size:15px; color:var(--text); text-shadow:none; }
+.hud-streak small, .hud-session small { font-size:14px; }
+.transport { flex:none; display:block; position:static; width:auto; padding:0 max(10px,env(safe-area-inset-right)) max(6px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left)); background:var(--bg); border-top:1px solid var(--line); }
+.note-status { height:18px; line-height:18px; text-align:center; font-size:18px; font-weight:700; overflow:hidden; white-space:nowrap; }
+.transport-actions { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:12px; }
+#listenSlot { justify-self:start; }
+#listenSlot button { min-height:44px; padding:8px 10px; color:var(--text); background:var(--panel); border:1px solid var(--line); border-radius:4px; }
+.piano-app:not([data-mode=reading]) #hudListen, .piano-app:not([data-mode=drills]) #drillListen { display:none; }
+.transport-status { display:flex; flex-direction:row; align-items:center; gap:5px; color:var(--text); font-size:14px; white-space:nowrap; }
+.transport-status .dot { width:10px; height:10px; border:2px solid var(--folio-progress); background:transparent !important; }
+.piano-app:has(#start[aria-pressed=true]) .transport-status .dot { background:var(--folio-progress) !important; }
+.meter { width:32px; height:8px; overflow:hidden; background:transparent; }
+.meter[aria-valuenow="0"] { visibility:hidden; }
+#level { display:block; height:100%; background:repeating-linear-gradient(to right,var(--folio-progress) 0 3px,transparent 3px 5px); }
+.transport-primary { display:flex; justify-self:end; gap:12px; }
+.space-key { min-width:100px; min-height:44px; padding:8px 14px; color:var(--folio-onAction); background:var(--folio-action); border:1px solid var(--folio-action); border-radius:4px; font-weight:700; }
+.space-key[aria-pressed=true] { color:var(--text); background:var(--panel); border-color:var(--line); }
+.space-key:disabled { color:var(--muted); background:var(--panel-2); border-color:var(--line); opacity:1; }
+.key-cap { display:none; }
+.transport-side { display:none; }
+.piano-app[data-mode=library]:not(.song-open) .performance, .piano-app[data-mode=library]:not(.song-open) .transport { display:none; }
+.piano-app:not([data-mode=reading]) .stage-summary, .piano-app[data-mode=library] .level-badge { display:none; }
+@media(max-width:1000px) { .brand { display:none; } }
+@media(max-width:600px) {
+  .piano-app .app-header { gap:2px; padding-inline:4px; }
+  .mode-menu-button, .settings-button { padding-inline:6px; font-size:13px; }
+  .level-badge { gap:2px; padding-inline:0; }
+  .level-diamond { width:20px; height:20px; }
+  .hud-session { display:none; }
+}
+@media(max-width:900px), (max-height:500px) {
+  .drill-bar:has(.drill-more-button[aria-expanded=true]) { flex-wrap:wrap; }
+  .drill-extra { position:static; flex-basis:100%; max-width:none; box-shadow:none; background:var(--panel); border-radius:4px; }
+  .drill-options { position:static; max-height:40dvh; background:var(--panel); box-shadow:none; }
+  .song-edit-bar:has(.edit-more-button[aria-expanded=true]) { flex-wrap:wrap; }
+  .edit-options { position:static; flex-basis:100%; max-height:40dvh; background:var(--panel); box-shadow:none; }
+}
+
+.drill-progress { font-size:15px; font-weight:700; white-space:nowrap; }
+.piano-app[data-mode=drills] .level-badge { display:none; }
+.drill-bar { flex-wrap:wrap; background:var(--bg); }
+.drill-tempo-display, .drill-best { flex:none; white-space:nowrap; font-size:13px; }
+#drillDetails, .drill-more-button { display:inline-flex; align-items:center; justify-content:center; min-width:44px; min-height:44px; padding:0 6px; color:var(--text); background:var(--panel); border:1px solid var(--line); border-radius:4px; }
+.drill-more-button { font-size:0; }
+.drill-more-button::after { content:'⋯'; font-size:18px; }
+.drill-extra { display:none; position:static; flex:1 0 100%; max-width:none; padding:8px; background:var(--panel); border:1px solid var(--line); border-radius:4px; box-shadow:none; flex-wrap:wrap; }
+.drill-more-button[aria-expanded=true] + .drill-extra { display:flex; }
+.drill-extra button { min-height:44px; }
+.drill-ladder-track { display:none; }
+@media(max-height:500px) and (orientation:landscape) {
+  .piano-app .app-header { padding-right:290px; }
+  .transport { min-height:18px; padding:0 8px; }
+  .transport-actions { position:absolute; top:-48px; right:8px; height:48px; grid-template-columns:auto auto auto; }
+  .note-status { height:18px; }
+  .space-key { min-width:80px; }
+  .piano-app[data-mode=library]:not(.song-open) .app-header { padding-right:8px; }
+}
+.meter-bar { position:relative; height:5px; background:var(--panel-2); }
+.meter-bar i { position:absolute; inset:0 auto 0 0; background:var(--folio-progress); }
+.meter-bar em { position:absolute; top:-3px; bottom:-3px; width:2px; background:var(--text); }

@@ -95,10 +95,10 @@
 
 .drill-panel { flex-shrink:0; border-bottom:1px solid var(--line); }
 .drill-bar { position:relative; display:flex; align-items:center; gap:6px; padding:6px 10px 7px; }
-.drill-title { flex:1; min-width:0; display:flex; align-items:center; gap:10px; padding:5px 8px; background:none; border:0; border-radius:6px; text-align:left; color:#dee0e4; }
-.drill-title:hover { background:#1e2734; }
-.drill-title strong { flex:0 1 auto; max-width:75%; font:20px/1.2 Georgia,serif; font-weight:400; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.drill-title small { flex:1 1 0; min-width:0; font-size:11px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.drill-title { flex:1; min-width:0; min-height:44px; display:flex; align-items:center; gap:4px; padding:5px 8px; background:var(--panel); border:1px solid var(--line); border-radius:4px; text-align:left; color:var(--text); }
+.drill-title:hover { background:var(--panel-2); }
+.drill-title strong { flex:1; min-width:0; font:700 14px/1.2 Atkinson,sans-serif; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.drill-title small { display:none; }
 .drill-title svg { flex:none; width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:2; transition:transform .2s; }
 .drill-title[aria-expanded=true] svg { transform:rotate(180deg); }
 .drill-bar .hud-tempo b { font-size:16px; }

@@ -30,6 +30,15 @@ async function checkLayout(page, label) {
         problems.push(`horizontal scroll: ${element.id || element.className}`);
       }
     }
+    const header = document.querySelector('.app-header');
+    const headerBounds = header.getBoundingClientRect();
+    if (headerBounds.height !== 48) problems.push(`header height ${headerBounds.height}`);
+    const slots = [...header.querySelectorAll('#modeMenuButton, .stage-summary, #openProfile, #openSettings, #scoreControlsSlot')]
+      .filter(element => element.getBoundingClientRect().width && getComputedStyle(element).display !== 'none');
+    for (const slot of slots) {
+      const bounds = slot.getBoundingClientRect();
+      if (bounds.top < headerBounds.top || bounds.bottom > headerBounds.bottom) problems.push(`topline row: ${slot.id || slot.className}`);
+    }
     const modal = document.querySelector('dialog[open]');
     const scope = modal || document;
     const elements = [...scope.querySelectorAll('button, select, input:not([type=hidden]), a[href], summary')].filter(element => {
@@ -44,6 +53,13 @@ async function checkLayout(page, label) {
       }
       return true;
     });
+    const score = document.querySelector('#sheetPanel').getBoundingClientRect();
+    if (!modal && score.width && score.height) for (const element of elements) {
+      if (element.closest('#sheetPanel')) continue;
+      const bounds = element.getBoundingClientRect();
+      if (Math.min(bounds.right, score.right) - Math.max(bounds.left, score.left) > 1 &&
+          Math.min(bounds.bottom, score.bottom) - Math.max(bounds.top, score.top) > 1) problems.push(`control over score: ${element.id || element.textContent.trim()}`);
+    }
     for (const [index, element] of elements.entries()) {
       const rect = element.getBoundingClientRect(), name = element.id || element.textContent.trim().slice(0, 30);
       if (rect.left < -1 || rect.right > innerWidth + 1) problems.push(`outside viewport horizontally: ${name}`);
@@ -119,6 +135,7 @@ for (const [engineName, engine] of [['chromium', chromium], ['webkit', webkit]])
     await page.waitForFunction(() => !document.querySelector('#start').disabled);
     await page.locator('#start').click();
     await page.waitForFunction(() => document.querySelector('#start').getAttribute('aria-pressed') === 'true', null, {timeout: 10000});
+    await checkLayout(page, `${engineName} playing`);
     await page.setViewportSize({width: 667, height: 375});
     await page.waitForFunction(count => document.querySelector('.score-phrase').querySelectorAll('.score-system').length < count, portraitSystems, {timeout: 5000});
     assert.equal(await page.locator('#start').getAttribute('aria-pressed'), 'true');
@@ -151,6 +168,12 @@ for (const [engineName, engine] of [['chromium', chromium], ['webkit', webkit]])
     await mode('reading');
     for (const {name, width, height} of viewports) {
       await resizeScore(width, height); await capture(`${name}-reading`);
+      await page.locator('#modeMenuButton').click();
+      await checkLayout(page, `${engineName} ${name}-mode-menu`);
+      await page.locator('#modeMenuButton').click();
+      await page.getByRole('button', {name: 'Score controls', exact: true}).click();
+      await checkLayout(page, `${engineName} ${name}-score-controls`);
+      await page.getByRole('button', {name: 'Score controls', exact: true}).click();
     }
     await mode('drills');
     for (const {name, width, height} of viewports) {

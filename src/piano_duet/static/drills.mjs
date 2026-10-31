@@ -270,11 +270,13 @@ export class DrillPicker {
   show(task) {
     const drill = task.drill;
     $('drillTempo').textContent = drill.bpm;
+    $('drillTempoDisplay').textContent = `♩ ${drill.bpm}`;
     $('drillSubdivision').textContent = SUBDIVISION[drill.per_beat];
     const level = this.levels[drill.drill];
-    $('drillLevelNumber').textContent = level.level;
+    $('drillLevelNumber').textContent = level.level || 'New';
+    $('drillProgress').textContent = level.level ? `Drill level ${level.level}` : 'New drill';
     $('drillLevelFill').style.width = `${level.next ? 100 * level.next.done / level.next.keys : 100}%`;
-    $('drillLevel').title = `${level.name}: level ${level.level}${level.next ? ` · next: ${level.next.done} of ${level.next.keys} keys at ${tempoLabel(level.next.tempo.per_beat, level.next.tempo.bpm)}` : ' · top level'}`;
+    $('drillLevel').title = `${level.name}: ${level.level ? `level ${level.level}` : 'new drill'}${level.next ? ` · next: ${level.next.done} of ${level.next.keys} keys at ${tempoLabel(level.next.tempo.per_beat, level.next.tempo.bpm)}` : ' · top level'}`;
     $('drillLevel').setAttribute('aria-label', $('drillLevel').title);
     $('drillSlower').disabled = drill.rung === 0;
     $('drillFaster').disabled = drill.rung === drill.rungs - 1;
@@ -283,6 +285,7 @@ export class DrillPicker {
     const ladder = this.catalog.drills[drill.drill].ladder;
     const working = ladder[drill.working];
     const best = drill.best === null ? null : ladder[drill.best];
+    $('drillBest').textContent = `Best tempo ${best ? best.bpm : '—'}`;
     const notes = [best ? `Your steady tempo ♩ ${best.bpm} in ${SUBDIVISION[best.per_beat]}` : 'Play at any tempo you can hold steadily',
       drill.rung === drill.working ? 'this is the suggestion' : `suggested ${tempoLabel(working.per_beat, working.bpm)}`];
     if (reached) notes.push(`meets ${reached}`);

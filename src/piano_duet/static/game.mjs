@@ -45,7 +45,7 @@ export function renderLevel(xp) {
 export function renderReadingHud(task, progress, curriculum, sessionXp, replaying) {
   const stage = curriculum?.path.find(item => item.number === task.reading.stage_number);
   const node = $('hudStageNumber');
-  node.textContent = String(task.reading.stage_number).padStart(2, '0');
+  node.textContent = String(task.reading.stage_number);
   node.style.setProperty('--phase', PHASE_COLORS[stage?.phase] || PHASE_COLORS.Beginner);
   const introduction = task.reading.introduce ?? null;
   $('hudStageLabel').textContent = introduction !== null ? pitchName(introduction) : stage?.label || task.title;

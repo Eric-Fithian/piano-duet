@@ -3,6 +3,7 @@ import "../../../src/piano_duet/static/style.css";
 import "../../../src/piano_duet/static/score.css";
 import "../../../src/piano_duet/static/practice.css";
 import "../../../src/piano_duet/static/game.css";
+import "../../../src/piano_duet/static/chrome.css";
 import { setLocalService } from "../../../src/piano_duet/static/practice.mjs";
 import { LocalService } from "../../../src/core/local-service.ts";
 import { AriaPhrase } from "../../../src/core/aria-phrase.ts";

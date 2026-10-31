@@ -24,11 +24,6 @@ button:disabled { cursor: default; opacity: .4; }
 .text-button { padding: 8px 10px; font-size: 12px; }
 kbd { font: 10px inherit; opacity: .7; margin-left: 9px; border: 1px solid currentColor; border-radius: 3px; padding: 1px 4px; }
 .shell { max-width: 1180px; margin: auto; padding: 0 36px; }
-.app-header { height: 72px; display: flex; align-items: center; justify-content: space-between; gap: 20px; border-bottom: 1px solid var(--line); }
-.brand { font-size: 18px; font-weight: 650; letter-spacing: 3px; display: flex; align-items: center; gap: 12px; }
-.mark { width: 30px; height: 30px; background: var(--peach); color: #15120a; font: 32px/26px Georgia; text-align: center; border-radius: 50%; letter-spacing: -6px; padding-right: 6px; }
-.brand-sub { font-size: 12px; color: var(--muted); font-weight: 400; letter-spacing: 0; margin-left: 10px; }
-.header-actions { display: flex; align-items: center; gap: 6px; }
 .local { font-size: 11px; color: #b2b7c0; display: flex; gap: 8px; align-items: center; margin-right: 12px; }
 .dot { display: inline-block; flex-shrink: 0; height: 7px; width: 7px; border-radius: 50%; background: var(--green); }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
@@ -38,7 +33,6 @@ kbd { font: 10px inherit; opacity: .7; margin-left: 9px; border: 1px solid curre
 .piano-app { height:100dvh; overflow:hidden; overscroll-behavior:none; }
 .piano-app .shell { height:100%; max-width:1600px; padding:0 max(24px,env(safe-area-inset-right)) 0 max(24px,env(safe-area-inset-left)); display:flex; flex-direction:column; }
 .piano-app main { flex:1; min-height:0; display:flex; flex-direction:column; position:relative; }
-.piano-app .app-header { height:62px; flex-shrink:0; border:0; }
 .session-setup { display:flex; justify-content:center; flex-shrink:0; padding:0 0 14px; }
 .mode-description { margin:0; padding:14px 20px; font-size:13px; color:var(--muted); }
 .practice-focus { display:flex; flex-direction:column; gap:8px; }
@@ -62,19 +56,12 @@ canvas { width:100%; height:100%; display:block; }
 .you { background:var(--peach); }.partner { background:var(--blue); }
 #timing { font-size:10px; color:var(--muted); text-align:right; margin-left:auto; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 #demo { margin-left:auto; padding:3px 8px; }
-.transport { flex-shrink:0; display:flex; align-items:center; justify-content:space-between; gap:16px; padding:16px 4px max(16px,env(safe-area-inset-bottom)); }
-.transport-primary { order:2; display:flex; align-items:center; gap:10px; }
-.transport button { min-height:46px; }
 .microphone-button { display:inline-flex; align-items:center; justify-content:center; gap:9px; }
 .microphone-button svg { width:18px; height:22px; fill:none; stroke:currentColor; stroke-width:1.7; stroke-linecap:round; }
 .microphone-button[aria-pressed=true] { color:#d6d9dd; background:transparent; border-color:#3a4a63; }
 .microphone-button[aria-pressed=true]:hover { background:#243143; }
-.transport-status { min-width:0; display:flex; flex-direction:column; gap:8px; }
 .status-label { display:flex; align-items:center; gap:9px; font-size:12px; line-height:1.5; }
 .input-meter { display:flex; align-items:center; gap:9px; }
-#levelText { font-size:9px; color:#b3b8c1; }
-.meter { width:70px; height:3px; background:#2c3849; border-radius:4px; overflow:hidden; }
-#level { width:0; height:100%; background:#45d483; transition:width .06s; }
 .error { color:#ffb4a8; background:#3a1b1a; border:1px solid #a0463f; border-radius:10px; padding:14px 18px; font-size:13px; line-height:1.6; }
 #error { position:absolute; z-index:6; bottom:90px; left:12px; right:12px; margin:0; }
 #scoreError { position:absolute; z-index:2; inset:12px 12px auto; margin:0; }
@@ -108,19 +95,10 @@ dialog::backdrop { background: #05080cc4; backdrop-filter: blur(5px); }
 .controls .key-follow { margin: 0; }
 @media(max-width:600px) {
   .piano-app .shell { padding-inline:max(12px,env(safe-area-inset-left)); }
-  .piano-app .app-header { height:54px; gap:10px; }
-  .brand { font-size:16px; gap:8px; }
-  .mark { width:26px; height:26px; font-size:29px; line-height:23px; }
-  .header-actions { gap:0; }.header-actions button { padding:10px; font-size:12px; }
   .session-setup { padding-bottom:10px; }
   .mode-description { padding:10px 14px; font-size:12px; }
   .performance { border-radius:12px; }
-  .transport { flex-direction:column; align-items:stretch; gap:10px; padding:10px 2px max(12px,env(safe-area-inset-bottom)); }
-  .transport-primary { justify-content:center; gap:8px; }
-  .transport button { padding:10px 12px; font-size:12px; min-height:44px; }
-  .transport-status { flex-direction:row; align-items:center; justify-content:space-between; gap:8px; }
-  .status-label { font-size:10px; }.input-meter { gap:5px; }.meter { width:34px; }
-  #levelText { font-size:8px; white-space:nowrap; }
+  .status-label { font-size:10px; }.input-meter { gap:5px; }
   kbd { display:none; }
   .score-toolbar { padding:3px 8px; }
   .roll-footer { padding:5px 12px; min-height:26px; }
@@ -131,14 +109,9 @@ dialog::backdrop { background: #05080cc4; backdrop-filter: blur(5px); }
 }
 @media(max-height:500px) and (min-width:601px) {
   .piano-app .shell { padding-inline:16px; }
-  .piano-app .app-header { height:46px; }
   .session-setup { position:absolute; top:-44px; left:120px; right:180px; padding:0; }
-  .mode-switch button { padding-block:5px; }
-  .transport { padding-block:6px; }
   .roll-footer { display:none; }
   .score-toolbar { padding-block:2px; }
-  .transport button { min-height:38px; }
-  .transport-status { flex-direction:row; align-items:center; }
 }
 @media(prefers-reduced-motion:reduce) { * { transition: none !important; } }
 [hidden] { display: none !important; }

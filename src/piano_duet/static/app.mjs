@@ -27,6 +27,11 @@ const SCORE_VIEWS = {
   learning: {scale: 1, sounding: true, headings: true, followNewest: true, empty: EMPTY_SCORE},
 };
 const sheet = new ScoreView($('sheetMusic'));
+$('scoreControlsSlot').append(sheet.controls);
+$('scoreOptions').append(...[...sheet.controls.children].filter(node => node !== sheet.controlsToggle), sheet.menu, sheet.resumeButton);
+$('scoreOptions').addEventListener('pointerdown', event => event.stopPropagation());
+$('listenSlot').append($('hudListen'), $('drillListen'));
+$('drillMore').before($('drillDetails'));
 sheet.onError = error => {
   console.error(error);
   $('scoreError').textContent = `Sheet music could not render: ${error.message}`;
@@ -977,9 +982,11 @@ function buttons() {
   $('songEdit').disabled = busy || Boolean(songEditor);
   $('start').disabled = !ready || (!microphone && busy && !previewing) || (mode === 'library' && !song);
   $('start').setAttribute('aria-pressed', Boolean(microphone));
+  $('micState').textContent = microphone ? 'Mic on' : 'Mic ready';
+  $('drillProgress').hidden = mode !== 'drills';
   const following = mode === 'reading' || mode === 'library';
   $('start').classList.toggle('no-key', Boolean(microphone) && !following);
-  $('micLabel').textContent = previewing ? 'Stop preview' : microphone ? (following ? 'Pause' : 'Mic off')
+  $('micLabel').textContent = previewing ? 'Stop preview' : microphone ? (following ? 'Stop' : 'Mic off')
     : mode === 'reading' && (reading.progress?.groups.length || sessionXp) ? 'Resume'
       : mode === 'library' && songStream.progress?.groups.length ? 'Resume' : 'Start';
   $('answer').disabled = !microphone || busy || calibrating > 0 || !detector.active;
