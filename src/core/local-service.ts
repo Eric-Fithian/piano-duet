@@ -168,9 +168,9 @@ export class LocalService {
     }
     if (method === "POST" && url.pathname === "/api/library/import-audio") {
       const filename = url.searchParams.get("filename"), rights = url.searchParams.get("rights");
-      const youtubeTitle = url.searchParams.get("youtubeTitle"), youtubeChannel = url.searchParams.get("youtubeChannel");
+      const youtubeTitle = url.searchParams.get("youtubeTitle"), youtubeChannel = url.searchParams.get("youtubeChannel"), youtubeUrl = url.searchParams.get("youtubeUrl");
       if (!filename || filename.length > 200 || rights !== "1") return Response.json({ detail: "Confirm that you have the rights to transcribe this recording" }, { status: 400 });
-      if ((youtubeTitle?.length ?? 0) > 200 || (youtubeChannel?.length ?? 0) > 200) return Response.json({ detail: "Invalid video details" }, { status: 400 });
+      if ((youtubeTitle?.length ?? 0) > 200 || (youtubeChannel?.length ?? 0) > 200 || (youtubeUrl?.length ?? 0) > 2048) return Response.json({ detail: "Invalid video details" }, { status: 400 });
       if (!(options.body instanceof ArrayBuffer) || !options.body.byteLength || options.body.byteLength > 256_000_000) {
         return Response.json({ detail: "Import an audio file under 256 MB" }, { status: 400 });
       }
@@ -188,7 +188,7 @@ export class LocalService {
         return Response.json({ detail: `Could not write ${filename}: ${error.message}` }, { status: 400 });
       }
       options.signal?.throwIfAborted();
-      const id = crypto.randomUUID(), song = { id, ...draft, ...(youtubeTitle ? { transcribed: true } : {}) };
+      const id = crypto.randomUUID(), song = { id, ...draft, ...(youtubeTitle ? { transcribed: true, url: youtubeUrl } : {}) };
       const event = await this.store.append("song", { action: "import", song } as unknown as LocalJsonValue, id);
       return Response.json(await songSummary({ ...song, created_at: Date.parse(event.createdAt) / 1000 }, []));
     }

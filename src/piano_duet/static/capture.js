@@ -3,6 +3,15 @@ class PianoCapture extends AudioWorkletProcessor {
     super();
     this.buffer = new Float32Array(1024);
     this.offset = 0;
+    this.port.onmessage = event => {
+      if (event.data !== 'flush') return;
+      if (this.offset) {
+        const samples = this.buffer.slice(0, this.offset);
+        this.port.postMessage({samples}, [samples.buffer]);
+        this.offset = 0;
+      }
+      this.port.postMessage({flushed: true});
+    };
   }
   process(inputs) {
     const channel = inputs[0]?.[0];

@@ -62,8 +62,13 @@ export default defineConfig({
         replace('  <script src="/notation-assets/vexflow.js" defer></script>\n', "");
         replace('  <script type="module" src="/static/app.mjs"></script>', '  <script type="module" src="/src/main.ts"></script>');
         replace('href="/static/credits.html"', 'href="/docs/credits/"');
-        replace('id="openYoutube" type=', 'id="openYoutube" hidden type=');
         replace('<button id="openYoutube"', '<button id="importAudio" type="button">Audio file</button><button id="recordAudio" type="button">Record audio</button><button id="openYoutube"');
+        replace('>From YouTube</button></div></details>', '>From YouTube link</button></div></details>');
+        replace('      <button id="youtubeGo" class="primary" type="submit">Transcribe</button>', `      <label>Title <input id="youtubeVideoTitle" type="text" maxlength="200" value="YouTube recording" required></label>
+      <label>Channel (optional) <input id="youtubeChannel" type="text" maxlength="200"></label>
+      <p class="setting-help">Choose the YouTube tab and keep “Also share tab audio” checked. Start the video after sharing begins; capture happens in real time.</p>
+      <button id="youtubeGo" class="primary" type="submit">Start</button><button id="youtubeStop" class="secondary" type="button" hidden>Stop and write score</button>
+      <p id="youtubeSupport" role="status" hidden></p><button id="youtubeRecord" class="secondary" type="button" hidden>Record with microphone</button>`);
         replace('      <h3>Listening</h3>', `      <h3>Account and sync</h3><section id="accountSync" aria-label="Account and sync"></section>
       <details class="history-import"><summary>Import history from the Mac app</summary><p>Quit the Mac app before selecting its .local/learner.sqlite3 file, so all history is saved in the file.</p><label class="secondary">Choose history file <input id="historyFile" type="file" accept=".sqlite3,.sqlite,.db"></label><progress id="historyImportProgress" aria-label="Importing history" hidden></progress><p id="historyImportStatus" aria-live="polite"></p></details>
       <h3>Listening</h3>`);

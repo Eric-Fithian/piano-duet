@@ -51,6 +51,12 @@ for (const [name, engine] of [['Chromium', chromium], ['WebKit', webkit]]) {
       await page.locator('#importMenu > summary').click();
       assert.equal(await page.locator('#importAudio').isVisible(), true);
       assert.equal(await page.locator('#recordAudio').isVisible(), true);
+      assert.equal(await page.locator('#openYoutube').textContent(), 'From YouTube link');
+      await page.locator('#openYoutube').click();
+      assert.equal(await page.locator('#youtubeDialog').evaluate(dialog => dialog.open), true);
+      assert.equal(await page.locator('#youtubeRights').isChecked(), false);
+      await page.locator('[data-close="youtubeDialog"]').click();
+      await page.locator('#importMenu > summary').click();
       const chooser = page.waitForEvent('filechooser');
       await page.locator('#chooseScore').click();
       assert.equal((await chooser).isMultiple(), false);
