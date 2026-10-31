@@ -13,7 +13,7 @@ npm ci --prefix site
 npm run dev    # app at http://127.0.0.1:5173, docs under /docs
 ```
 
-The browser practice modes and model catalog are still being built. For the working Python reference, run `make setup` to install its dependencies, models and browser test engines, then `make dev` to start it at `http://127.0.0.1:8765`. Python edits restart that server; browser edits refresh its page without reloading the models.
+The browser app is under construction: Reading, Drills, Library recording import, Duet and Variations use the local service and the pinned model catalog; guided Practice and account sync are being integrated. The browser downloads model files when a mode first needs them. For the Python reference, run `make setup` to install its dependencies, models and browser test engines, then `make dev` to start it at `http://127.0.0.1:8765`. Python edits restart that server; browser edits refresh its page without reloading the models.
 
 ## Checks
 
@@ -24,7 +24,7 @@ make test      # pytest, Node and Playwright tests
 make benchmark # the real models on synthetic audio
 ```
 
-The CI tests don't need the downloaded models. Full-model comparisons and their requirements are described in [Browser inference measurements](/docs/how/performance/).
+The basic `make check` suite does not download model weights. CI also downloads and caches the pinned published models for parity and end-to-end microphone checks. Full-model comparisons and their requirements are described in [Browser inference measurements](/docs/how/performance/).
 
 The benchmark renders a two-handed piano phrase, checks note recognition at three input levels, and measures transcription and time to the first generated note on the actual local models. Synthetic benchmark audio and metrics go to `.cache/benchmark/`. It is a repeatable smoke test, not an estimate of accuracy on your acoustic piano.
 

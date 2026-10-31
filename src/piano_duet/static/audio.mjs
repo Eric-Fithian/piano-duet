@@ -1,5 +1,17 @@
 import {localFetch} from './practice.mjs';
 
+export function capturePerformanceTime(capturedAt, timestamp, baseLatency) {
+  if (![capturedAt, timestamp?.contextTime, timestamp?.performanceTime, baseLatency].every(Number.isFinite) || baseLatency < 0) {
+    throw new Error('The microphone capture clock is unavailable.');
+  }
+  return timestamp.performanceTime + (capturedAt - timestamp.contextTime + baseLatency) * 1000;
+}
+
+export function captureAllowed(capturedAt, resumeAt, speakerUntil, awaitingReply) {
+  if (!Number.isFinite(capturedAt)) throw new Error('The microphone capture time is invalid.');
+  return !awaitingReply && capturedAt >= Math.max(resumeAt, speakerUntil);
+}
+
 export class PhraseDetector {
   constructor({pause = 0.9, gate = -48, noise = 0, autoReply = true} = {}) {
     this.pause = pause;
@@ -112,8 +124,9 @@ export class PianoSound {
   }
   // While the app is making sound, the microphone would hear it as playing; listening waits.
   get audible() {
-    return this.context.currentTime < this.until + ECHO;
+    return this.context.currentTime < this.audibleUntil;
   }
+  get audibleUntil() { return this.until + ECHO; }
   async example() {
     const context = new OfflineAudioContext(1, 16000 * 5, 16000);
     const melody = [60, 64, 67, 69, 67, 64, 62, 60];
