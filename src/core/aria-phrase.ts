@@ -5,7 +5,7 @@ import type { PhraseWriter } from "./reading-chord.ts";
 import { roundEven } from "./numeric.ts";
 
 export interface AriaSession {
-  run(input: { tokens: number[]; reset: boolean; commit?: boolean }): Promise<{ logits: Float32Array }>;
+  run(input: { tokens: number[]; reset: boolean; commit?: boolean }, signal?: AbortSignal): Promise<{ logits: Float32Array }>;
 }
 export interface SamplingRandom { choices(options: number[], weights: number[]): number[] }
 
