@@ -26,6 +26,15 @@ import { recordingStage, setupRecordingUi } from "./recording-ui";
 import "./style.css";
 
 Object.assign(window, { VexFlow });
+if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", (event: MessageEvent<unknown>) => {
+  const message = event.data as { type?: string; error?: string } | null;
+  if (message?.type !== "offline-install-error") return;
+  const display = document.querySelector<HTMLElement>("#error");
+  if (!display) throw new Error("The interface has no error display");
+  display.textContent = `Offline setup failed: ${message.error}. Check available device storage and reload.`;
+  display.hidden = false;
+  console.error(display.textContent);
+});
 const indicator = document.createElement("section");
 indicator.className = "asset-download";
 indicator.setAttribute("aria-live", "polite");
