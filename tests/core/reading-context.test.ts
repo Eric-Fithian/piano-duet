@@ -14,7 +14,7 @@ let recordedCases: RecordingCase[] | undefined;
 
 function recordings(): RecordingCase[] {
   if (!recordedCases) {
-    const reference = spawnSync("uv", ["run", "--frozen", "python", "tests/reading_recording.py"], { encoding: "utf8", maxBuffer: 20_000_000 });
+    const reference = spawnSync("uv", ["run", "--frozen", "python", "tests/reading_recording.py"], { encoding: "utf8", timeout: 300_000, maxBuffer: 20_000_000 });
     assert.equal(reference.status, 0, reference.stderr);
     recordedCases = JSON.parse(reference.stdout) as RecordingCase[];
   }
@@ -26,7 +26,7 @@ test("all 24 musical keys match the Python reference", () => {
 import json
 from piano_duet.key_tracking import MusicalKey
 print(json.dumps([MusicalKey(tonic, mode).to_dict() for mode in ("major", "minor") for tonic in range(12)]))
-`], { encoding: "utf8" });
+`], { encoding: "utf8", timeout: 300_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const expected: MusicalKey[] = JSON.parse(reference.stdout);
   assert.deepEqual((["major", "minor"] as KeyMode[]).flatMap((mode) => Array.from({ length: 12 }, (_, tonic) => musicalKey(tonic, mode))), expected);
@@ -62,7 +62,7 @@ for item in cases:
     context = choose_context(item["stage"], item["progress"], RecordingRandom(13, events))
     result.append({"events": events, "context": context})
 print(json.dumps(result))
-`], { input: JSON.stringify(inputs) + "\n", encoding: "utf8" });
+`], { input: JSON.stringify(inputs) + "\n", encoding: "utf8", timeout: 300_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const expected: { events: ReplayEvent[]; context: [string, MusicalKey, string] }[] = JSON.parse(reference.stdout);
   inputs.forEach(({ stage, progress }, index) => {

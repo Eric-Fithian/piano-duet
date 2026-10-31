@@ -37,7 +37,7 @@ for (const [name, engine] of [["Chromium", chromium], ["WebKit", webkit]]) {
         const rect = row.getBoundingClientRect();
         return { width: rect.width, height: rect.height };
       }));
-      assert.equal(closedRows.length, 6);
+      assert.equal(closedRows.length, 5);
       assert.ok(closedRows.every(({ width, height }) => width === 0 && height === 0), JSON.stringify(closedRows));
       await models.locator(":scope > summary").scrollIntoViewIfNeeded();
       await models.locator(":scope > summary").click();

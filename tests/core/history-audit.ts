@@ -20,7 +20,7 @@ with sqlite3.connect(path, uri=True) as db:
 profile = build_profile(attempts)
 progress, practice_days = drill_progress(attempts)
 print(json.dumps({'counts': counts, 'profile': profile, 'drills': {'progress': progress, 'levels': drill_levels(progress), 'practice_days': practice_days}}))
-`, path], { encoding: "utf8", maxBuffer: 100_000_000 });
+`, path], { encoding: "utf8", timeout: 300_000, maxBuffer: 100_000_000 });
   if (reference.status !== 0) throw new Error(`Python reference failed: ${reference.stderr}`);
   const expected = JSON.parse(reference.stdout);
   const db = new DatabaseSync(path, { readOnly: true });

@@ -34,7 +34,7 @@ with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.S
         saved = client.get('/api/attempts/' + attempt).json()
         profile = client.get('/api/profile').json()
 print(json.dumps({'task':task,'events':events,'saved':saved,'profile':profile}))
-`], { encoding: "utf8", maxBuffer: 10_000_000 });
+`], { encoding: "utf8", timeout: 300_000, maxBuffer: 10_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const expected = JSON.parse(reference.stdout);
   const events: ReadingLogEvent[] = [];
@@ -96,7 +96,7 @@ with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.S
         assert response.status_code == 200, response.text
         task = response.json()
 print(json.dumps({'task':task, 'events':events}))
-`], { encoding: "utf8", maxBuffer: 10_000_000 });
+`], { encoding: "utf8", timeout: 300_000, maxBuffer: 10_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const expected = JSON.parse(reference.stdout);
   const { ReadingReplay } = await import("./reading-replay.ts");
@@ -140,7 +140,7 @@ with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.S
         assert response.status_code == 200
         check = client.post('/api/practice/next', json={'focus':'guided'}, headers=headers).json()
 print(json.dumps({'task':task,'check':check}))
-`], { encoding: "utf8", maxBuffer: 10_000_000 });
+`], { encoding: "utf8", timeout: 300_000, maxBuffer: 10_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const expected = JSON.parse(reference.stdout);
   const events: ReadingLogEvent[] = [];
@@ -188,7 +188,7 @@ with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.S
         results = [client.post('/api/practice/next', json=body, headers={'X-Duet-Client':'1'}) for body in json.load(sys.stdin)]
         output = [{'status':r.status_code, 'body':r.json()} for r in results]
 print(json.dumps(output))
-`], { input: JSON.stringify(bodies), encoding: "utf8" });
+`], { input: JSON.stringify(bodies), encoding: "utf8", timeout: 300_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const expected = JSON.parse(reference.stdout);
   const events: ReadingLogEvent[] = [];
@@ -319,7 +319,7 @@ with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.S
         again = client.post('/api/practice/next', json={'focus':'repertoire'}, headers=headers).json()
         pieces = client.get('/api/pieces').json()
 print(json.dumps({'task':task,'again':again,'pieces':pieces}))
-`], { encoding: "utf8", maxBuffer: 10_000_000 });
+`], { encoding: "utf8", timeout: 300_000, maxBuffer: 10_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const expected = JSON.parse(reference.stdout);
   const events: ReadingLogEvent[] = [];
@@ -391,7 +391,7 @@ with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.S
             response = client.request(case['method'], case['path'], **options)
             result.append({'status':response.status_code, 'locations':[item['loc'] for item in response.json()['detail']]})
 print(json.dumps(result))
-`], { input: JSON.stringify(cases), encoding: "utf8", maxBuffer: 10_000_000 });
+`], { input: JSON.stringify(cases), encoding: "utf8", timeout: 300_000, maxBuffer: 10_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const expected: { status: number; locations: (string | number)[][] }[] = JSON.parse(reference.stdout);
   const service = new LocalService({ async list() { return []; } });

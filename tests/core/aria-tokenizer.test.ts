@@ -27,7 +27,7 @@ for context in contexts:
 piano = [[pitch, velocity, tokenizer.tok_to_id[("piano", pitch, tokenizer._quantize_velocity(velocity))]] for pitch in (21, 60, 108) for velocity in range(1, 128)]
 phrase = ConstrainedPhrase(generator, random.Random(1))
 print(json.dumps({"contexts": contexts, "encoded": encoded, "piano": piano, "pitchTokens": list(phrase.pitch_tokens.items()), "durationTokens": [(tok[1], tokenizer.tok_to_id[tok]) for tok in tokenizer.dur_tokens]}))
-`], { encoding: "utf8", maxBuffer: 10_000_000 });
+`], { encoding: "utf8", timeout: 300_000, maxBuffer: 10_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const data: { contexts: (PhraseContext | null)[]; encoded: EncodedContext[]; piano: [number, number, number][];
     pitchTokens: [number, number[]][]; durationTokens: [number, number][] } = JSON.parse(reference.stdout);

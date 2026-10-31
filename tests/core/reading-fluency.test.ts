@@ -26,7 +26,7 @@ import json, sys
 from piano_duet.reading_curriculum import measure_landings, summarize_fluency
 histories, positions, observations, contexts = json.loads(sys.stdin.readline())
 print(json.dumps({"summaries": [summarize_fluency(rows) for rows in histories], "landings": [measure_landings(positions, observations, context) for context in contexts]}))
-`], { input: JSON.stringify([histories, positions, observations, contexts]) + "\n", encoding: "utf8" });
+`], { input: JSON.stringify([histories, positions, observations, contexts]) + "\n", encoding: "utf8", timeout: 300_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const expected = JSON.parse(reference.stdout);
   assert.deepEqual(histories.map(summarizeFluency), expected.summaries);

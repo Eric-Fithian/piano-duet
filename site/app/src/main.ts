@@ -52,6 +52,10 @@ const label = document.createElement("span");
 const bar = document.createElement("progress");
 indicator.append(label, bar);
 document.body.append(indicator);
+const MODEL_LABELS: Record<ModelId, string> = {
+  aria: "music writer", "live-transcription": "note listener", "recording-transcription": "take checker",
+  "midi-to-score": "sheet-music writer", "phrase-transcription": "phrase listener",
+};
 const received = new Map<string, number>();
 const sampleBytes = PIANO_SAMPLES.reduce((sum, sample) => sum + sample.bytes, 0);
 let reportSettingsProgress: (progress: DownloadProgress) => void = () => {};
@@ -73,16 +77,25 @@ function report(progress: DownloadProgress): void {
     label.textContent = "Preparing piano sounds";
     if (bar.value === bar.max) indicator.hidden = true;
   } else {
-    label.textContent = `Preparing ${progress.file}`;
+    const megabytes = (bytes: number) => Math.round(bytes / 1_000_000);
+    const amount = progress.total === null ? "" : ` · ${megabytes(progress.received)} of ${megabytes(progress.total)} MB`;
+    label.textContent = `Downloading the ${MODEL_LABELS[progress.model]} (first time only)${amount}`;
     if (progress.total === null) bar.removeAttribute("value");
     else { bar.max = progress.total; bar.value = progress.received; }
+    if (progress.total !== null && progress.received >= progress.total) indicator.hidden = true;
   }
 }
 
 async function start(): Promise<void> {
   const log = new EventLog();
-  await requestPersistentStorage();
-  await log.open();
+  // Firefox asks the user before granting persistence, so start-up must not wait for the answer.
+  void requestPersistentStorage();
+  const storageHelp = "Piano Duet keeps your practice history in this browser's storage, and it could not be opened. Private or incognito windows cannot store it, so use a normal window. If this is a normal window, allow site data for this site and reload.";
+  let stalled: ReturnType<typeof setTimeout> | undefined;
+  await Promise.race([
+    log.open().catch((error: unknown) => { throw new Error(`${storageHelp} (${error instanceof Error ? error.message : String(error)})`, { cause: error }); }),
+    new Promise<never>((_, reject) => { stalled = setTimeout(() => reject(new Error(`${storageHelp} (Storage did not respond within 20 seconds.)`)), 20000); }),
+  ]).finally(() => clearTimeout(stalled));
   await initializeLearnerSettings(log);
   const native = (window as Window & { webkit?: { messageHandlers?: { pianoInference?: WebKitMessageHandler } } }).webkit?.messageHandlers?.pianoInference;
   const backend = native ? new NativeInference(new WebKitInferenceTransport(native, window)) : new BrowserInference(MODEL_CATALOG);

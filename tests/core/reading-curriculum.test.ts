@@ -24,7 +24,7 @@ for stage in (STAGES[0], STAGES[1], STAGES[6], STAGES[11], STAGES[23]):
 attempts.insert(3, attempts[0])
 histories = [attempts[:size] for size in (0, 1, 3, 7, 14, len(attempts))]
 print(json.dumps({"histories": histories, "expected": [curriculum_progress(history) for history in histories], "replay": curriculum_progress(attempts, 1)}))
-`], { encoding: "utf8", maxBuffer: 50_000_000 });
+`], { encoding: "utf8", timeout: 300_000, maxBuffer: 50_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const data: { histories: CurriculumAttempt[][]; expected: unknown[]; replay: unknown } = JSON.parse(reference.stdout);
   assert.deepEqual(data.histories.map((attempts) => curriculumProgress(attempts)), data.expected);

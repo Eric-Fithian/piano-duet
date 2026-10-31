@@ -27,7 +27,7 @@ with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.S
         responses = [client.post('/api/export', json={'notes':notes}, headers={'X-Duet-Client':'1'}) for notes in cases]
         result = [{'bytes':list(r.content),'type':r.headers['content-type'],'disposition':r.headers['content-disposition']} for r in responses]
 print(json.dumps(result))
-`], { input: JSON.stringify(cases), encoding: "utf8" });
+`], { input: JSON.stringify(cases), encoding: "utf8", timeout: 300_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const expected = JSON.parse(reference.stdout);
   const service = new LocalService({ async list() { return []; } });

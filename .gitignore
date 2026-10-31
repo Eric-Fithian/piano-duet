@@ -13,3 +13,4 @@ node_modules/
 /site/app/sync-config.json
 .vercel
 .env*
+visual-audit/

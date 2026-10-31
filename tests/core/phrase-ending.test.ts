@@ -31,7 +31,7 @@ for index in range(400):
     last = [n.model_dump() for n in ending.finish(model_ended)]
     cases.append({'target': target, 'tonic': tonic, 'scale': scale, 'notes': [n.model_dump() for n in notes], 'beat': beat, 'releases': releases, 'last': last, 'reason': ending.reason, 'modelEnded': model_ended})
 print(json.dumps(cases))
-`], { encoding: "utf8", maxBuffer: 10_000_000 });
+`], { encoding: "utf8", timeout: 300_000, maxBuffer: 10_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const cases: { target: number; tonic: number | null; scale: number[] | null; notes: ContextNote[]; beat: number;
     releases: ContextNote[][]; last: ContextNote[]; reason: string; modelEnded: boolean }[] = JSON.parse(reference.stdout);

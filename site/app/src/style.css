@@ -1,4 +1,4 @@
-.asset-download { position:fixed; z-index:100; right:1rem; bottom:1rem; width:min(22rem, calc(100vw - 2rem)); padding:.8rem 1rem; border:1px solid var(--line); border-radius:4px; color:var(--text); background:var(--panel); font:14px Atkinson,sans-serif; }
+.asset-download { position:fixed; z-index:100; right:1rem; top:calc(env(safe-area-inset-top) + 56px); width:min(22rem, calc(100vw - 2rem)); padding:.8rem 1rem; border:1px solid var(--line); border-radius:4px; color:var(--text); background:var(--panel); font:14px Atkinson,sans-serif; }
 .asset-download progress { display: block; width: 100%; margin-top: .5rem; accent-color: var(--folio-progress); }
 .recording-import { display: flex; align-items: center; flex-wrap: wrap; gap: .7rem; margin: 0 0 1rem; }
 .recording-import p { color: var(--muted); font-size: .85rem; margin: 0; }

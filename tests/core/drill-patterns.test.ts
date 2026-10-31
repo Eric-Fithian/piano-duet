@@ -22,7 +22,7 @@ for drill, spec in DRILLS.items():
                         validate(config)
                         cases.append([config, drill_events(config)])
 print(json.dumps(cases))
-`], { encoding: "utf8", maxBuffer: 100_000_000 });
+`], { encoding: "utf8", timeout: 300_000, maxBuffer: 100_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const cases: [DrillConfig, unknown][] = JSON.parse(reference.stdout);
   assert.equal(cases.length, 912);

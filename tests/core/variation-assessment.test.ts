@@ -35,7 +35,7 @@ for case in cases:
     context = {'source': case['source'], 'notation_visible': False, 'hearings': 0, 'reveals': 0, 'hints': 0, 'familiar': False}
     result.append(assess(prompt, [Note.model_validate(note) for note in case['notes']], context, case['quality']))
 print(json.dumps(result))
-`], { encoding: "utf8", input: JSON.stringify(cases), maxBuffer: 10_000_000 });
+`], { encoding: "utf8", timeout: 300_000, input: JSON.stringify(cases), maxBuffer: 10_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const expected = JSON.parse(reference.stdout);
   for (const [index, item] of cases.entries()) {

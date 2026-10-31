@@ -39,7 +39,7 @@ with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.S
         invalid = client.post("/api/reading/listen", content=b"x", headers={"X-Duet-Client": "1"})
 profile["generated_at"] = 1700000000
 print(json.dumps({"status": status, "profile": profile, "pieces": pieces, "library": library, "drills": drills, "drill_coach": drill_coach, "drill_choice": drill_choice, "invalid_drills": invalid_drills, "invalid_drill_statuses": [r.status_code for r in invalid_drill_responses], "task": task, "aided": aided, "heard": heard["notes"], "invalid": {"status": invalid.status_code, "body": invalid.json()}}))
-`], { encoding: "utf8", maxBuffer: 10_000_000 });
+`], { encoding: "utf8", timeout: 300_000, maxBuffer: 10_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const expected = JSON.parse(reference.stdout);
   const transcriber: LocalTranscriber = { async run(input) {
@@ -148,7 +148,7 @@ with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.S
         assert retry_result.status_code == 200, retry_result.text
         retry_profile = client.get("/api/profile").json()["reading"]
 print(json.dumps({"task": task, "preview": preview.json(), "events": events, "groups": groups, "result": result.json(), "detail": detail, "excluded": excluded, "excluded_detail": excluded_detail, "restored": restored, "repeat": repeat.status_code, "busy_retry": {"status": busy_retry.status_code, "body": busy_retry.json()}, "retry_task": retry_task, "retry_result": retry_result.json(), "retry_profile": retry_profile, "introductions": profile["reading"]["introductions"]}))
-`], { encoding: "utf8", maxBuffer: 10_000_000 });
+`], { encoding: "utf8", timeout: 300_000, maxBuffer: 10_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const expected = JSON.parse(reference.stdout);
   const events: ReadingLogEvent[] = [];

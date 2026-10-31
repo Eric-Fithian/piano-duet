@@ -31,7 +31,7 @@ for seed in range(35):
     midi.save(file=output)
     files.append(output.getvalue())
 print(json.dumps([{'midi': base64.b64encode(data).decode(), 'parsed': parse_midi(data)} for data in files]))
-`], { encoding: "utf8", maxBuffer: 10_000_000 });
+`], { encoding: "utf8", timeout: 300_000, maxBuffer: 10_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const cases: { midi: string; parsed: unknown }[] = JSON.parse(reference.stdout);
   assert.equal(cases.length, 36);

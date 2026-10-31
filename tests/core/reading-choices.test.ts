@@ -33,7 +33,7 @@ for tonic, mode in ((0, "major"), (9, "minor"), (7, "major")):
                     "attacks": remaining_attacks(line), "beats": remaining_beats(line),
                     "introductions": [introducing(2, scale[:5], scale, previous, scale[:5], remaining) for remaining in (0, 1)]})
 print(json.dumps(cases))
-`], { encoding: "utf8", maxBuffer: 20_000_000 });
+`], { encoding: "utf8", timeout: 300_000, maxBuffer: 20_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const cases: { hand: ReadingHand; key: MusicalKey; scale: number[]; stage: { chromatic: number }; line: ReadingLine;
     lowest: [number, number][]; previous: number; degrees: number[]; weights: number[]; chromatic: [number, number][];

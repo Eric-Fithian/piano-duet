@@ -48,7 +48,7 @@ with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.S
             saved = client.get(f'/api/attempts/{attempt}')
             outcomes.append({'events': [json.loads(line) for line in response.text.splitlines()], 'saved': saved.json() if saved.status_code == 200 else None})
 print(json.dumps({'outcomes': outcomes, 'takes': original}))
-`], { encoding: "utf8", maxBuffer: 10_000_000 });
+`], { encoding: "utf8", timeout: 300_000, maxBuffer: 10_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const expected = JSON.parse(reference.stdout), events: ReadingLogEvent[] = [];
   const store: LocalEventStore = { async list() { return [...events]; }, async append(kind, payload: LocalJsonValue, id) {

@@ -18,7 +18,7 @@ import json, sys
 from piano_duet.reading_stages import reading_rhythm
 cases = json.loads(sys.stdin.readline())
 print(json.dumps([reading_rhythm(c["task"], c["observations"], c["context"]) for c in cases]))
-`], { input: JSON.stringify(cases) + "\n", encoding: "utf8" });
+`], { input: JSON.stringify(cases) + "\n", encoding: "utf8", timeout: 300_000 });
   assert.equal(reference.status, 0, reference.stderr);
   assert.deepEqual(cases.map(({ task, observations, context }) => readingTiming(task, observations, context)), JSON.parse(reference.stdout));
 });

@@ -43,7 +43,7 @@ for stage in STAGES:
         cases.append({"stage": stage, "hands": progress["hands"], "key": key, "beats": beats, "unit": unit,
             "initial": initial, "final": final, "notes": notes, "events": events})
 print(json.dumps(cases))
-`], { encoding: "utf8", maxBuffer: 50_000_000 });
+`], { encoding: "utf8", timeout: 300_000, maxBuffer: 50_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   type SerializedLine = Omit<ReadingLine, "endings"> & { endings: [number, number][] };
   const cases: { stage: AttackStage; hands: Record<string, ReadingHand>; key: MusicalKey; beats: number; unit: number;

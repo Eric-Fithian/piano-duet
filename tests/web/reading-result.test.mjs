@@ -335,8 +335,8 @@ for (const [name, engine] of [['Chromium', chromium], ['WebKit', webkit]]) for (
       await page.locator('#drillsMode').click();
       await page.waitForFunction(() => document.body.dataset.mode === 'drills' && document.querySelector('#drillTitle').textContent !== 'Drills');
       assert.ok((await page.locator('#drillProgress').innerText()).toLowerCase().includes('drill'));
-      assert.ok((await page.locator('#drillBest').innerText()).startsWith('Best tempo'));
-      assert.equal(await page.locator('#drillBest').evaluate(node => node.scrollWidth <= node.clientWidth), true);
+      assert.equal(await page.locator('#drillBest').textContent(), '');
+      assert.equal(await page.locator('#drillBest').isVisible(), false);
       assert.equal(await page.locator('#openProfile').isVisible(), false);
       assert.equal(await page.locator('#noteStatus').innerText(), '');
       await page.locator('#sheetMusic .score-system svg .vf-stavenote').first().waitFor();
@@ -398,7 +398,7 @@ for (const [name, engine] of [['Chromium', chromium], ['WebKit', webkit]]) for (
       await page.locator('#start').click();
       await page.waitForFunction(() => document.querySelector('#start').getAttribute('aria-pressed') === 'false');
       assert.equal(await page.locator('#drillProgress').isVisible(), true);
-      assert.equal(await page.locator('#drillBest').isVisible(), true);
+      assert.equal(await page.locator('#drillBest').isVisible(), false, 'no best tempo yet, so the slot stays empty');
       await page.locator('#modeMenuButton').click();
       await page.locator('#libraryMode').click();
       await page.waitForFunction(() => document.body.dataset.mode === 'library' && document.querySelector('#songEmpty').textContent.length > 0);

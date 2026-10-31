@@ -44,7 +44,7 @@ for variant in range(4):
     encoded = {key: base64.b64encode(value.tobytes()).decode() for key, value in prediction.items()}
     cases.append({'frames': frames, 'prediction': encoded, 'notes': [note.model_dump() for note, _ in ordered], 'quality': quality})
 print(json.dumps(cases))
-`], { encoding: "utf8", maxBuffer: 20_000_000 });
+`], { encoding: "utf8", timeout: 300_000, maxBuffer: 20_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const cases: { frames: number; prediction: Record<string, string>; notes: ContextNote[]; quality: unknown }[] = JSON.parse(reference.stdout);
   const floats = (encoded: string) => {

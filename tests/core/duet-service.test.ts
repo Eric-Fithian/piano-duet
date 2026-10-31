@@ -39,7 +39,7 @@ with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.S
             assert response.status_code == 200, response.text
             outcomes.append({'events': [json.loads(line) for line in response.text.splitlines()], 'saved': client.get(f'/api/attempts/{attempt}').json()})
 print(json.dumps({'outcomes': outcomes, 'calls': engine.generator.calls, 'takes': [[{'pitch':p,'start':i*.4+.3,'duration':.35,'velocity':80} for i,p in enumerate(pitches)] for pitches in ((60,64,67),(62,65,69),(),(48,55,60))]}))
-`], { encoding: "utf8", maxBuffer: 10_000_000 });
+`], { encoding: "utf8", timeout: 300_000, maxBuffer: 10_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const expected = JSON.parse(reference.stdout);
   const events: ReadingLogEvent[] = [];

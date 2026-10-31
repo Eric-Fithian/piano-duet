@@ -53,7 +53,7 @@ from piano_duet.assessment import assess
 from piano_duet.notes import Note
 cases = json.load(sys.stdin)
 print(json.dumps([assess(c['prompt'], [Note.model_validate(n) for n in c['notes']], c['context'], c['quality']) for c in cases]))
-`], { input: JSON.stringify(cases), encoding: "utf8", maxBuffer: 10_000_000 });
+`], { input: JSON.stringify(cases), encoding: "utf8", timeout: 300_000, maxBuffer: 10_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const expected = JSON.parse(reference.stdout) as ReturnType<typeof assessPractice>[];
   for (const [index, item] of cases.entries()) {
@@ -88,7 +88,7 @@ for stage in STAGES:
         cases.append({'task':task, 'notes':notes, 'context':context, 'quality':quality,
                       'expected':assess(task, [Note.model_validate(note) for note in notes], context, quality)})
 print(json.dumps(cases))
-`], { encoding: "utf8", maxBuffer: 50_000_000 });
+`], { encoding: "utf8", timeout: 300_000, maxBuffer: 50_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const cases: { task: PracticePrompt; notes: PracticeNote[]; context: PracticeContext; quality: PracticeQuality;
     expected: ReturnType<typeof assessPractice> }[] = JSON.parse(reference.stdout);

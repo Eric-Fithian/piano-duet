@@ -52,7 +52,8 @@ export function renderLibrary(library, query, {onOpen, onDelete}) {
     rows.append(row);
   });
   $('songEmpty').hidden = songs.length > 0;
-  $('songEmpty').textContent = library.songs.length ? 'No songs match your search.' : 'Import a MIDI or MusicXML file to start your library.';
+  document.querySelector('.song-columns').hidden = songs.length === 0;
+  $('songEmpty').textContent = library.songs.length ? 'No songs match your search.' : 'Your library is empty. Use Import to add a score, an audio recording or a YouTube video.';
   const catalog = $('catalogRows');
   catalog.replaceChildren();
   for (const item of library.catalog.filter(match)) {
@@ -62,7 +63,7 @@ export function renderLibrary(library, query, {onOpen, onDelete}) {
     row.rel = 'noopener';
     const title = element('span', 'song-name');
     title.append(element('strong', '', item.title), element('small', '', item.artist));
-    row.append(title, element('span', 'catalog-link', 'Get sheet music'), element('span', 'catalog-arrow', '↗'));
+    row.append(title, element('span', 'catalog-link', 'Get sheet music ↗'));
     catalog.append(row);
   }
   $('catalogHeading').hidden = !catalog.childElementCount;

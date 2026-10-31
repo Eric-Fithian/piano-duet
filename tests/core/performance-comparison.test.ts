@@ -16,7 +16,7 @@ import type { ReadingLogEvent } from "../../src/core/reading-events.ts";
 import { coachDrill } from "../../src/core/drill-coach.ts";
 
 test("drill take analysis and progress match Python for controlled synthetic performances", async () => {
-  const reference = spawnSync("uv", ["run", "--frozen", "python", "tests/core/drill_fixtures.py"], { encoding: "utf8", maxBuffer: 20_000_000 });
+  const reference = spawnSync("uv", ["run", "--frozen", "python", "tests/core/drill_fixtures.py"], { encoding: "utf8", timeout: 300_000, maxBuffer: 20_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const fixtures: { drill: string; scenario: string; task: DrillPrompt; notes: DrillNote[]; comparison: ReturnType<typeof comparePerformance>;
     timing: unknown; assessment: unknown; context: { source: string }; quality: { usable: boolean } }[] = JSON.parse(reference.stdout);
@@ -53,7 +53,7 @@ print(json.dumps({"progress": progress, "practice_days": practice_days, "levels"
                   "data": {drill: spec['milestones'] for drill, spec in DRILLS.items()},
                   "coaches": [coach_config(progress, levels, avoid, now=1800000000, focus=focus) for avoid, focus in requests],
                   "empty_coach": coach_config({}, drill_levels({}), now=1800000000)}))
-`], { encoding: "utf8", input: JSON.stringify(attempts), maxBuffer: 20_000_000 });
+`], { encoding: "utf8", timeout: 300_000, input: JSON.stringify(attempts), maxBuffer: 20_000_000 });
   assert.equal(replay.status, 0, replay.stderr);
   const expected = JSON.parse(replay.stdout);
   const actual = drillProgress(attempts);

@@ -26,7 +26,7 @@ for texture, shapes in CHORDS.items():
                 chord = build_chord({"texture": texture}, SimpleNamespace(scale=scale), pitch, 0, 0.5, shapes, forced, phrase, rng)
                 cases.append({"texture": texture, "scale": scale, "pitch": pitch, "shapes": shapes, "forced": forced, "events": events, "chord": chord})
 print(json.dumps(cases))
-`], { encoding: "utf8" });
+`], { encoding: "utf8", timeout: 300_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const cases: { texture: string; scale: number[]; pitch: number; shapes: number[][]; forced: boolean; events: ReplayEvent[]; chord: number[] }[] = JSON.parse(reference.stdout);
   for (const item of cases) {

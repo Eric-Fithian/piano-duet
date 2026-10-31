@@ -13,7 +13,7 @@ test("Mac app history rebuilds the Python profile, drills, songs and saved piece
   const directory = mkdtempSync(".local/history-parity-");
   try {
     const path = `${directory}/learner.sqlite3`;
-    const fixture = spawnSync("uv", ["run", "--frozen", "python", "tests/core/history_fixture.py", path], { encoding: "utf8", maxBuffer: 20_000_000 });
+    const fixture = spawnSync("uv", ["run", "--frozen", "python", "tests/core/history_fixture.py", path], { encoding: "utf8", timeout: 300_000, maxBuffer: 20_000_000 });
     assert.equal(fixture.status, 0, fixture.stderr);
     const expected = JSON.parse(fixture.stdout);
     const db = new DatabaseSync(path, { readOnly: true });

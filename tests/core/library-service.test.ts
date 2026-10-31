@@ -37,7 +37,7 @@ with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.S
 print(json.dumps({'xml':base64.b64encode(MUSICXML.encode()).decode(), 'imported':imported, 'listing':listing,
                   'full':full, 'play':play, 'stats':stats, 'edit':edit, 'edited':edited, 'fewer':fewer,
                   'reverted':reverted, 'deleted':deleted, 'final':final}))
-`], { encoding: "utf8", maxBuffer: 10_000_000 });
+`], { encoding: "utf8", timeout: 300_000, maxBuffer: 10_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const expected = JSON.parse(reference.stdout), events: ReadingLogEvent[] = [];
   const store: LocalEventStore = { async list() { return [...events]; }, async append(kind, payload: LocalJsonValue, id) {

@@ -23,7 +23,7 @@ test("composition replay checks order, options, context and complete consumption
 
 test("the replay accepts the Python recorder's complete stream for all stages", async () => {
   const { spawnSync } = await import("node:child_process");
-  const reference = spawnSync("uv", ["run", "--frozen", "python", "tests/reading_recording.py"], { encoding: "utf8", maxBuffer: 20_000_000 });
+  const reference = spawnSync("uv", ["run", "--frozen", "python", "tests/reading_recording.py"], { encoding: "utf8", timeout: 300_000, maxBuffer: 20_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const cases: { events: ReplayEvent[] }[] = JSON.parse(reference.stdout);
   assert.equal(cases.length, 48);

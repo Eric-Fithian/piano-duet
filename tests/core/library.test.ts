@@ -22,7 +22,7 @@ edited = edit_song(song, song['bpm']//2, '3/4', (9,'minor'), slower)
 print(json.dumps({'song': song, 'long': long, 'plays': plays, 'version': song_version(notes), 'attacks':song_attacks(notes),
                   'sections': song_sections(long), 'stats':song_stats(long, plays), 'summary':summary(long, plays),
                   'slower':slower, 'edited':edited, 'reverted':revert_song(edited)}))
-`], { encoding: "utf8", maxBuffer: 10_000_000 });
+`], { encoding: "utf8", timeout: 300_000, maxBuffer: 10_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const data: { song: Song; long: Song; plays: SongPlay[]; version: string; attacks: unknown; sections: unknown; stats: unknown;
     summary: unknown; slower: Song["notes"]; edited: Song; reverted: Song } = JSON.parse(reference.stdout);

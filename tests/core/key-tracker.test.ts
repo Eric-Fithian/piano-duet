@@ -16,7 +16,7 @@ for index in range(100):
     notes = [Note(pitch=rng.randrange(48, 85), start=i / 4, duration=rng.uniform(.05, 2), velocity=rng.randrange(30, 128)) for i in range(index % 17 + 1)]
     cases.append({'notes': [n.model_dump() for n in notes], 'key': tracker.observe(notes)})
 print(json.dumps(cases))
-`], { encoding: "utf8", maxBuffer: 3_000_000 });
+`], { encoding: "utf8", timeout: 300_000, maxBuffer: 3_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const cases: { notes: KeyNote[]; key: unknown }[] = JSON.parse(reference.stdout);
   const tracker = new KeyTracker();

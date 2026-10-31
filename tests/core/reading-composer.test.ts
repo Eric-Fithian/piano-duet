@@ -7,7 +7,7 @@ import { ReadingReplay } from "./reading-replay.ts";
 import type { ReplayEvent } from "./reading-replay.ts";
 
 test("whole reading scores replay Python's random and phrase choices in every stage", async () => {
-  const reference = spawnSync("uv", ["run", "--frozen", "python", "tests/reading_recording.py"], { encoding: "utf8", maxBuffer: 50_000_000 });
+  const reference = spawnSync("uv", ["run", "--frozen", "python", "tests/reading_recording.py"], { encoding: "utf8", timeout: 300_000, maxBuffer: 50_000_000 });
   assert.equal(reference.status, 0, reference.stderr);
   const cases: { stage: ComposerStage; progress: ComposerProgress; context: unknown; events: ReplayEvent[]; score: ReadingScore }[] = JSON.parse(reference.stdout);
   assert.equal(cases.length, 48);
