@@ -1,0 +1,64 @@
+/* Visual reference: adapt to the production DOM and real progress state. */
+@font-face { font-family:Atkinson; src:url('../fonts/atkinson-hyperlegible-next-latin.woff2') format('woff2'); font-weight:200 900; }
+@font-face { font-family:Fraunces; src:url('../fonts/fraunces-latin.woff2') format('woff2'); font-weight:100 900; }
+:root { --bg:var(--folio-bg); --panel:var(--folio-surface); --panel-2:var(--folio-raised); --text:var(--folio-text); --muted:var(--folio-muted); --dim:var(--folio-muted); --line:var(--folio-border); --line-strong:var(--folio-border); --gold:var(--folio-action); --green:var(--folio-action); --cyan:var(--folio-action); --red:var(--folio-error); --paper:var(--folio-paper); --display:Atkinson,sans-serif; color:var(--text); background:var(--bg); font-family:Atkinson,sans-serif; }
+body.piano-app { background:var(--bg); color:var(--text); font:16px Atkinson,sans-serif; }
+body.piano-app .shell { padding:0; max-width:none; }
+.piano-app .app-header,.reading-hud,.piano-app .transport,.drill-panel { display:none !important; }
+.piano-app main { min-width:0; }
+button,input,select,summary { font-family:Atkinson,sans-serif; letter-spacing:0; font-variant-numeric:lining-nums tabular-nums; }
+:focus-visible { outline:3px solid var(--folio-focus) !important; outline-offset:2px; }
+.performance { background:var(--paper); border:0; border-radius:0; }.piano-app[data-mode=reading] .performance { background:var(--paper); }
+#sheetPanel,#sheetMusic { background:var(--paper); color:var(--folio-ink); border-radius:0; }
+.score-flow { padding:8px 0 58px; }.score-flow-wrap { gap:12px; }
+.score-phrase::before { content:'Current score'; display:block; color:var(--folio-ink); font:600 13px Atkinson,sans-serif; margin:2px 12px 4px; }
+.score-phrase:not(:first-child)::before { content:'Next score · ready when you finish'; border-top:1px solid var(--folio-ink); padding-top:14px; }
+.score-system-past,.score-system-ahead { opacity:1; }
+.score-system svg text { fill:var(--folio-ink); }
+.score-system svg .score-finger { fill:var(--folio-ink); font:700 13px Atkinson,sans-serif; stroke:none; paint-order:stroke; }
+.score-system svg .score-read-done path,.score-system svg .score-read-done text { fill:var(--folio-correct); stroke:var(--folio-correct); }
+.score-system svg .score-read-missed path { stroke:var(--folio-error); }.score-system svg .score-read-missed .vf-notehead text { fill:var(--folio-error); stroke:var(--folio-ink); stroke-width:1.3; }
+.reading-cursor rect { fill:var(--folio-cursor); filter:none; }
+.score-controls,.score-menu { background:var(--folio-surface); border:1px solid var(--folio-border); color:var(--folio-text); opacity:1; }.score-controls button { color:inherit; }
+.library { background:var(--bg); border:0; border-radius:0; padding:16px max(16px,env(safe-area-inset-right)) 24px max(16px,env(safe-area-inset-left)); }
+.library-head { gap:8px; }.library-head input { background:var(--folio-surface); color:var(--text); border-color:var(--line); border-radius:4px; }
+.rule-heading { font:600 19px Fraunces,serif; letter-spacing:0; text-transform:none; }.rule-heading::after { display:none; }
+.catalog { gap:0; }.catalog-row { display:grid; grid-template-columns:1fr auto; background:transparent; border:0; border-bottom:1px solid var(--line); border-radius:0; padding:16px 0; }
+.catalog-row a { color:var(--folio-action); text-decoration:underline; text-underline-offset:3px; font-size:14px; }.song-name strong { color:var(--text); }.song-name small,.song-empty,.recording-import p { color:var(--muted); }
+.primary,.import-button { background:var(--folio-action); color:var(--folio-onAction); border:1px solid var(--folio-action); font:700 14px Atkinson,sans-serif; letter-spacing:0; text-transform:none; border-radius:4px; }
+.secondary,.quiet-button,.text-button { color:var(--text); background:transparent; border-color:var(--line); }.secondary:hover,.quiet-button:hover,.text-button:hover { color:var(--text); background:var(--panel-2); }
+button:disabled { opacity:1; background:var(--panel-2); color:var(--muted); border:1px dashed var(--line); }
+dialog,.dialog-heading { color:var(--text); background:var(--panel); border-color:var(--line); border-radius:4px; }.dialog-heading h2 { font:600 22px Fraunces,serif !important; letter-spacing:0; text-transform:none; }.controls { font-family:Atkinson,sans-serif; }.controls label,.controls summary { color:var(--text); font-size:15px; }.setting-help,.model-settings p { color:var(--muted); font-size:14px; }
+.model-settings > summary,.model-name { color:var(--text); font-size:15px; }.model-size,.model-note { color:var(--muted); font-size:13px; }.model-status,.model-status[data-state=downloaded] { background:var(--panel-2); color:var(--text); font-size:13px; padding:4px 7px; border:1px solid var(--line); }.model-actions { display:flex; gap:8px; flex-wrap:wrap; }.model-detail .model-actions { margin:10px 0; }
+[data-night=true] #sheetMusic { background:var(--folio-nightPaper); }
+[data-night=true] .score-system svg text { fill:var(--folio-nightInk); }
+[data-night=true] .score-system svg path:not([fill=none]),[data-night=true] .score-system svg line,[data-night=true] .score-system svg rect:not(.reading-cursor rect) { stroke:var(--folio-nightInk); stroke-width:1.8; }
+[data-night=true] .score-system svg .vf-notehead text { fill:var(--folio-nightInk); }
+[data-night=true] .score-phrase::before { color:var(--folio-nightInk); }
+@media(max-width:600px) {
+ .catalog { display:block; }.library-head { flex-wrap:wrap; }.library-head .rule-heading { flex-basis:100%; }.library-head input { flex:1; min-width:0; }
+}
+@media(prefers-reduced-motion:reduce) { *,*::before,*::after { animation-duration:.001ms !important; transition-duration:.001ms !important; } }
+.library-head>.import-button,.recording-import { display:none; }
+.model-status::before { content:'↓ '; font-weight:700; }.model-status[data-state=downloaded]::before { content:'✓ '; }
+.library .catalog-row { cursor:pointer; }.library .catalog-row:focus-visible { outline:3px solid var(--folio-focus); }
+.slider-label output,.range-ends { color:var(--muted); }.model-links a { color:var(--text); text-decoration:underline; }
+.catalog-row a { color:var(--text); }
+[data-night=true] .score-system svg .vf-stave path,[data-night=true] .score-system svg .vf-stem path,[data-night=true] .score-system svg .vf-stavenote>path { stroke:var(--folio-nightInk); stroke-width:1.8; }
+[data-night=true] .score-system svg .vf-stavebarline rect { fill:var(--folio-nightInk); stroke:none; }
+
+[data-theme=dark] .primary { border:2px solid var(--folio-border); }
+
+.controls select,.controls input:not([type=range]):not([type=checkbox]) { color:var(--text); background:var(--panel); border:1px solid var(--line); border-radius:4px; }
+.controls details>summary { list-style:none; }.controls details>summary::-webkit-details-marker { display:none; }.controls details>summary::marker { content:''; }.controls details>summary::before { content:'+'; display:inline-block; width:18px; color:var(--text); }.controls details[open]>summary::before { content:'−'; }.controls .model-entry>summary::before { content:'+'; }.controls .model-entry[open]>summary::before { content:'−'; }
+.model-status[data-state=downloaded] { background:var(--folio-successSurface); }
+
+[data-night=true] .score-system svg .score-read-missed path { stroke:var(--folio-nightError); }
+[data-night=true] .score-system svg .score-read-missed .vf-notehead text { fill:var(--folio-nightError); stroke:var(--folio-nightInk); }
+
+.model-entry>summary.model-row { display:grid; grid-template-columns:18px minmax(0,1fr) auto; grid-template-areas:'mark name test' '. meta test'; gap:4px 8px; align-items:center; }
+.model-entry>summary.model-row::before { grid-area:mark; align-self:start; }.model-row .model-name { grid-area:name; min-width:0; }
+
+.song-row:not(.song-columns) { position:relative; border-block:1px solid var(--line); border-radius:0; padding:10px 0; color:var(--text); }.song-row:not(.song-columns) .song-name { padding-right:65px; }.song-row:not(.song-columns) .song-name::after { content:'Open ›'; position:absolute; right:48px; top:50%; transform:translateY(-50%); color:var(--text); font-size:14px; }.song-delete { color:var(--text); }
+body.piano-app { font-variant-numeric:lining-nums tabular-nums; }
+.score-system svg>text { font:600 12px Atkinson,sans-serif; font-variant-numeric:lining-nums tabular-nums; }
