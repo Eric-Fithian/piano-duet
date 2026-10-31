@@ -42,6 +42,7 @@ import { ScoreError } from "./score-midi.ts";
 import { editSong, revertSong, songAttacks, songStats, songSummary, songVersion } from "./library.ts";
 import type { Song, SongNote } from "./library.ts";
 import { libraryFromEvents } from "./library-events.ts";
+import { exportMidi } from "./midi-export.ts";
 import { DuetService } from "./duet-service.ts";
 import type { LocalPhraseTranscriber, LocalDuetGenerator } from "./duet-service.ts";
 export type { LocalPhraseTranscriber, LocalDuetGenerator } from "./duet-service.ts";
@@ -119,6 +120,15 @@ export class LocalService {
     }
     if (method === "GET" && url.pathname === "/api/profile") {
       return Response.json(learnerProfile(attemptsFromEvents(await this.store.list()), this.now()));
+    }
+    if (method === "POST" && url.pathname === "/api/export") {
+      if (typeof options.body !== "string") return Response.json({ detail: "MIDI export needs JSON" }, { status: 400 });
+      const request = JSON.parse(options.body) as { notes?: unknown };
+      if (!Array.isArray(request.notes) || !request.notes.length || !request.notes.every(validMidiNote)) {
+        return Response.json({ detail: "Invalid MIDI notes" }, { status: 422 });
+      }
+      return new Response(exportMidi(request.notes).buffer as ArrayBuffer,
+        { headers: { "Content-Type": "audio/midi", "Content-Disposition": 'attachment; filename="piano-duet.mid"' } });
     }
     if (method === "GET" && url.pathname === "/api/profile/export") {
       const events = await this.store.list();
@@ -679,6 +689,15 @@ function validSongPlay(value: unknown): value is { id: string; attacks: [number,
 function isPiece(value: unknown): boolean {
   return value !== null && typeof value === "object" && !Array.isArray(value)
     && (value as Record<string, unknown>).type === "piece" && "piece" in value;
+}
+
+function validMidiNote(value: unknown): value is { pitch: number; start: number; duration: number; velocity: number } {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const note = value as Record<string, unknown>;
+  return Number.isInteger(note.pitch) && (note.pitch as number) >= 21 && (note.pitch as number) <= 108
+    && typeof note.start === "number" && Number.isFinite(note.start) && note.start >= 0
+    && typeof note.duration === "number" && Number.isFinite(note.duration) && note.duration > 0
+    && Number.isInteger(note.velocity) && (note.velocity as number) >= 1 && (note.velocity as number) <= 127;
 }
 
 function piecesFromEvents(events: ReadingLogEvent[]): PracticePiece[] {
