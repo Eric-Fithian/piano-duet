@@ -1,5 +1,5 @@
-import type { ModelAsset, ModelCatalog, ModelRole } from "./browser-inference";
-import type { ModelId } from "./inference";
+import type { ModelAsset, ModelCatalog, ModelRole } from "./browser-inference.ts";
+import type { ModelId } from "./inference.ts";
 
 function asset(model: ModelId, repository: string, revision: string, role: ModelRole, name: string,
   bytes: number, sha256: string): ModelAsset {

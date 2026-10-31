@@ -1,5 +1,5 @@
-import type { DownloadProgress, InferenceBackend, InferenceSession, ModelId, ModelInputs, ModelOutputs } from "./inference";
-import type { ModelFile } from "./model-store";
+import type { DownloadProgress, InferenceBackend, InferenceSession, ModelId, ModelInputs, ModelOutputs } from "./inference.ts";
+import type { ModelFile } from "./model-store.ts";
 
 export type ModelRole = "graph" | "weights" | "convolution" | "recurrent" | "features" | "attributes"
   | "score-encoder" | "score-first" | "score-context" | "score-step";
@@ -9,7 +9,12 @@ export type ModelCatalog = Partial<Record<ModelId, ModelAsset[]>>;
 type Pending = { resolve: (value: unknown) => void; reject: (error: Error) => void };
 
 export class BrowserInference implements InferenceBackend {
-  constructor(private catalog: ModelCatalog, private preference: "auto" | "wasm" = "auto") {}
+  private readonly catalog: ModelCatalog;
+  private readonly preference: "auto" | "wasm";
+
+  constructor(catalog: ModelCatalog, preference: "auto" | "wasm" = "auto") {
+    this.catalog = catalog; this.preference = preference;
+  }
 
   async createSession<K extends ModelId>(model: K, onProgress: (progress: DownloadProgress) => void,
     signal?: AbortSignal): Promise<InferenceSession<K>> {
@@ -21,12 +26,26 @@ export class BrowserInference implements InferenceBackend {
       return session;
     } catch (error) {
       session.terminate();
+      if (this.preference === "auto" && error instanceof Error && error.name === "WebGPUInitializationError" && !signal?.aborted) {
+        console.info(`WebGPU could not initialize ${model}; retrying with WASM: ${error.message}\n${error.stack ?? ""}`);
+        const fallback = new BrowserSession(model, onProgress, { provider: "webgpu", message: error.message, stack: error.stack });
+        try {
+          await fallback.initialize(files, "wasm", signal);
+          return fallback;
+        } catch (fallbackError) {
+          fallback.terminate();
+          if (signal?.aborted) throw signal.reason;
+          throw new AggregateError([error, fallbackError], `Could not initialize ${model} with WebGPU or WASM`);
+        }
+      }
       throw error;
     }
   }
 }
 
 class BrowserSession<K extends ModelId> implements InferenceSession<K> {
+  readonly model: K;
+  readonly fallback?: InferenceSession<K>["fallback"];
   private worker = new Worker(new URL("./inference-worker.ts", import.meta.url), { type: "module" });
   private pending = new Map<number, Pending>();
   private sequence = 0;
@@ -38,14 +57,20 @@ class BrowserSession<K extends ModelId> implements InferenceSession<K> {
     return this.runtime;
   }
 
-  constructor(readonly model: K, onProgress: (progress: DownloadProgress) => void) {
-    this.worker.onmessage = ({ data }: MessageEvent<{ id?: number; progress?: DownloadProgress; value?: unknown; error?: string; errorName?: string }>) => {
+  constructor(model: K, onProgress: (progress: DownloadProgress) => void, fallback?: InferenceSession<K>["fallback"]) {
+    this.model = model; this.fallback = fallback;
+    this.worker.onmessage = ({ data }: MessageEvent<{ id?: number; progress?: DownloadProgress; value?: unknown; error?: string; errorName?: string; errorStack?: string }>) => {
       if (data.progress) { onProgress(data.progress); return; }
       if (data.id === undefined) throw new Error("Inference worker sent a response without an ID");
       const pending = this.pending.get(data.id);
       if (!pending) throw new Error(`Unexpected inference response ${data.id}`);
       this.pending.delete(data.id);
-      if (data.error) pending.reject(data.errorName === "AbortError" ? new DOMException(data.error, "AbortError") : new Error(data.error));
+      if (data.error) {
+        const error = data.errorName === "AbortError" ? new DOMException(data.error, "AbortError")
+          : Object.assign(new Error(data.error), { name: data.errorName ?? "Error" });
+        if (data.errorStack) error.stack = data.errorStack;
+        pending.reject(error);
+      }
       else pending.resolve(data.value);
     };
     this.worker.onerror = (event) => {

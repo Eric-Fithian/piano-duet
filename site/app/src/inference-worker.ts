@@ -36,6 +36,17 @@ const controllers = new Map<number, AbortController>();
 const store = new ModelStore();
 let busy = false;
 
+async function initializeProvider<T>(create: () => Promise<T>): Promise<T> {
+  try { return await create(); }
+  catch (error) {
+    if (provider !== "webgpu") throw error;
+    const failure = new Error(error instanceof Error ? error.message : String(error), { cause: error });
+    failure.name = "WebGPUInitializationError";
+    if (error instanceof Error && error.stack) failure.stack = error.stack;
+    throw failure;
+  }
+}
+
 async function open(id: number, name: ModelId, files: ModelAsset[], preference: "auto" | "wasm", signal: AbortSignal): Promise<{ provider: "webgpu" | "wasm"; recordingWorkers?: { provider: "wasm"; threads: number }[] }> {
   if (session || recordingPool || scoreRuntime) throw new Error("The inference session is already open");
   if (files.some((file) => file.model !== name)) throw new Error("Model catalog contains a mismatched file");
@@ -58,20 +69,14 @@ async function open(id: number, name: ModelId, files: ModelAsset[], preference: 
       options.preferredOutputLocation = Object.fromEntries(Array.from({ length: 16 }, (_, index) =>
         ["key", "value"].map((kind) => [`present_${kind}_${index}`, "gpu-buffer"])).flat());
     }
-    session = await ort.InferenceSession.create(graph, options);
+    session = await initializeProvider(() => ort.InferenceSession.create(graph, options));
     resetCache();
   } else if (name === "phrase-transcription") {
     if (provider === "webgpu") {
       const convolution = await (await asset("convolution")).arrayBuffer();
       const remainder = await (await asset("recurrent")).arrayBuffer();
-      try {
-        session = await ort.InferenceSession.create(convolution, { executionProviders: ["webgpu"], graphOptimizationLevel: "disabled" });
-        recurrent = await ort.InferenceSession.create(remainder, { executionProviders: ["wasm"], graphOptimizationLevel: "disabled" });
-      } catch (error) {
-        await session?.release(); session = undefined;
-        provider = "wasm";
-        console.info(`Phrase transcription is using WASM: ${error instanceof Error ? error.message : String(error)}`);
-      }
+      session = await initializeProvider(() => ort.InferenceSession.create(convolution, { executionProviders: ["webgpu"], graphOptimizationLevel: "disabled" }));
+      recurrent = await ort.InferenceSession.create(remainder, { executionProviders: ["wasm"], graphOptimizationLevel: "disabled" });
     }
     if (provider === "wasm") {
       const graph = await (await asset("graph")).arrayBuffer();
@@ -92,13 +97,13 @@ async function open(id: number, name: ModelId, files: ModelAsset[], preference: 
     const first = await (await asset("score-first")).arrayBuffer();
     const context = await (await asset("score-context")).arrayBuffer();
     const step = await (await asset("score-step")).arrayBuffer();
-    scoreRuntime = await ScoreRuntime.open({ encoder, first, context, step }, provider);
+    scoreRuntime = await initializeProvider(() => ScoreRuntime.open({ encoder, first, context, step }, provider));
   } else {
     options.graphOptimizationLevel = "disabled";
     if (provider === "webgpu") {
       const convolution = await (await asset("convolution")).arrayBuffer();
       const remainder = await (await asset("recurrent")).arrayBuffer();
-      session = await ort.InferenceSession.create(convolution, options);
+      session = await initializeProvider(() => ort.InferenceSession.create(convolution, options));
       recurrent = await ort.InferenceSession.create(remainder, { ...options, executionProviders: ["wasm"] });
     } else {
       const graph = await (await asset("graph")).arrayBuffer();
@@ -208,7 +213,7 @@ self.onmessage = async ({ data }: MessageEvent<Request>) => {
   } catch (error) {
     if (controller.signal.aborted) await close();
     self.postMessage({ id: data.id, error: error instanceof Error ? error.message : String(error),
-      errorName: error instanceof Error ? error.name : "Error" });
+      errorName: error instanceof Error ? error.name : "Error", errorStack: error instanceof Error ? error.stack : undefined });
   } finally {
     controllers.delete(data.id);
     busy = false;
