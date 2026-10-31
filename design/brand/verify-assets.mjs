@@ -9,7 +9,7 @@ const require=createRequire(resolve('site/package.json'));
 const sharp=require('sharp');
 const {DOMParser}=require('@xmldom/xmldom');
 const dir='design/brand/assets';
-const distributed=['favicon.svg','favicon.ico','apple-touch-icon.png','icon-192.png','icon-512.png','icon-maskable-192.png','icon-maskable-512.png','icon-monochrome-512.png','og-image.png'];
+const distributed=['favicon.svg','favicon.ico','apple-touch-icon.png','icon-192.png','icon-512.png','icon-maskable-192.png','icon-maskable-512.png','icon-monochrome-512.png','og-image.png','wordmark-horizontal-header-light.svg','wordmark-horizontal-header-dark.svg'];
 for(const destination of ['src/piano_duet/static/brand','site/public/brand']){
   for(const name of distributed)assert.deepEqual(await readFile(`${destination}/${name}`),await readFile(`${dir}/${name}`),`${destination}/${name} is stale`);
   assert.deepEqual(await readFile(`${destination}/manifest.webmanifest`),await readFile('design/brand/manifest.webmanifest'),`${destination} manifest is stale`);

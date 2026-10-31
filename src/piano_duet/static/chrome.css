@@ -1,7 +1,9 @@
 .piano-app .shell { max-width:none; padding:0; }
 .piano-app .app-header { flex:none; height:48px; display:flex; flex-wrap:nowrap; align-items:center; gap:4px; padding:0 max(8px, env(safe-area-inset-right)) 0 max(8px, env(safe-area-inset-left)); border-bottom:1px solid var(--line); position:relative; }
-.brand { font:600 21px Fraunces,serif; color:var(--text); margin-right:12px; }
-.brand .mark { display:none; }
+.brand { display:block; flex:none; width:150px; margin-right:12px; }
+.brand img { display:block; width:100%; height:auto; }
+.brand .brand-dark, [data-theme=dark] .brand .brand-light { display:none; }
+[data-theme=dark] .brand .brand-dark { display:block; }
 .mode-menu-button, .settings-button, .score-controls-toggle { flex:none; min-height:44px; padding:0 8px; background:transparent; color:var(--text); border:1px solid var(--line); border-radius:4px; font-size:14px; }
 .mode-menu-button { display:inline-flex; align-items:center; gap:3px; }
 .mode-switch { display:none; flex:none; flex-wrap:wrap; gap:4px; padding:6px 8px; background:var(--panel); border-bottom:1px solid var(--line); }

@@ -70,7 +70,7 @@ const display=wordmark('light',72,true);
 const displayInner=display.slice(display.indexOf('>',display.indexOf('<svg'))+1,display.lastIndexOf('</svg>'));
 const share=(w,h)=>`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 1200 630" preserveAspectRatio="none"><rect width="1200" height="630" fill="${palette.light.bg}"/><g transform="translate(76 70) scale(1.35)">${displayInner}</g>${glyphWord(outlines.atkinson,'Real music. Fresh every time.',82,286,43,palette.light.text)}${glyphWord(outlines.atkinson,'Practice at your piano · Private on your device · Free and open',82,345,26,palette.light.muted)}<g transform="translate(660 420)">${score}</g></svg>`;
 for(const [name,w,h] of [['og-image.png',1200,630],['github-social-1280x640.png',1280,640]])await sharp(Buffer.from(share(w,h))).resize(w,h,{fit:'fill'}).removeAlpha().png().toFile(`${output}/${name}`);
-const published=['favicon.svg','favicon.ico','apple-touch-icon.png','icon-192.png','icon-512.png','icon-maskable-192.png','icon-maskable-512.png','icon-monochrome-512.png','og-image.png'];
+const published=['favicon.svg','favicon.ico','apple-touch-icon.png','icon-192.png','icon-512.png','icon-maskable-192.png','icon-maskable-512.png','icon-monochrome-512.png','og-image.png','wordmark-horizontal-header-light.svg','wordmark-horizontal-header-dark.svg'];
 for(const destination of ['src/piano_duet/static/brand','site/public/brand']){
   await mkdir(destination,{recursive:true});
   for(const name of published)await copyFile(`${output}/${name}`,`${destination}/${name}`);

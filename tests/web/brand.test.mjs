@@ -27,7 +27,7 @@ for (const [name, engine] of [['Chromium', chromium], ['WebKit', webkit]]) {
       assert.equal(head.manifest, '/static/brand/manifest.webmanifest');
       assert.equal(head.image, 'https://piano-duet.vercel.app/docs/og.png');
       assert.equal(head.themes, 2);
-      for (const filename of ['favicon.svg', 'favicon.ico', 'apple-touch-icon.png']) {
+      for (const filename of ['favicon.svg', 'favicon.ico', 'apple-touch-icon.png', 'wordmark-horizontal-header-light.svg', 'wordmark-horizontal-header-dark.svg']) {
         const response = await page.request.get(`${root}/static/brand/${filename}`);
         assert.equal(response.status(), 200, filename);
         assert.deepEqual(await response.body(), await readFile(`design/brand/assets/${filename}`));
