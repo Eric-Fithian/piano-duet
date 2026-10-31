@@ -2,3 +2,25 @@
 .asset-download progress { display: block; width: 100%; margin-top: .5rem; accent-color: #91bca2; }
 .recording-import { display: flex; align-items: center; flex-wrap: wrap; gap: .7rem; margin: 0 0 1rem; }
 .recording-import p { color: var(--muted); font-size: .85rem; margin: 0; }
+
+.model-settings { margin: 1.2rem 0; }
+.model-settings > summary { font-size: 15px; font-weight: 600; color: #e1e3e6; }
+.model-settings p { font-size: 12px; line-height: 1.6; color: #b0b6bf; overflow-wrap: anywhere; }
+.model-list { margin-top: 1rem; border-top: 1px solid var(--line); }
+.model-entry { margin: 0; padding: 0; border: 0; border-bottom: 1px solid var(--line); }
+.model-entry > summary.model-row { display: flex; align-items: center; gap: .5rem; padding: .8rem 0; margin: 0; list-style: none; }
+.model-entry > summary::-webkit-details-marker { display: none; }
+.model-entry > summary::before { content: "›"; color: var(--muted); font-size: 18px; line-height: 1; }
+.model-entry[open] > summary::before { transform: rotate(90deg); }
+.model-name { flex: 1; min-width: 0; color: #e1e3e6; font-size: 13px; font-weight: 600; }
+.model-size { color: var(--muted); white-space: nowrap; font-size: 11px; }
+.model-status { border-radius: 99px; padding: .2rem .5rem; background: #283343; color: #cbd2da; font-size: 10px; white-space: nowrap; }
+.model-status[data-state="downloaded"] { color: #a4e4bc; background: #1b3c30; }
+.model-detail { padding: 0 0 .8rem 1.15rem; }
+.model-detail p { margin: .35rem 0; }
+.model-links a { color: #b7d7e5; text-decoration: underline; text-underline-offset: 3px; }
+.model-actions { display: flex; flex-wrap: wrap; gap: .45rem; margin: .6rem 0; }
+.model-actions button { font-size: 12px; padding: .55rem .7rem; white-space: normal; text-align: left; }
+.model-entry progress { width: 100%; accent-color: #91bca2; }
+.model-note { display: block; color: var(--muted); font-size: 10px; font-weight: 400; }
+.model-confirm[hidden] { display: none; }

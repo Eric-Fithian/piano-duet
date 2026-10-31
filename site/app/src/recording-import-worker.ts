@@ -61,8 +61,10 @@ async function open(id: number, recording: ModelAsset[], files: ModelAsset[], si
   if (written.status === "rejected" || transcriber.status === "rejected") throw failure ?? new Error("Could not initialize recording import");
   signal.throwIfAborted();
   if (written.status !== "fulfilled") throw new Error("Score model did not initialize");
-  self.postMessage({ id, stage: `Ready · ${describeInferenceBackend({ model: "midi-to-score", ...written.value.backend })}` });
-  return written.value.backend;
+  const backend = provider === "wasm" ? { ...written.value.backend,
+    fallback: { provider: "webgpu" as const, message: "No compatible WebGPU adapter was available" } } : written.value.backend;
+  self.postMessage({ id, stage: `Ready · ${describeInferenceBackend({ model: "midi-to-score", ...backend })}` });
+  return backend;
 }
 
 async function run(id: number, audio: Float32Array, signal: AbortSignal): Promise<{ musicXml: string; notes: ScoreInputNote[] }> {

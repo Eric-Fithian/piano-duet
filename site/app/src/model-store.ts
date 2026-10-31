@@ -11,9 +11,11 @@ export class ModelStore {
     const present = await Promise.all(files.map(async (file) => {
       validateFile(file);
       const response = await cache.match(fileKey(file));
-      return response ? (await response.blob()).size === file.bytes && Boolean(await cache.match(markerKey(file))) : false;
+      if (!response) return "missing";
+      return (await response.blob()).size === file.bytes && Boolean(await cache.match(markerKey(file))) ? "verified" : "incomplete";
     }));
-    return present.every(Boolean) ? "downloaded" : present.some(Boolean) ? "partially downloaded" : "not downloaded";
+    return present.every((state) => state === "verified") ? "downloaded"
+      : present.some((state) => state !== "missing") ? "partially downloaded" : "not downloaded";
   }
 
   async delete(files: ModelFile[]): Promise<void> {

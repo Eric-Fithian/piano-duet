@@ -65,3 +65,5 @@ Pages are Markdown files in `site/src/content/docs/`. Every page has an **Edit p
 - Comment the *why*, not the *how*, and explain every regular expression.
 - Every Python file has a `main()` right after its imports and constants.
 - Run commands from the project root; paths such as `.cache` are relative to it.
+
+The model settings flow has an additional full-model browser check: `node tests/inference/model-settings.mjs chromium` or `node tests/inference/model-settings.mjs webkit`. It downloads the pinned models into a disposable browser profile and tests fixed, non-user inputs. Chromium requires the Mac's Apple WebGPU adapter. Playwright WebKit may report its existing large-Blob loading failure for Aria and the score model; the check still requires the other models and samples to pass.

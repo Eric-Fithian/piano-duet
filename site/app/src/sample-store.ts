@@ -1,3 +1,4 @@
+import { acquireModelLock } from "./model-lock.ts";
 import { ModelStore } from "./model-store";
 import { PIANO_SAMPLES, SAMPLE_REVISION } from "./piano-samples";
 import type { DownloadProgress } from "./inference";
@@ -26,10 +27,13 @@ export class SampleStore {
     const name = path.slice(prefix.length);
     const sample = this.samples.find((item) => item.file === name);
     if (!sample) return Response.json({ detail: "Unknown piano sample" }, { status: 404 });
-    const response = await this.store.get({ model: "piano-samples", name, revision: this.revision,
-      url: `https://raw.githubusercontent.com/nbrosowsky/tonejs-instruments/${this.revision}/samples/piano/${name}`,
-      sha256: sample.sha256, bytes: sample.bytes }, this.onProgress, options.signal ?? undefined);
-    this.onProgress({ model: "piano-samples", file: name, received: sample.bytes, total: sample.bytes });
-    return response;
+    const release = await acquireModelLock("piano-samples", options.signal ?? undefined);
+    try {
+      const response = await this.store.get({ model: "piano-samples", name, revision: this.revision,
+        url: `https://raw.githubusercontent.com/nbrosowsky/tonejs-instruments/${this.revision}/samples/piano/${name}`,
+        sha256: sample.sha256, bytes: sample.bytes }, this.onProgress, options.signal ?? undefined);
+      this.onProgress({ model: "piano-samples", file: name, received: sample.bytes, total: sample.bytes });
+      return response;
+    } finally { release(); }
   }
 }

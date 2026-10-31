@@ -1,3 +1,4 @@
+import { acquireModelLock } from "./model-lock.ts";
 import { decodeAudioFile } from "./audio-decoder.ts";
 import type { DownloadProgress, InferenceBackendRecord, PianoNote } from "./inference.ts";
 import type { ModelAsset } from "./browser-inference.ts";
@@ -6,6 +7,7 @@ type Pending = { resolve: (value: unknown) => void; reject: (error: Error) => vo
 
 export class BrowserRecordingImporter {
   private worker?: Worker;
+  private releases: (() => void)[] = [];
   private pending = new Map<number, Pending>();
   private sequence = 0;
   private opening?: Promise<void>;
@@ -41,7 +43,7 @@ export class BrowserRecordingImporter {
         else pending.resolve(data.value);
       };
       this.worker.onerror = (event) => this.terminate(new Error(`Recording import worker failed: ${event.message}`));
-      this.opening = this.send<InferenceBackendRecord>("open", { recording: this.recording, score: this.score }, signal).then((backend) => {
+      this.opening = this.lockModels(signal).then(() => this.send<InferenceBackendRecord>("open", { recording: this.recording, score: this.score }, signal)).then((backend) => {
         this.reportBackend(backend);
       }).catch((error: unknown) => {
         this.terminate(error instanceof Error ? error : new Error(String(error))); throw error;
@@ -56,6 +58,11 @@ export class BrowserRecordingImporter {
     signal?.throwIfAborted();
     try { return await this.send("run", { audio: decoded.audio.buffer }, signal, [decoded.audio.buffer]); }
     catch (error) { this.terminate(error instanceof Error ? error : new Error(String(error))); throw error; }
+  }
+
+  private async lockModels(signal?: AbortSignal): Promise<void> {
+    this.releases.push(await acquireModelLock("midi-to-score", signal));
+    this.releases.push(await acquireModelLock("recording-transcription", signal));
   }
 
   private send<T>(action: string, fields: object, signal?: AbortSignal, transfer: Transferable[] = []): Promise<T> {
@@ -77,6 +84,7 @@ export class BrowserRecordingImporter {
 
   private terminate(error: Error): void {
     this.worker?.terminate(); this.worker = undefined; this.opening = undefined;
+    for (const release of this.releases.splice(0)) release();
     for (const pending of this.pending.values()) pending.reject(error);
     this.pending.clear();
   }
