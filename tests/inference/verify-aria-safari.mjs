@@ -1,8 +1,19 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { createReadStream } from "node:fs";
+import { readFile, stat } from "node:fs/promises";
 import { Builder } from "selenium-webdriver";
+import { MODEL_CATALOG } from "../../site/app/src/model-catalog.ts";
 import { startServer } from "./server.mjs";
 
+const directory = process.env.PIANO_ARIA_MODEL_DIR ?? ".cache/models/aria/onnx-int4-block64";
+for (const asset of MODEL_CATALOG.aria) {
+  const path = `${directory}/${asset.name}`;
+  assert.equal((await stat(path)).size, asset.bytes, `${path} has the wrong size`);
+  const hash = createHash("sha256");
+  for await (const chunk of createReadStream(path)) hash.update(chunk);
+  assert.equal(hash.digest("hex"), asset.sha256, `${path} does not match the pinned model`);
+}
 const fixture = JSON.parse(await readFile("tests/fixtures/aria-sampling.json", "utf8"));
 if (fixture.cases.length < 50) throw new Error("At least 50 masked choices are required");
 const server = await startServer();
