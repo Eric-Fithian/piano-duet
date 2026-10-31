@@ -23,6 +23,8 @@ The browser app is under construction; its practice modes and published model ca
 
 ## Make a change
 
+For account and sync tests, start Docker, install the Supabase CLI, run `supabase start`, then `npm run test:sync`. The tests use local accounts and Mailpit; they do not need a hosted project or provider credentials. To enable sign-in in a local browser, supply an untracked `site/app/sync-config.json` containing `{"url":"<local API URL>","anonKey":"<local anon key>"}` using the values from `supabase status`. A deployment must serve the same JSON at `/sync-config.json` at runtime. The URL and anon key are public client configuration; never use a service-role key. Optional `providers` may contain `"apple"` and `"google"` after those providers and their credentials are configured in Supabase. The hosted project and provider credentials still need to be set up separately. Restart the dev server after changing its configuration if necessary.
+
 1. Branch from `main`.
 2. Make the change, with tests. Python tests live in `tests/test_*.py`, browser-module tests in `tests/*.test.mjs`, TypeScript parity tests in `tests/core/`, and browser storage tests in `tests/web/`. These tests do not need the downloaded models.
 3. Run `make check`, which is what CI runs. Run `make site-build` if you touched `site/`.

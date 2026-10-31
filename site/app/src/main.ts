@@ -18,6 +18,8 @@ import { PIANO_SAMPLES } from "./piano-samples";
 import { SampleStore } from "./sample-store";
 import { BrowserRecordingImporter } from "./recording-import";
 import { recordingStage, setupRecordingUi } from "./recording-ui";
+import { setupSyncUi } from "./sync-ui";
+import { initializeLearnerSettings } from "../../../src/piano_duet/static/learner-settings.mjs";
 import "./style.css";
 
 Object.assign(window, { VexFlow });
@@ -50,6 +52,7 @@ async function start(): Promise<void> {
   const log = new EventLog();
   await requestPersistentStorage();
   await log.open();
+  await initializeLearnerSettings(log);
   const backend = new BrowserInference(MODEL_CATALOG);
   let live: Promise<InferenceSession<"live-transcription">> | undefined;
   const transcriber = {
@@ -110,6 +113,11 @@ async function start(): Promise<void> {
   if (import.meta.env.PROD && "serviceWorker" in navigator) await navigator.serviceWorker.register("/service-worker.js");
   const app = await import("../../../src/piano_duet/static/app.mjs");
   setupRecordingUi(importer, app.loadLibrary);
+  void setupSyncUi(log, app.refreshSyncedData).catch((error: unknown) => {
+    const panel = document.querySelector<HTMLElement>("#accountSync");
+    if (!panel) throw new Error("The interface has no account panel");
+    panel.textContent = `Account sync unavailable: ${error instanceof Error ? error.message : String(error)}`;
+  });
 }
 
 start().catch((error: unknown) => {

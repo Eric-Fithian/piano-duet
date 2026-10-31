@@ -16,6 +16,7 @@
     "@astrojs/starlight": "^0.42.8",
     "@noble/hashes": "^2.4.0",
     "@sqlite.org/sqlite-wasm": "3.54.1-build1",
+    "@supabase/supabase-js": "^2.118.0",
     "@xmldom/xmldom": "^0.9.12",
     "astro": "^7.4.4",
     "fflate": "^0.8.3",

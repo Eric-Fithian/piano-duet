@@ -9,6 +9,7 @@
     "dev": "concurrently -k -n app,docs \"npm run dev --prefix site\" \"npm run docs:dev --prefix site\"",
     "test:core": "node --test tests/core/*.test.ts",
     "test:web": "npm run build --prefix site && node --test --test-concurrency=1 tests/web/*.test.mjs",
+    "test:sync": "node --test --test-concurrency=1 tests/sync/*.test.mjs",
     "check:core": "tsc --noEmit"
   },
   "devDependencies": {
