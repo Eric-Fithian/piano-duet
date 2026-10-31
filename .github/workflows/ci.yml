@@ -67,6 +67,27 @@ jobs:
       - run: npm run check:core
       - run: npm run test:core
 
+  model-parity:
+    name: Published model parity
+    runs-on: macos-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          version: "0.10.12"
+          enable-cache: true
+      - run: uv sync --frozen
+      - uses: actions/cache@v4
+        with:
+          path: .cache/ci-models
+          key: published-models-${{ hashFiles('site/app/src/model-catalog.ts') }}
+      - run: node tests/inference/download-models.mjs
+      - run: uv run --frozen python tests/inference/published_model_parity.py
+
   browser-storage:
     name: Browser storage
     runs-on: macos-latest

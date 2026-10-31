@@ -9,6 +9,7 @@ import { AriaPhrase } from "../../../src/core/aria-phrase.ts";
 import type { PhraseContext } from "../../../src/core/aria-tokenizer.ts";
 import { RandomSource } from "../../../src/core/random.ts";
 import { BrowserInference } from "./browser-inference";
+import { MODEL_CATALOG } from "./model-catalog";
 import type { DownloadProgress, InferenceSession } from "./inference";
 import { EventLog, requestPersistentStorage } from "./event-log";
 import { PIANO_SAMPLES } from "./piano-samples";
@@ -45,7 +46,7 @@ async function start(): Promise<void> {
   const log = new EventLog();
   await requestPersistentStorage();
   await log.open();
-  const backend = new BrowserInference({});
+  const backend = new BrowserInference(MODEL_CATALOG);
   let live: Promise<InferenceSession<"live-transcription">> | undefined;
   const transcriber = {
     async run(input: { audio: Float32Array; sampleRate: 16000; threshold: number }, signal?: AbortSignal) {

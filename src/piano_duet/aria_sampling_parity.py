@@ -25,6 +25,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", type=Path, default=QUANTIZED)
     parser.add_argument("--output", type=Path, default=RESULT)
+    parser.add_argument("--ci-fixture", type=Path)
     args = parser.parse_args()
     fixture = json.loads(OUTPUT.read_text())
     config = ModelConfig(**load_model_config("medium"))
@@ -38,6 +39,7 @@ def main():
     session = ort.InferenceSession(str(args.model), sess_options=options, providers=["CPUExecutionProvider"])
     names = [item.name for item in session.get_inputs()]
     results = []
+    ci_cases = []
     for case in tqdm(fixture["cases"], desc="Comparing sampling distributions"):
         tokens = np.array([case["tokens"]], dtype=np.int64)
         cache = [np.zeros((1, config.n_heads, 0, config.d_model // config.n_heads), dtype=np.float32)
@@ -57,6 +59,10 @@ def main():
         results.append({"context": case["context"], "prefix_tokens": len(case["tokens"]),
                         "choices": len(allowed), "k": k, "mlx_kl": mlx_kl, "onnx_kl": onnx_kl,
                         "mlx_top_k_overlap": mlx_overlap, "onnx_top_k_overlap": onnx_overlap})
+        if args.ci_fixture:
+            ci_cases.append({"context": case["context"], "tokens": case["tokens"], "allowed": case["allowed"],
+                             "weights": case["weights"], "fp32_logits": reference[allowed].tolist(),
+                             "mlx_logits": np.array(case["mlx_logits"])[allowed].tolist()})
     if len(results) < 50:
         raise ValueError("Sampling parity needs at least 50 contexts")
     summary = {name: summarize(results, name) for name in ("mlx", "onnx")}
@@ -66,6 +72,9 @@ def main():
                  and summary["onnx"][metric] <= limits[metric] for metric in limits)
     args.output.write_text(json.dumps({"device": device, "summary": summary, "limits": limits, "passed": passed,
                                        "results": results, "workloads": fixture["workloads"]}, indent=2) + "\n")
+    if args.ci_fixture:
+        args.ci_fixture.parent.mkdir(parents=True, exist_ok=True)
+        args.ci_fixture.write_text(json.dumps({"cases": ci_cases}) + "\n")
     print(json.dumps({"summary": summary, "limits": limits, "passed": passed}, indent=2))
     if not passed:
         raise AssertionError("ONNX sampling distributions did not meet the aggregate parity limits")
