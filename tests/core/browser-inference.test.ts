@@ -6,6 +6,7 @@ import { describeInferenceBackend } from "../../site/app/src/inference.ts";
 
 test("browser inference retries only failed WebGPU initialization and retains the cause", async () => {
   const originalWorker = Object.getOwnPropertyDescriptor(globalThis, "Worker"), originalInfo = console.info;
+  const originalLocks = Object.getOwnPropertyDescriptor(navigator, "locks");
   const messages: string[] = [], workers: FakeWorker[] = [];
   let outcomes: ("gpu-failure" | "wasm-failure" | "other-failure" | "success")[] = [];
   class FakeWorker {
@@ -26,6 +27,9 @@ test("browser inference retries only failed WebGPU initialization and retains th
     terminate() { this.terminated = true; }
   }
   Object.defineProperty(globalThis, "Worker", { configurable: true, writable: true, value: FakeWorker });
+  Object.defineProperty(navigator, "locks", { configurable: true, value: {
+    request: (_name: string, _options: unknown, callback: () => Promise<void>) => callback(),
+  } });
   console.info = (...parts: unknown[]) => { messages.push(parts.join(" ")); };
   try {
     outcomes = ["gpu-failure", "success"];
@@ -52,5 +56,7 @@ test("browser inference retries only failed WebGPU initialization and retains th
     console.info = originalInfo;
     if (originalWorker) Object.defineProperty(globalThis, "Worker", originalWorker);
     else Reflect.deleteProperty(globalThis, "Worker");
+    if (originalLocks) Object.defineProperty(navigator, "locks", originalLocks);
+    else Reflect.deleteProperty(navigator, "locks");
   }
 });

@@ -25,6 +25,7 @@ import { SampleStore } from "./sample-store";
 import { BrowserRecordingImporter } from "./browser-recording-import";
 import { NativeRecordingImporter } from "./native-recording-import";
 import { recordingStage, setupRecordingUi } from "./recording-ui";
+import { setupModelSettings } from "./model-settings";
 import { setupHistoryImport } from "./history-import";
 import { setupSyncUi } from "./sync-ui";
 import { initializeLearnerSettings } from "../../../src/piano_duet/static/learner-settings.mjs";
@@ -50,7 +51,9 @@ indicator.append(label, bar);
 document.body.append(indicator);
 const received = new Map<string, number>();
 const sampleBytes = PIANO_SAMPLES.reduce((sum, sample) => sum + sample.bytes, 0);
+let reportSettingsProgress: (progress: DownloadProgress) => void = () => {};
 function report(progress: DownloadProgress): void {
+  reportSettingsProgress(progress);
   indicator.hidden = false;
   if (progress.model === "piano-samples") {
     received.set(progress.file, progress.received);
@@ -74,10 +77,16 @@ async function start(): Promise<void> {
   const backend = native ? new NativeInference(new WebKitInferenceTransport(native, window)) : new BrowserInference(MODEL_CATALOG);
   const settings = document.querySelector<HTMLElement>("#settingsDialog");
   if (!settings) throw new Error("The settings dialog is missing");
+  const modelSettings = document.querySelector<HTMLDetailsElement>("#modelSettings");
+  if (!modelSettings) throw new Error("The model settings section is missing");
+  const modelPanel = native ? undefined : setupModelSettings(modelSettings, backend);
+  if (modelPanel) reportSettingsProgress = modelPanel.progress;
+  if (!native) modelSettings.hidden = false;
   const backendStatus = document.createElement("p"), backends = new Map<ModelId, string>();
   backendStatus.setAttribute("aria-live", "polite");
-  settings.append(backendStatus);
+  if (native) settings.append(backendStatus);
   const reportBackend = (model: ModelId, record: InferenceBackendRecord) => {
+    modelPanel?.backend(model, record);
     backends.set(model, describeInferenceBackend({ model, provider: record.provider, fallback: record.fallback }));
     backendStatus.textContent = `Model backends: ${[...backends.values()].join("; ")}`;
   };

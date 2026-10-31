@@ -1,3 +1,4 @@
+import { acquireModelLock } from "./model-lock.ts";
 import type { DownloadProgress, InferenceBackend, InferenceSession, ModelFile, ModelId, ModelInputs, ModelOutputs } from "./inference.ts";
 
 export type ModelRole = "graph" | "weights" | "convolution" | "recurrent" | "features" | "attributes"
@@ -19,7 +20,8 @@ export class BrowserInference implements InferenceBackend {
     signal?: AbortSignal): Promise<InferenceSession<K>> {
     const files = this.catalog[model];
     if (!files?.length) throw new Error(`The ${model} model is not available yet`);
-    const session = new BrowserSession(model, onProgress);
+    const release = await acquireModelLock(model, signal);
+    const session = new BrowserSession(model, onProgress, release);
     try {
       await session.initialize(files, this.preference, signal);
       return session;
@@ -27,7 +29,8 @@ export class BrowserInference implements InferenceBackend {
       session.terminate();
       if (this.preference === "auto" && error instanceof Error && error.name === "WebGPUInitializationError" && !signal?.aborted) {
         console.info(`WebGPU could not initialize ${model}; retrying with WASM: ${error.message}\n${error.stack ?? ""}`);
-        const fallback = new BrowserSession(model, onProgress, { provider: "webgpu", message: error.message, stack: error.stack });
+        const fallbackRelease = await acquireModelLock(model, signal);
+        const fallback = new BrowserSession(model, onProgress, fallbackRelease, { provider: "webgpu", message: error.message, stack: error.stack });
         try {
           await fallback.initialize(files, "wasm", signal);
           return fallback;
@@ -45,20 +48,21 @@ export class BrowserInference implements InferenceBackend {
 
 class BrowserSession<K extends ModelId> implements InferenceSession<K> {
   readonly model: K;
-  readonly fallback?: InferenceSession<K>["fallback"];
+  fallback?: InferenceSession<K>["fallback"];
   private worker = new Worker(new URL("./inference-worker.ts", import.meta.url), { type: "module" });
   private pending = new Map<number, Pending>();
   private sequence = 0;
   private closed = false;
   private runtime?: "webgpu" | "wasm";
+  private readonly release: () => void;
 
   get provider(): "webgpu" | "wasm" {
     if (!this.runtime) throw new Error("The inference session is not initialized");
     return this.runtime;
   }
 
-  constructor(model: K, onProgress: (progress: DownloadProgress) => void, fallback?: InferenceSession<K>["fallback"]) {
-    this.model = model; this.fallback = fallback;
+  constructor(model: K, onProgress: (progress: DownloadProgress) => void, release: () => void, fallback?: InferenceSession<K>["fallback"]) {
+    this.model = model; this.fallback = fallback; this.release = release;
     this.worker.onmessage = ({ data }: MessageEvent<{ id?: number; progress?: DownloadProgress; value?: unknown; error?: string; errorName?: string; errorStack?: string }>) => {
       if (data.progress) { onProgress(data.progress); return; }
       if (data.id === undefined) throw new Error("Inference worker sent a response without an ID");
@@ -82,8 +86,9 @@ class BrowserSession<K extends ModelId> implements InferenceSession<K> {
   }
 
   async initialize(files: ModelAsset[], preference: "auto" | "wasm", signal?: AbortSignal): Promise<void> {
-    const result = await this.send<{ provider: "webgpu" | "wasm" }>("open", { model: this.model, files, preference }, signal);
+    const result = await this.send<{ provider: "webgpu" | "wasm"; fallback?: InferenceSession<K>["fallback"] }>("open", { model: this.model, files, preference }, signal);
     this.runtime = result.provider;
+    this.fallback ??= result.fallback;
   }
 
   run(input: ModelInputs[K], signal?: AbortSignal): Promise<ModelOutputs[K]> {
@@ -92,13 +97,15 @@ class BrowserSession<K extends ModelId> implements InferenceSession<K> {
 
   async close(): Promise<void> {
     if (this.closed) return;
-    await this.send("close");
-    this.terminate();
+    try { await this.send("close"); }
+    finally { this.terminate(); }
   }
 
   terminate(): void {
+    if (this.closed) return;
     this.closed = true;
     this.worker.terminate();
+    this.release();
   }
 
   private send<T>(action: string, fields: object = {}, signal?: AbortSignal): Promise<T> {
