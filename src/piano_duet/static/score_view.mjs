@@ -13,7 +13,7 @@ export const FOLLOWS = ['smooth', 'page', 'off'];
 const PREFERENCES = {layout: 'wrap', zoom: 'fit', lookahead: 'normal', follow: 'smooth'};
 const FEATURES = {
   scale: 1, cursor: false, feedback: false, heard: false, pace: false, sounding: false, focus: false,
-  headings: false, maxBars: null, barNumbers: 'systems', followNewest: false,
+  headings: false, maxBars: null, barNumbers: 'systems', followNewest: false, stableFit: false,
   settings: ['layout', 'zoom', 'lookahead', 'follow'], defaults: {}, empty: null,
 };
 const PADDING = 12;
@@ -112,7 +112,7 @@ export class ScoreView {
     this.name = null;
     this.preferences = {...PREFERENCES};
     this.phrases = [];
-    this.pending = new Set();
+    this.pending = new Map();
     this.timer = null;
     this.revision = 0;
     this.onRender = () => {};
@@ -120,7 +120,12 @@ export class ScoreView {
     this.paused = false;
     this.motion = null;
     this.width = 0;
+    this.outerWidth = 0;
     this.height = 0;
+    this.active = false;
+    this.fittedScale = null;
+    this.fitRequested = true;
+    this.fontDeferred = false;
     this.buildControls();
     this.clear();
     // Scrolling by hand pauses following until the player resumes it or the music moves on to another line.
@@ -141,24 +146,49 @@ export class ScoreView {
       this.step(pinch < 0 ? 1 : -1);
       pinch = 0;
     }, {passive: false});
-    this.observer = new ResizeObserver(() => {
-      const width = this.scroller.clientWidth;
-      const height = this.scroller.clientHeight;
-      if (!width) return;
-      if ((width !== this.width || (height !== this.height && this.preferences.zoom === 'fit')) && this.preferences.layout === 'wrap') {
-        for (const phrase of this.phrases) this.schedule(phrase);
-      }
-      this.width = width;
-      this.height = height;
-      this.refollow(true);
-    });
+    this.observer = new ResizeObserver(() => this.relayout());
     this.observer.observe(this.scroller);
-    document.fonts.addEventListener('loading', () => this.relayout());
+    document.fonts.addEventListener('loading', () => {
+      this.fitRequested = true;
+      if (this.active) this.fontDeferred = true;
+      else for (const phrase of this.phrases) this.schedule(phrase, 'font');
+    });
   }
 
   relayout() {
-    if (this.preferences.layout === 'wrap') for (const phrase of this.phrases) this.schedule(phrase);
+    const width = this.scroller.clientWidth, outerWidth = this.scroller.offsetWidth, height = this.scroller.clientHeight;
+    if (!width) return;
+    const widthChanged = outerWidth !== this.outerWidth || (!this.active && width !== this.width);
+    const heightChanged = height !== this.height || width !== this.width;
+    this.width = width;
+    this.outerWidth = outerWidth;
+    this.height = height;
+    if (this.preferences.layout === 'wrap' && (widthChanged || (heightChanged && this.preferences.zoom === 'fit'))) {
+      this.fitRequested = true;
+      if (widthChanged || !this.active) for (const phrase of this.phrases) this.schedule(phrase, widthChanged ? 'width' : 'height');
+    }
     this.refollow(true);
+  }
+
+  setActive(active) {
+    if (this.active === active) return;
+    this.active = active;
+    if (active) {
+      for (const [phrase, reasons] of this.pending) {
+        reasons.delete('height');
+        if (reasons.delete('font')) this.fontDeferred = true;
+        if (!reasons.size) this.pending.delete(phrase);
+      }
+      if (!this.pending.size && this.timer) {
+        clearTimeout(this.timer);
+        this.timer = null;
+        this.revision++;
+      }
+    } else if (this.fontDeferred || (this.fitRequested && this.preferences.layout === 'wrap' && this.preferences.zoom === 'fit')) {
+      const reason = this.fontDeferred ? 'font' : 'fit';
+      this.fontDeferred = false;
+      for (const phrase of this.phrases) this.schedule(phrase, reason);
+    }
   }
 
   async ready() {
@@ -174,6 +204,8 @@ export class ScoreView {
   use(name, profile) {
     this.name = name;
     this.profile = {...FEATURES, ...profile};
+    this.fittedScale = null;
+    this.fitRequested = true;
     const saved = JSON.parse(localStorage.getItem(`piano-duet.view.${profile.preferences || name}`) || '{}');
     this.preferences = {...PREFERENCES, ...this.profile.defaults, ...saved};
     if (this.preferences.zoom !== 'fit' && !ZOOMS.includes(this.preferences.zoom)) this.preferences.zoom = 'fit';
@@ -189,9 +221,10 @@ export class ScoreView {
     }
     const before = this.preferences;
     this.preferences = {...before, ...changes};
+    if (before.layout !== this.preferences.layout || changes.zoom === 'fit') this.fitRequested = true;
     localStorage.setItem(`piano-duet.view.${this.profile.preferences || this.name}`, JSON.stringify(this.preferences));
     this.resume(false);
-    if (before.layout !== this.preferences.layout || (before.zoom !== this.preferences.zoom && this.preferences.layout === 'wrap')) {
+    if (before.layout !== this.preferences.layout || ((before.zoom !== this.preferences.zoom || changes.zoom === 'fit') && this.preferences.layout === 'wrap')) {
       for (const phrase of this.phrases) this.schedule(phrase);
     } else if (before.zoom !== this.preferences.zoom) {
       for (const phrase of this.phrases) this.size(phrase);
@@ -311,15 +344,17 @@ export class ScoreView {
     this.flow.className = `score-flow score-flow-${this.preferences.layout}`;
   }
 
-  schedule(phrase) {
-    this.pending.add(phrase);
+  schedule(phrase, reason = 'content') {
+    if (this.active && reason === 'content' && this.preferences.zoom === 'fit') this.fitRequested = true;
+    if (!this.pending.has(phrase)) this.pending.set(phrase, new Set());
+    this.pending.get(phrase).add(reason);
     if (this.timer) return;
     const revision = this.revision;
     this.timer = setTimeout(async () => {
       await document.fonts.ready;
       if (revision !== this.revision) return;
       this.timer = null;
-      const pending = [...this.pending];
+      const pending = [...this.pending.keys()];
       this.pending.clear();
       this.applyLayout();
       for (const current of pending) {
@@ -341,7 +376,7 @@ export class ScoreView {
     const doc = {...phrase, bpm, meter, flats: this.options.flats ?? phrase.flats};
     const draw = scale => engrave(doc, phrase.host, {width: wrap ? availableWidth / scale : null,
       maxBars: this.profile.maxBars, barNumbers: this.profile.barNumbers});
-    if (wrap && this.preferences.zoom === 'fit') {
+    if (wrap && this.preferences.zoom === 'fit' && !this.active && (!this.profile.stableFit || this.fitRequested || this.fittedScale === null)) {
       const flowStyle = getComputedStyle(this.flow);
       const verticalPadding = parseFloat(flowStyle.paddingTop) + parseFloat(flowStyle.paddingBottom);
       const gap = parseFloat(getComputedStyle(phrase.host).rowGap) || 0;
@@ -352,6 +387,7 @@ export class ScoreView {
           height: candidate.systems.reduce((sum, system) => sum + system.frame.height * scale, 0) + gap * (candidate.systems.length - 1),
           breaks: candidate.systems.map(system => system.bars.join('-')).join(',')};
       }, availableWidth, availableHeight);
+      this.fitRequested = false;
     }
     const engraved = draw(this.scale);
     phrase.engraved = engraved;
@@ -384,8 +420,7 @@ export class ScoreView {
     }
     const available = this.scroller.clientWidth - 2 * PADDING;
     for (const system of phrase.systems) {
-      const scale = this.preferences.zoom === 'fit' ? this.scale
-        : this.preferences.layout === 'wrap' ? Math.min(this.scale, available / system.frame.width) : this.scale;
+      const scale = this.preferences.layout === 'wrap' ? Math.min(this.scale, available / system.frame.width) : this.scale;
       system.scale = scale;
       system.svg.style.setProperty('--score-finger-size', `${Math.max(13, 12 / scale)}px`);
       system.svg.style.setProperty('--score-mark-size', `${Math.max(14, 12 / scale)}px`);

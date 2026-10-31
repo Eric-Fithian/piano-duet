@@ -109,6 +109,13 @@ for (const [engineName, engine] of [['chromium', chromium], ['webkit', webkit]])
     await context.route('https://raw.githubusercontent.com/**/responsive-fixture/samples/piano/C4.mp3', route => route.fulfill({body: bytes, headers: {'Content-Type': 'audio/wav', 'Access-Control-Allow-Origin': '*', 'Cross-Origin-Resource-Policy': 'cross-origin'}}));
     await context.route('**/src/browser-inference.ts', route => route.fulfill({contentType: 'text/javascript', body: 'export class BrowserInference { async createSession(model) { return {model, provider: "wasm", run: async () => model === "aria" ? {logits: new Float32Array(18000)} : {notes: []}}; } }'}));
     await context.route('**/src/browser-recording-import.ts', route => route.fulfill({contentType: 'text/javascript', body: 'export class BrowserRecordingImporter { async prepare() {} }'}));
+    await context.route('**/static/app.mjs*', async route => {
+      const response = await route.fetch();
+      const source = await response.text();
+      const declaration = "const sheet = new ScoreView($('sheetMusic'));";
+      assert.equal(source.split(declaration).length, 2);
+      await route.fulfill({response, body: source.replace(declaration, "const sheet = window.responsiveSheet = new ScoreView($('sheetMusic'));")});
+    });
     await context.route('**/sync-config.json', route => route.fulfill({json: {url: 'http://127.0.0.1:54321', anonKey: 'fixture', emailEnabled: false, providers: ['google']}}));
     const page = await context.newPage();
     page.setDefaultTimeout(5000);
@@ -272,6 +279,10 @@ for (const [engineName, engine] of [['chromium', chromium], ['webkit', webkit]])
     }, `/@fs${resolve('src/piano_duet/static/drills.mjs')}`);
     for (const {name, width, height} of viewports) {
       await resizeScore(width, height);
+      const stable = name === 'android-portrait' || name === 'iphone-landscape';
+      if (stable) await page.waitForTimeout(150);
+      const activeSystem = stable ? await page.locator('.score-system svg').first().elementHandle() : null;
+      const activeWidth = stable ? (await activeSystem.boundingBox()).width : 0;
       const scoreBefore = await page.locator('#sheetPanel').boundingBox();
       await page.evaluate(() => window.showResponsiveDrillResult());
       const score = await page.locator('#sheetPanel').boundingBox();
@@ -281,8 +292,18 @@ for (const [engineName, engine] of [['chromium', chromium], ['webkit', webkit]])
       assert.equal(await page.locator('#drillResults').evaluate(node => node.parentElement.classList.contains('transport')), true);
       assert.equal(await page.locator('#start').isVisible(), true);
       assert.equal(await page.locator('#start').getAttribute('aria-pressed'), 'true');
+      if (stable) {
+        await page.waitForTimeout(150);
+        assert.equal(await activeSystem.evaluate(element => element.isConnected), true, `${name}: showing results re-engraved during a take`);
+        assert.equal((await activeSystem.boundingBox()).width, activeWidth);
+      }
       await checkLayout(page, `${engineName} ${name}-drill-result`);
       await page.getByRole('button', {name: 'Hide results'}).click();
+      if (stable) {
+        await page.waitForTimeout(150);
+        assert.equal(await activeSystem.evaluate(element => element.isConnected), true, `${name}: hiding results re-engraved during a take`);
+        assert.equal((await activeSystem.boundingBox()).width, activeWidth);
+      }
     }
     await resizeScore(393, 852);
     await page.locator('#answer').evaluate(node => { node.hidden = false; });
@@ -290,6 +311,22 @@ for (const [engineName, engine] of [['chromium', chromium], ['webkit', webkit]])
     await checkLayout(page, `${engineName} active drill controls`);
     await page.locator('#answer').evaluate(node => { node.hidden = true; });
     await page.locator('#start').click();
+    await page.waitForFunction(() => !document.querySelector('#drillListen').disabled);
+    await page.locator('#drillListen').click();
+    await page.waitForFunction(() => document.querySelector('#drillListen').classList.contains('playing'));
+    await page.waitForTimeout(150);
+    const listeningSystem = await page.locator('.score-system svg').first().elementHandle();
+    const listeningWidth = (await listeningSystem.boundingBox()).width;
+    await page.evaluate(() => window.showResponsiveDrillResult());
+    await page.waitForTimeout(150);
+    assert.equal(await listeningSystem.evaluate(element => element.isConnected), true, 'showing results re-engraved during playback');
+    assert.equal((await listeningSystem.boundingBox()).width, listeningWidth);
+    await page.getByRole('button', {name: 'Hide results'}).click();
+    await page.waitForTimeout(150);
+    assert.equal(await listeningSystem.evaluate(element => element.isConnected), true, 'hiding results re-engraved during playback');
+    assert.equal((await listeningSystem.boundingBox()).width, listeningWidth);
+    await page.locator('#drillListen').click();
+    await page.waitForFunction(() => !document.querySelector('#drillListen').classList.contains('playing'));
     for (const {name, width, height} of viewports) {
       await resizeScore(width, height); await capture(`${name}-drills`);
       if (await page.locator('#drillMore').isVisible()) {
@@ -320,11 +357,25 @@ for (const [engineName, engine] of [['chromium', chromium], ['webkit', webkit]])
       await page.locator('[data-close="settingsDialog"]').click();
     }
     await page.setViewportSize({width: 375, height: 667});
-    const measures = Array.from({length: 8}, (_, index) => `<measure number="${index + 1}">${index === 0 ? '<attributes><divisions>1</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>' : ''}<note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note></measure>`).join('');
+    const denseNotes = Array.from({length: 16}, () => '<note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration><type>16th</type></note>').join('');
+    const measures = Array.from({length: 8}, (_, index) => `<measure number="${index + 1}">${index === 0 ? '<attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>' : ''}${index === 0 ? denseNotes : '<note><pitch><step>C</step><octave>4</octave></pitch><duration>16</duration></note>'}</measure>`).join('');
     const score = `<score-partwise><work><work-title>Viewport song</work-title></work><part id="P1">${measures}</part></score-partwise>`;
     await page.locator('#libraryFile').setInputFiles({name: 'viewport.musicxml', mimeType: 'application/xml', buffer: Buffer.from(score)});
     await page.getByText('Viewport song', {exact: true}).click();
     await page.locator('#sheetMusic .score-system svg').first().waitFor({timeout: 30000});
+    await page.setViewportSize({width: 360, height: 800});
+    await page.waitForFunction(() => {
+      const view = window.responsiveSheet;
+      return !view.timer && view.width === view.scroller.clientWidth && view.phrases[0]?.systems?.length;
+    });
+    const denseLibrary = await page.evaluate(() => {
+      const view = window.responsiveSheet, system = view.phrases[0].systems[0];
+      return {available: view.scroller.clientWidth - 24, natural: system.frame.width * view.scale,
+        drawn: system.svg.getBoundingClientRect().width, zoom: view.preferences.zoom};
+    });
+    assert.equal(denseLibrary.zoom, 'fit');
+    assert.ok(denseLibrary.natural > denseLibrary.available, JSON.stringify(denseLibrary));
+    assert.ok(denseLibrary.drawn <= denseLibrary.available + 1, JSON.stringify(denseLibrary));
     await page.locator('#songSectionSelect').selectOption('1');
     for (const {name, width, height} of viewports) {
       await resizeScore(width, height);

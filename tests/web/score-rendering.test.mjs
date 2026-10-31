@@ -4,6 +4,7 @@ import {tmpdir} from 'node:os';
 import {join, resolve} from 'node:path';
 import {after, before, test} from 'node:test';
 import {chromium, webkit} from 'playwright';
+import {MIN_FIT_SCALE} from '../../src/piano_duet/static/score_view.mjs';
 import {startTestServer} from './server.mjs';
 
 let server, port;
@@ -125,6 +126,93 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) {
         if (width === 393) assert.ok(await page.evaluate(() => window.scoreFixture.phrase.systems.length > 1));
         if (width === 1440) assert.equal(await page.evaluate(() => window.scoreFixture.phrase.systems.length), 1);
       }
+
+      await page.waitForFunction(() => !window.scoreFixture.view.timer);
+      const playingSystem = await page.locator('#scoreFixture .score-system svg').first().elementHandle();
+      const pinnedScale = await page.evaluate(() => {
+        const {view} = window.scoreFixture;
+        view.setActive(true);
+        return view.fittedScale;
+      });
+      await page.setViewportSize({width: 820, height: 900});
+      await page.evaluate(() => window.scoreFixture.view.relayout());
+      await page.waitForTimeout(250);
+      assert.equal(await playingSystem.evaluate(element => element.isConnected), true);
+      assert.equal(await page.evaluate(() => window.scoreFixture.view.fittedScale), pinnedScale);
+      await page.setViewportSize({width: 900, height: 900});
+      await page.waitForFunction(element => !element.isConnected, playingSystem, {timeout: 10000});
+      assert.equal(await page.evaluate(() => window.scoreFixture.view.fittedScale), pinnedScale);
+      const resizedSystem = await page.locator('#scoreFixture .score-system svg').first().elementHandle();
+      await page.evaluate(() => window.scoreFixture.view.setActive(false));
+      await page.waitForFunction(element => !element.isConnected, resizedSystem, {timeout: 10000});
+
+      const beforeHeight = await page.locator('#scoreFixture .score-system svg').first().elementHandle();
+      await page.evaluate(() => {
+        const {view} = window.scoreFixture;
+        document.querySelector('#scoreFixture').style.bottom = '100px';
+        view.relayout();
+        view.setActive(true);
+      });
+      await page.waitForTimeout(250);
+      assert.equal(await beforeHeight.evaluate(element => element.isConnected), true);
+      await page.evaluate(() => window.scoreFixture.view.setActive(false));
+      await page.waitForFunction(element => !element.isConnected, beforeHeight, {timeout: 10000});
+
+      const beforeActiveFont = await page.locator('#scoreFixture .score-system svg').first().elementHandle();
+      await page.evaluate(() => {
+        window.scoreFixture.view.setActive(true);
+        document.fonts.dispatchEvent(new Event('loading'));
+      });
+      await page.waitForTimeout(250);
+      assert.equal(await beforeActiveFont.evaluate(element => element.isConnected), true);
+      await page.evaluate(() => window.scoreFixture.view.setActive(false));
+      await page.waitForFunction(element => !element.isConnected, beforeActiveFont, {timeout: 10000});
+
+      await page.setViewportSize({width: 360, height: 800});
+      await page.evaluate(() => {
+        const {view} = window.scoreFixture;
+        document.querySelector('#scoreFixture').style.bottom = '0';
+        view.use('fixture-library', {scale: 1.05, cursor: true, feedback: true});
+        const notes = Array.from({length: 16}, (_, index) => ({pitch: 60 + index % 5, start: index / 4, duration: .25, staff: 'treble'}));
+        window.scoreFixture.phrase = view.add('target', notes, {bpm: 60, meter: '4/4', clef: 'grand', bars: 1, exact: true});
+      });
+      await page.waitForFunction(() => !window.scoreFixture.view.timer && window.scoreFixture.phrase.systems?.length);
+      const dense = await page.evaluate(() => {
+        const {view, phrase} = window.scoreFixture;
+        const system = phrase.systems[0], available = view.scroller.clientWidth - 24;
+        return {available, natural: system.frame.width * view.scale, drawn: system.svg.getBoundingClientRect().width, scale: system.scale};
+      });
+      assert.ok(dense.natural > dense.available, JSON.stringify(dense));
+      assert.ok(dense.drawn <= dense.available + 1 && dense.scale < MIN_FIT_SCALE, JSON.stringify(dense));
+
+      await page.evaluate(() => {
+        const {view} = window.scoreFixture;
+        view.use('fixture-editor', {scale: 1.05, stableFit: true});
+        const notes = [0, 4, 8, 12].map((start, index) => ({pitch: 60 + index, start, duration: 1, staff: 'treble'}));
+        window.scoreFixture.phrase = view.add('target', notes, {bpm: 60, meter: '4/4', clef: 'treble', bars: 4, exact: true});
+      });
+      await page.waitForFunction(() => !window.scoreFixture.view.timer && window.scoreFixture.phrase.systems?.length);
+      const editorScale = await page.evaluate(() => {
+        const {view, phrase} = window.scoreFixture;
+        window.editorReplacements = 0;
+        window.editorObserver = new MutationObserver(records => { window.editorReplacements += records.filter(record => record.removedNodes.length).length; });
+        window.editorObserver.observe(phrase.host, {childList: true});
+        view.update(phrase, {notes: phrase.notes.map((note, index) => index ? note : {...note, pitch: note.pitch + 2})});
+        return view.fittedScale;
+      });
+      await page.waitForFunction(() => !window.scoreFixture.view.timer);
+      const edit = await page.evaluate(() => ({scale: window.scoreFixture.view.fittedScale, replacements: window.editorReplacements}));
+      assert.equal(edit.scale, editorScale);
+      assert.equal(edit.replacements, 1);
+      const switched = await page.evaluate(() => {
+        const {view} = window.scoreFixture;
+        view.fittedScale = 3.8;
+        view.use('fixture-switch', {scale: 1});
+        const fitted = view.fittedScale;
+        view.step(1);
+        return {fitted, zoom: view.preferences.zoom};
+      });
+      assert.deepEqual(switched, {fitted: null, zoom: 1.5});
     } finally {
       await context.close();
       await rm(profile, {recursive: true, force: true});

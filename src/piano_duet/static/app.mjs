@@ -20,7 +20,7 @@ const EMPTY_SCORE = '<span aria-hidden="true">𝄞</span><p>Start with a few not
 const SCORE_VIEWS = {
   reading: {scale: 1.8, cursor: true, feedback: true, heard: true, pace: true, focus: true, barNumbers: 'all'},
   library: {scale: 1.05, cursor: true, feedback: true, heard: true},
-  editor: {scale: 1.05, preferences: 'library', settings: ['layout', 'zoom']},
+  editor: {scale: 1.05, preferences: 'library', settings: ['layout', 'zoom'], stableFit: true},
   drills: {scale: 1.25, sounding: true},
   practice: {scale: 1.15, sounding: true, headings: true, followNewest: true, empty: EMPTY_SCORE},
   duet: {scale: 1, sounding: true, headings: true, followNewest: true, empty: EMPTY_SCORE},
@@ -1046,6 +1046,7 @@ function status(text, color = '#9ab89d') {
 }
 
 function buttons() {
+  sheet.setActive(Boolean(microphone || busy || listening || previewing));
   appearance.setLocked(Boolean(microphone));
   document.body.classList.toggle('is-playing', Boolean(microphone));
   $('songEdit').disabled = busy || Boolean(songEditor);
