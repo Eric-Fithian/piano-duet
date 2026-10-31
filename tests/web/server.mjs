@@ -40,3 +40,8 @@ export async function startTestServer(preview = false, requestedPort = 0) {
   });
   return { server, port };
 }
+
+export async function enableAllModes(context) {
+  await context.route('**/enabled_modes.mjs*', route => route.fulfill({contentType: 'text/javascript',
+    body: "export const ENABLED_MODES = ['practice', 'reading', 'drills', 'library', 'duet', 'learning'];"}));
+}

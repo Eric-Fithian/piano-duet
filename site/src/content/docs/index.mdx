@@ -3,7 +3,7 @@ title: Piano Duet
 description: Learn piano on your own acoustic piano, with an AI partner that listens through your Mac's microphone and runs entirely on your Mac.
 template: splash
 hero:
-  tagline: Play your real piano. Piano Duet listens through your Mac's microphone, writes fresh sheet music for you to read, coaches your technique, and answers your ideas, with every model running on your Mac.
+  tagline: Play your real piano. Piano Duet listens through your Mac's microphone, writes fresh sheet music for you to read and coaches your technique, with every model running on your Mac.
   image:
     file: ../../assets/logo.svg
   actions:
@@ -20,7 +20,6 @@ import {Card, CardGrid, LinkCard} from '@astrojs/starlight/components';
 import {Image} from 'astro:assets';
 import reading from '../../assets/screenshots/reading.png';
 import results from '../../assets/screenshots/drill-results.png';
-import duet from '../../assets/screenshots/duet.png';
 
 <Image class="screenshot" src={reading} alt="Reading mode: a four-bar score in G major. Notes already played are green, a late note is red, and a cursor waits on the next note." />
 
@@ -40,9 +39,6 @@ There is no on-screen keyboard and no MIDI cable. Put your Mac near an acoustic 
   <Card title="Library" icon="document">
     Import MIDI, MusicXML or a piano recording, or record one yourself. The cursor waits for each note, and every section is coloured by how well you've been playing it.
   </Card>
-  <Card title="Duet" icon="comment">
-    Trade musical phrases with Aria. It replies in your key, at a difficulty you choose, and shows the whole conversation as sheet music or a piano roll.
-  </Card>
 </CardGrid>
 
 <div class="rainbow" />
@@ -52,14 +48,6 @@ There is no on-screen keyboard and no MIDI cable. Put your Mac near an acoustic 
 <Image class="screenshot" src={results} alt="Drill results: meters for notes, evenness, tempo and loudness, and a note-by-note timeline whose tempo line turns amber where the player sped up." />
 
 Drills judge you against **your own** tempo, not a forced one. Three clean takes in a row earn a steady tempo, and ten levels per drill track how many keys you've mastered and how fast. The meters and timeline show exactly where a take went wrong.
-
-<div class="rainbow" />
-
-## A partner that answers
-
-<Image class="screenshot" src={duet} alt="Duet piano roll: the player's phrase in orange followed by Aria's reply in blue." />
-
-Play an idea, pause, and Aria continues it. **Variations** turns your phrase into a practice target, with the notes Aria found most surprising corrected, then scores your playback out of 100.
 
 <div class="rainbow" />
 

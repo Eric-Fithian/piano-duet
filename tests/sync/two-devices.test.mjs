@@ -6,7 +6,7 @@ import {tmpdir} from 'node:os';
 import {join, resolve} from 'node:path';
 import {test} from 'node:test';
 import {chromium} from 'playwright';
-import {startTestServer} from '../web/server.mjs';
+import {startTestServer, enableAllModes} from '../web/server.mjs';
 
 const config = JSON.parse(execFileSync('supabase', ['status', '-o', 'json'], {encoding: 'utf8'}));
 const staticBase = `/@fs${resolve('src/piano_duet/static')}`;
@@ -51,6 +51,7 @@ test('two signed-in devices rebuild the same progress after practising offline',
     for (const name of ['first', 'second']) {
       const context = await chromium.launchPersistentContext(join(directory, name), {headless: true});
       contexts.push(context);
+      await enableAllModes(context);
       await context.route('**/sync-config.json', (route) => route.fulfill({json: {url: config.API_URL, anonKey: config.ANON_KEY, emailEnabled: true}}));
       await context.route('**/src/piano-samples.ts', (route) => route.fulfill({contentType: 'text/javascript',
         body: `export const SAMPLE_REVISION = "sync-fixture"; export const PIANO_SAMPLES = ${JSON.stringify([sample])};`}));

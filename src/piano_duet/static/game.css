@@ -338,3 +338,75 @@ dialog::backdrop { background: #05080cc4; backdrop-filter: blur(8px); }
 .piano-app.song-editing #songSections, .piano-app.song-editing .song-hud .hud-right > :not(#songEdit), .piano-app.song-editing .transport { display: none; }
 .piano-app.song-editing #sheetMusic { cursor: crosshair; }
 .edit-selection ellipse { fill: #f1aa1c38; stroke: #c98400; stroke-width: 1.5; }
+
+.mode-menu-button, .drill-more-button { display:none; }
+.drill-extra { display:flex; align-items:center; gap:6px; }
+@media (max-width:900px), (max-height:500px) {
+  .piano-app .shell { padding:env(safe-area-inset-top) max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left)); }
+  .piano-app .app-header { height:52px; gap:8px; }
+  .mode-menu-button, .drill-more-button { display:inline-flex; align-items:center; min-height:44px; background:#202a38; color:var(--text); }
+  .mode-menu-button { margin-right:auto; gap:9px; }
+  .app-header .mode-switch { display:none; position:absolute; z-index:8; top:100%; left:0; transform:none; min-width:180px; padding:6px; background:#141a23; border:1px solid var(--line-strong); box-shadow:0 12px 30px #0008; }
+  .mode-menu-button[aria-expanded=true] + .mode-switch { display:flex; flex-direction:column; align-items:stretch; }
+  .mode-switch button { min-height:44px; text-align:left; }
+  .drill-bar { gap:4px; }
+  .drill-extra { display:none; position:absolute; z-index:5; top:100%; right:4px; max-width:calc(100vw - 32px); padding:8px; background:#141a23; border:1px solid var(--line-strong); border-radius:8px; flex-wrap:wrap; box-shadow:0 12px 30px #0008; }
+  .drill-more-button[aria-expanded=true] + .drill-extra { display:flex; }
+  .drill-extra button, .hud-tempo button { min-width:44px; min-height:44px; }
+  .drill-options { position:absolute; z-index:4; left:0; right:0; max-height:60dvh; overflow:auto; padding:12px; background:#141a23; box-shadow:0 12px 30px #0008; }
+  .drill-panel { position:relative; }
+  .drill-picker select, .drill-picker button { min-height:44px; max-width:100%; }
+  .library { padding:16px; }
+  .library-head { flex-wrap:wrap; gap:8px; }
+  .library-head .rule-heading { flex-basis:100%; }
+  .library-head input { flex:1; min-width:0; width:auto; min-height:44px; }
+  .import-button { min-height:44px; }
+  .song-row { grid-template-columns:minmax(0,1fr) 44px; gap:8px; }
+  .song-columns, .song-row > :not(.song-name):not(.song-delete) { display:none; }
+  .song-delete { width:44px; height:44px; opacity:1; }
+  .catalog { grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr)); }
+  .catalog-row button, .catalog-row a { min-height:44px; }
+  .song-hud { grid-template-columns:minmax(0,1fr) auto; }
+  .song-sections { grid-column:1 / -1; grid-row:2; }
+  .song-hud .hud-right { gap:2px; }
+  .song-hud .hud-streak, .song-hud .hud-session { display:none; }
+  dialog:is(.settings-dialog,.profile-dialog,.career-dialog) { position:fixed; inset:0; margin:0; width:100%; max-width:none; height:100dvh; max-height:none; border:0; border-radius:0; padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  .dialog-heading button, .session-choices button, .controls button, .controls select, .controls summary { min-height:44px; }
+  .score-controls button { width:44px; height:44px; }
+  .score-menu-choices button { min-height:44px; }
+  .transport { padding:6px 0 max(6px,env(safe-area-inset-bottom)); }
+  .transport-status, .transport-side { display:none; }
+  .space-key { min-height:46px !important; }
+}
+@media (max-height:500px) and (orientation:landscape) {
+  .piano-app .app-header { height:46px; }
+  .reading-hud { padding:2px 10px; display:flex; gap:8px; }
+  .reading-hud .hud-notes, .reading-hud .hud-streak, .reading-hud .hud-session { display:none; }
+  .reading-hud .hud-right { margin-left:auto; gap:2px; }
+  .score-toolbar { display:none; }
+  .transport { position:absolute; right:12px; bottom:max(8px,env(safe-area-inset-bottom)); z-index:4; padding:0; display:block; width:auto; }
+  .space-key { min-width:110px; min-height:44px !important; padding:0 14px; }
+  .space-key .key-cap { display:none; }
+  .score-controls { right:125px; bottom:10px; }
+}
+@media (max-width:900px), (max-height:500px) {
+  .mode-menu-button[aria-expanded=true] + .mode-switch { display:flex; flex-direction:column; align-items:stretch; }
+  .mode-switch button { min-height:44px; text-align:left; }
+  .header-actions button { min-width:44px; min-height:44px; }
+  .reading-hud .icon-button { min-width:44px; min-height:44px; }
+}
+
+.score-controls-toggle { display:none; }
+@media (pointer:coarse) { .space-key .key-cap { display:none; } }
+@media (max-width:900px), (max-height:500px) {
+  .score-controls .score-controls-toggle { display:block; }
+  .score-controls:not(.expanded) > :not(.score-controls-toggle) { display:none; }
+  .score-controls { opacity:.9; }
+}
+@media (max-height:500px) and (orientation:landscape) {
+  .piano-app[data-mode=drills] .shell { position:relative; }
+  .piano-app[data-mode=drills] .app-header { position:absolute; z-index:5; left:max(12px,env(safe-area-inset-left)); top:env(safe-area-inset-top); width:185px; }
+  .piano-app[data-mode=drills] .app-header .brand { display:none; }
+  .piano-app[data-mode=drills] .drill-bar { padding-left:195px; min-height:46px; }
+  .piano-app[data-mode=drills] .score-controls { right:125px; }
+}

@@ -8,8 +8,10 @@ import {currentOrdinal, renderLibrary, renderSongHud, sessionAccuracy} from './l
 import {DrillPicker, attackPlan, followPosition, heardAttacks, planSession, playedGap, streakText, takeEnded, tempoLabel} from './drills.mjs';
 import {METERS, SongEditor, musicalKey} from './song_editor.mjs';
 import {readLearnerSetting, refreshLearnerSettings, writeLearnerSetting} from './learner-settings.mjs';
+import {ENABLED_MODES} from './enabled_modes.mjs';
 
 const $ = id => document.getElementById(id);
+const ALL_MODES = ['practice', 'reading', 'drills', 'library', 'duet', 'learning'];
 const EMPTY_SCORE = '<span aria-hidden="true">𝄞</span><p>Start with a few notes.</p><small>Your music will appear here.</small>';
 // What each part of the app shows on top of the music. The player's own layout, zoom, look-ahead and following
 // are remembered separately for each part; `scale` is its staff size at 100% zoom.
@@ -28,7 +30,10 @@ sheet.onError = error => {
   $('scoreError').textContent = `Sheet music could not render: ${error.message}`;
   $('scoreError').hidden = false;
 };
-sheet.use('practice', SCORE_VIEWS.practice);
+sheet.use(ENABLED_MODES[0], SCORE_VIEWS[ENABLED_MODES[0]]);
+window.addEventListener('resize', () => sheet.relayout());
+screen.orientation?.addEventListener('change', () => sheet.relayout());
+window.visualViewport?.addEventListener('resize', () => sheet.relayout());
 const context = new AudioContext();
 const piano = new PianoSound(context);
 const detector = new PhraseDetector();
@@ -54,7 +59,7 @@ let reply = [];
 let turn = 0;
 let exchangeOffset = 0;
 let lateNotes = 0;
-let mode = 'practice';
+let mode = ENABLED_MODES[0];
 const learning = new LearningCycle();
 const practice = new PracticeCycle();
 const drills = new DrillPicker();
@@ -556,8 +561,7 @@ async function loadPractice() {
     if (!request) {
       const saved = drills.saved();
       if (saved) { drills.sync(saved); request = drills.next(); }
-      // A first visit opens the options so the choice of drills is visible.
-      else { showDrillOptions(true); request = {}; }
+      else request = {};
     }
     adopt = !request.drill;
     task = await localRequest('/api/drills/next', request);
@@ -891,6 +895,7 @@ function clearLearning() {
 }
 
 async function selectMode(value, persist = true) {
+  if (!ENABLED_MODES.includes(value)) throw new Error(`Playing mode ${value} is disabled.`);
   if (value === mode) return;
   if (mode === 'library') await closeSong();
   reading.pause();
@@ -905,6 +910,13 @@ async function selectMode(value, persist = true) {
 function updateModeControls() {
   const value = mode;
   document.body.dataset.mode = value;
+  $('currentMode').textContent = $(`${value}Mode`).textContent;
+  $('openProfile').hidden = value === 'library' && !ENABLED_MODES.includes('practice');
+  for (const selector of ['.session-info', '.session-actions', '.key-settings', '.score-settings']) {
+    document.querySelector(selector).hidden = !['practice', 'duet', 'learning'].includes(value);
+  }
+  $('modeMenuButton').setAttribute('aria-expanded', 'false');
+  $('drillMore').setAttribute('aria-expanded', 'false');
   const practicing = isPracticeMode();
   $('practiceMode').setAttribute('aria-pressed', value === 'practice');
   $('readingMode').setAttribute('aria-pressed', value === 'reading');
@@ -926,7 +938,7 @@ function updateModeControls() {
   $('sheetMusic').setAttribute('aria-label', value === 'reading' ? 'Reading music' : 'Sheet music');
   $('practiceChallenge').classList.toggle('reading-caption', value === 'reading');
   $('readingHelpActions').hidden = value !== 'reading';
-  $('autoReplyControls').hidden = value === 'reading';
+  $('autoReplyControls').hidden = !['practice', 'duet', 'learning'].includes(value);
   $('practiceFinishHelp').textContent = value === 'reading'
     ? 'Play the highlighted note. The score advances automatically when you find the right key.'
     : 'Take your time, then press Finish attempt or space.';
@@ -1064,8 +1076,9 @@ async function initialize() {
     if (!['build', 'mix'].includes(savedFlow)) throw new Error('The saved drill flow is invalid.');
     $('drillFlow').value = savedFlow;
   }
-  const savedMode = readLearnerSetting('piano-duet.mode') || 'practice';
-  if (!['practice', 'reading', 'drills', 'library', 'duet', 'learning'].includes(savedMode)) throw new Error('The saved playing mode is invalid.');
+  const storedMode = readLearnerSetting('piano-duet.mode') || ENABLED_MODES[0];
+  if (!ALL_MODES.includes(storedMode)) throw new Error('The saved playing mode is invalid.');
+  const savedMode = ENABLED_MODES.includes(storedMode) ? storedMode : ENABLED_MODES[0];
   const response = await localFetch('/api/status');
   if (!response.ok) throw new Error('The local piano server is not available. Restart Piano Duet.');
   await Promise.all([piano.load(), sheet.ready()]);
@@ -1567,9 +1580,30 @@ $('answer').addEventListener('click', answer);
 $('demo').addEventListener('click', () => demo().catch(fail));
 $('reset').addEventListener('click', reset);
 $('export').addEventListener('click', () => exportMidi().catch(fail));
-for (const value of ['practice', 'reading', 'drills', 'library', 'duet', 'learning']) {
-  $(`${value}Mode`).addEventListener('click', () => selectMode(value).catch(fail));
+for (const value of ALL_MODES) {
+  $(`${value}Mode`).hidden = !ENABLED_MODES.includes(value);
+  $(`${value}Mode`).addEventListener('click', () => { $('modeMenuButton').setAttribute('aria-expanded', 'false'); selectMode(value).catch(fail); });
 }
+$('allProgress').hidden = !ENABLED_MODES.includes('practice');
+$('modeMenuButton').addEventListener('click', () => {
+  const button = $('modeMenuButton');
+  button.setAttribute('aria-expanded', button.getAttribute('aria-expanded') !== 'true');
+});
+$('drillMore').addEventListener('click', () => {
+  const button = $('drillMore');
+  button.setAttribute('aria-expanded', button.getAttribute('aria-expanded') !== 'true');
+});
+document.addEventListener('click', event => {
+  if (!event.target.closest('#modeMenu, #modeMenuButton')) $('modeMenuButton').setAttribute('aria-expanded', 'false');
+  if (!event.target.closest('#drillExtra, #drillMore')) $('drillMore').setAttribute('aria-expanded', 'false');
+});
+document.addEventListener('scroll', () => $('drillMore').setAttribute('aria-expanded', 'false'), true);
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') {
+    $('modeMenuButton').setAttribute('aria-expanded', 'false');
+    $('drillMore').setAttribute('aria-expanded', 'false');
+  }
+});
 $('nextPractice').addEventListener('click', () => loadPractice().catch(fail));
 for (const id of ['drillKind', 'drillVariant', 'drillKey', 'drillHands', 'drillOctaves', 'drillInversion', 'drillPractice']) {
   $(id).addEventListener('change', () => { drills.sync(drills.read()); drills.save(); loadDrill(drills.next()); });
@@ -1602,6 +1636,8 @@ $('reviewPractice').addEventListener('click', () => {
 $('openProfile').addEventListener('click', () => {
   reading.interrupt();
   if (mode === 'reading') { openCareer(); return; }
+  if (mode === 'drills' && !ENABLED_MODES.includes('practice')) { openLevels().catch(fail); return; }
+  if (!ENABLED_MODES.includes('practice')) return;
   $('profileDialog').showModal(); $('profileDialog').scrollTop = 0;
 });
 $('allProgress').addEventListener('click', () => { $('readingProgressDialog').close(); $('profileDialog').showModal(); });
@@ -1722,7 +1758,8 @@ async function applyLearnerSettings(selectSavedMode = true) {
   sheet.configure({tempo: $('scoreTempo').value, bpm: Number($('scoreBpm').value), meter: $('scoreMeter').value,
     flats: $('scoreAccidentals').value === 'auto' ? null : $('scoreAccidentals').value === 'flats'});
   const selected = readLearnerSetting('piano-duet.mode');
-  if (selectSavedMode && selected && selected !== mode) await selectMode(selected, false);
+  if (selectSavedMode && selected && !ALL_MODES.includes(selected)) throw new Error('The saved playing mode is invalid.');
+  if (selectSavedMode && selected && ENABLED_MODES.includes(selected) && selected !== mode) await selectMode(selected, false);
 }
 window.addEventListener('pagehide', () => { controller?.abort(); microphone?.getTracks().forEach(track => track.stop()); piano.stop(); });
 const initialized = initialize();

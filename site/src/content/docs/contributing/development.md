@@ -13,7 +13,7 @@ npm ci --prefix site
 npm run dev    # app at http://127.0.0.1:5173, docs under /docs
 ```
 
-The browser app is under construction: Reading, guided Practice, Drills, Library recording import, Duet and Variations use the local service and the pinned model catalog. The browser downloads model files when a mode first needs them. For the Python reference, run `make setup` to install its dependencies, models and browser test engines, then `make dev` to start it at `http://127.0.0.1:8765`. Python edits restart that server; browser edits refresh its page without reloading the models.
+The browser app is under construction: Reading, Drills and Library recording import use the local service and the pinned model catalog. The browser downloads model files when a mode first needs them. For the Python reference, run `make setup` to install its dependencies, models and browser test engines, then `make dev` to start it at `http://127.0.0.1:8765`. Python edits restart that server; browser edits refresh its page without reloading the models.
 
 ## Account sign-in
 

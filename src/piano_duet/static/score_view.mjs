@@ -131,6 +131,11 @@ export class ScoreView {
     this.observer.observe(this.scroller);
   }
 
+  relayout() {
+    if (this.preferences.layout === 'wrap') for (const phrase of this.phrases) this.schedule(phrase);
+    this.refollow(true);
+  }
+
   async ready() {
     if (!window.VexFlow) throw new Error('The local sheet-music library is missing. Run piano-duet setup.');
     await document.fonts.ready;
@@ -176,7 +181,8 @@ export class ScoreView {
   }
 
   get scale() {
-    return this.profile.scale * this.preferences.zoom;
+    const scale = this.name === 'reading' && matchMedia('(max-width: 600px)').matches ? 1 : this.profile.scale;
+    return scale * this.preferences.zoom;
   }
 
   configure(options) {
@@ -720,6 +726,13 @@ export class ScoreView {
       node.addEventListener('click', action);
       return node;
     };
+    this.controlsToggle = button('Score controls', '⋯', () => {
+      const expanded = controls.classList.toggle('expanded');
+      this.controlsToggle.setAttribute('aria-expanded', expanded);
+      if (!expanded) this.toggleMenu(false);
+    });
+    this.controlsToggle.className = 'score-controls-toggle';
+    this.controlsToggle.setAttribute('aria-expanded', 'false');
     this.zoomOut = button('Zoom out', '−', () => this.step(-1));
     this.zoomLabel = element('span', 'score-zoom', controls);
     this.zoomIn = button('Zoom in', '+', () => this.step(1));
@@ -760,6 +773,10 @@ export class ScoreView {
       this.rows[key] = row;
     }
     document.addEventListener('pointerdown', event => {
+      if (!controls.contains(event.target) && !this.menu.contains(event.target)) {
+        controls.classList.remove('expanded');
+        this.controlsToggle.setAttribute('aria-expanded', 'false');
+      }
       if (!this.menu.hidden && !this.menu.contains(event.target) && !this.menuButton.contains(event.target)) this.toggleMenu(false);
     });
     this.menu.addEventListener('keydown', event => { if (event.key === 'Escape') { this.toggleMenu(false); this.menuButton.focus(); } });

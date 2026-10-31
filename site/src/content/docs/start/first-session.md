@@ -19,9 +19,7 @@ When you first press **Space**, the browser asks for microphone access. If you d
 - **Drills** end each take by themselves shortly after you stop.
 - **Library** listens for the notes of an imported score and waits at each attack.
 
-The browser versions of Practice, Duet and Variations are still being built.
-
-The app fits one screen, with the microphone controls always at the bottom. Exercise details, help, settings and progress open in panels. **Mic off** releases the microphone and stops playback. **Stop** is also available during processing or playback.
+On phones, use the mode menu to switch between Reading, Drills and Library. Turn the phone sideways for a wider score. Exercise details, help, settings and progress open in panels. **Mic off** releases the microphone and stops playback. **Stop** is also available during processing or playback.
 
 ## Pick a mode
 
@@ -30,11 +28,7 @@ The app fits one screen, with the microphone controls always at the bottom. Exer
 | [Reading](/docs/modes/reading/) | Sight-reading fresh scores, one note at a time |
 | [Drills](/docs/modes/drills/) | Scales, arpeggios, chords and Hanon at a steady tempo |
 | [Library](/docs/modes/library/) | Learning full pieces from MIDI, MusicXML or a recording |
-| [Practice](/docs/modes/practice/) | Guided exercises across technique, theory, ear and repertoire |
-| [Duet and Variations](/docs/modes/duet/) | Improvising with Aria and imitating your own ideas |
-
-The Python reference app also includes demonstrations in Duet and Variations; those browser modes are still in progress.
 
 ## If notes are missed or misheard
 
-Microphone transcription is approximate. Room acoustics, pedal resonance, fast repeated notes and distant microphones can cause missing or extra notes. **Note confidence**, near the top of **Settings** under Listening, defaults to **0.80**. Raise it gradually if you get extra notes, or lower it if notes are missed. Every attempt can be reviewed and excluded under **Progress**, which recalculates your levels.
+Microphone transcription is approximate. Room acoustics, pedal resonance, fast repeated notes and distant microphones can cause missing or extra notes. **Note confidence**, near the top of **Settings** under Listening, defaults to **0.80**. Raise it gradually if you get extra notes, or lower it if notes are missed. Reading and drill progress is available from the level button.

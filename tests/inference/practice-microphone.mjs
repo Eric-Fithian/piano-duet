@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 import { chromium, webkit } from "playwright";
 import { MODEL_CATALOG } from "../../site/app/src/model-catalog.ts";
 import { startServer } from "./server.mjs";
-import { startTestServer } from "../web/server.mjs";
+import { startTestServer, enableAllModes } from "../web/server.mjs";
 import { browserProfile } from "./browser-profile.mjs";
 
 const engineName = process.argv[2];
@@ -24,6 +24,7 @@ try {
   browser = await engine.launchPersistentContext(profile.path, { headless: true,
     ...(engineName === "chromium" ? { channel: "chrome", args: ["--use-fake-ui-for-media-stream", "--autoplay-policy=no-user-gesture-required"] } : {}) });
   await browser.grantPermissions(["microphone"], { origin: `http://127.0.0.1:${site.port}` });
+  await enableAllModes(browser);
   const base = `http://127.0.0.1:${models.address().port}`;
   const assets = MODEL_CATALOG["phrase-transcription"].filter((asset) => !wasmOnly || asset.role === "graph")
     .map((asset) => ({ ...asset, revision: "local-fixture", url: `${base}/models/local-fixture/${asset.name}` }));

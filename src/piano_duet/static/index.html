@@ -17,7 +17,8 @@
   <div class="shell">
     <header class="app-header">
       <a class="brand" href="/" aria-label="Piano Duet home"><span class="mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>DUET</a>
-      <nav class="mode-switch" role="group" aria-label="Playing mode"><button id="readingMode" aria-pressed="false">Reading</button><button id="drillsMode" aria-pressed="false">Drills</button><button id="libraryMode" aria-pressed="false">Library</button><button id="practiceMode" aria-pressed="true">Practice</button><button id="duetMode" aria-pressed="false">Duet</button><button id="learningMode" aria-pressed="false">Variations</button></nav>
+      <button id="modeMenuButton" class="mode-menu-button" aria-expanded="false" aria-controls="modeMenu">☰ <span id="currentMode">Reading</span></button>
+      <nav id="modeMenu" class="mode-switch" role="group" aria-label="Playing mode"><button id="readingMode" aria-pressed="true">Reading</button><button id="drillsMode" aria-pressed="false">Drills</button><button id="libraryMode" aria-pressed="false">Library</button><button id="practiceMode" hidden aria-pressed="false">Practice</button><button id="duetMode" hidden aria-pressed="false">Duet</button><button id="learningMode" hidden aria-pressed="false">Variations</button></nav>
       <div class="header-actions">
         <button id="openProfile" class="level-badge" aria-haspopup="dialog" aria-label="Progress"><span class="level-diamond" aria-hidden="true"><b id="levelNumber">1</b></span><span class="level-meta"><span><span class="level-caption">Level</span><span id="levelXp" class="level-xp"></span></span><span class="xp-track"><i id="levelFill"></i></span></span></button>
         <button id="openSettings" class="icon-button" aria-haspopup="dialog" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg></button>
@@ -59,6 +60,8 @@
         <section id="drillPanel" class="drill-panel" aria-label="Drill" hidden>
           <div class="drill-bar">
             <button id="drillToggle" class="drill-title" aria-expanded="false" aria-controls="drillOptions" title="Change drill"><strong id="drillTitle">Drills</strong><small id="drillCue"></small><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg></button>
+            <button id="drillMore" class="drill-more-button" aria-expanded="false" aria-controls="drillExtra">More</button>
+            <div id="drillExtra" class="drill-extra">
             <button id="drillLevel" class="drill-level" aria-haspopup="dialog" title="Drill levels"><b id="drillLevelNumber">0</b><span class="xp-track"><i id="drillLevelFill"></i></span></button>
             <span id="drillTempoControl" class="hud-tempo" role="group" aria-label="Drill tempo"><button id="drillSlower" aria-label="Slower" aria-keyshortcuts="ArrowLeft">−</button><span><small>♩</small><b id="drillTempo">—</b><small id="drillSubdivision"></small></span><button id="drillFaster" aria-label="Faster" aria-keyshortcuts="ArrowRight">+</button></span>
             <button id="drillListen" class="icon-button listen-button" aria-label="Hear it played" title="Hear it played"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="play-icon" d="M8 5l11 7-11 7z"/><path class="stop-icon" d="M7 7h10v10H7z"/></svg></button>
@@ -67,6 +70,7 @@
             <button id="drillNext" class="icon-button" aria-label="Next drill" title="Next drill"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l8 6-8 6zM17 6v12"/></svg></button>
             <button id="drillSession" class="quiet-button drill-session" aria-haspopup="dialog">Session</button>
             <button id="drillDetails" class="icon-button" aria-haspopup="dialog" aria-label="Instructions and tips" title="Instructions and tips"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.2"/></svg></button>
+            </div>
             <span class="xp-track drill-ladder-track" aria-hidden="true"><i id="drillLadderFill"></i></span>
           </div>
           <div id="drillOptions" class="drill-options" hidden>
@@ -152,7 +156,7 @@
       <div class="landing-legend"><span>0.5 s</span><span class="landing-gradient" aria-hidden="true"></span><span>3 s+</span></div>
       <div id="readingFluency" class="fluency-hands"></div>
     </details>
-    <button id="allProgress" class="text-button career-more">All piano skills →</button>
+    <button id="allProgress" hidden class="text-button career-more">All piano skills →</button>
   </dialog>
   <dialog id="drillLogDialog" class="settings-dialog drill-levels-dialog" aria-labelledby="drillLogTitle">
     <div class="dialog-heading"><h2 id="drillLogTitle">Drill levels</h2><span id="drillStreak" class="drill-streak"></span><button class="quiet-button" data-close="drillLogDialog" autofocus>Done</button></div>

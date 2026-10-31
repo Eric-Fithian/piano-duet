@@ -5,7 +5,7 @@ import { readFile, stat } from "node:fs/promises";
 import { resolve } from "node:path";
 import { chromium } from "playwright";
 import { startServer } from "./server.mjs";
-import { startTestServer } from "../web/server.mjs";
+import { startTestServer, enableAllModes } from "../web/server.mjs";
 import { MODEL_CATALOG } from "../../site/app/src/model-catalog.ts";
 
 const staticBase = `/@fs${resolve("src/piano_duet/static")}`;
@@ -34,6 +34,7 @@ try {
   const assets = files.map((file) => ({ ...file, url: `${base}/models/local-fixture/recording-${file.name}` }));
   browser = await chromium.launch({ channel, headless: true, args: ["--use-fake-ui-for-media-stream", "--autoplay-policy=no-user-gesture-required"] });
   context = await browser.newContext({ permissions: ["microphone"] });
+  await enableAllModes(context);
   const page = await context.newPage();
   page.on("pageerror", (error) => errors.push(String(error)));
   page.on("console", (message) => process.stderr.write(`Page ${message.type()}: ${message.text()}\n`));

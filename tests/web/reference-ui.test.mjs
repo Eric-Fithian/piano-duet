@@ -6,7 +6,7 @@ import {join} from 'node:path';
 import {after, before, test} from 'node:test';
 import {chromium, webkit} from 'playwright';
 import {strToU8, zipSync} from 'fflate';
-import {startTestServer} from './server.mjs';
+import {startTestServer, enableAllModes} from './server.mjs';
 
 function sampleWave() {
   const samples = 800;
@@ -27,6 +27,7 @@ for (const [name, engine] of [['Chromium', chromium], ['WebKit', webkit]]) {
     const browser = await engine.launchPersistentContext(profile, {headless: true,
       ...(name === 'Chromium' ? {args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream']} : {})});
     try {
+      await enableAllModes(browser);
       const bytes = sampleWave();
       const sample = {pitch: 60, file: 'C4.mp3', sha256: createHash('sha256').update(bytes).digest('hex'), bytes: bytes.length};
       await browser.route('**/src/piano-samples.ts', route => route.fulfill({contentType: 'text/javascript',

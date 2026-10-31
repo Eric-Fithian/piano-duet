@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 import { chromium } from "playwright";
 import { MODEL_CATALOG } from "../../site/app/src/model-catalog.ts";
 import { startServer } from "./server.mjs";
-import { startTestServer } from "../web/server.mjs";
+import { startTestServer, enableAllModes } from "../web/server.mjs";
 import { browserProfile } from "./browser-profile.mjs";
 import { waitForCreativeProgress } from "./creative-progress.mjs";
 import { hasSpacedOnsets } from "./capture-onsets.mjs";
@@ -34,6 +34,7 @@ let browser;
 try {
   browser = await chromium.launchPersistentContext(profile.path, { channel: "chrome", headless: true, permissions: ["microphone"],
     args: ["--use-fake-ui-for-media-stream", "--autoplay-policy=no-user-gesture-required"] });
+  await enableAllModes(browser);
   const base = `http://127.0.0.1:${models.address().port}`;
   const local = (model) => MODEL_CATALOG[model].map((asset) => ({ ...asset, revision: "local-fixture", url: `${base}/models/local-fixture/${asset.name}` }));
   const catalog = process.env.PIANO_CREATIVE_REMOTE_MODELS === "1" ? MODEL_CATALOG

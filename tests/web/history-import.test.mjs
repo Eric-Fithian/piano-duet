@@ -4,7 +4,7 @@ import {createHash} from 'node:crypto';
 import {mkdir, mkdtemp, rm} from 'node:fs/promises';
 import {after, before, test} from 'node:test';
 import {chromium, webkit} from 'playwright';
-import {startTestServer} from './server.mjs';
+import {startTestServer, enableAllModes} from './server.mjs';
 
 let server, port, directory, path;
 before(async () => {
@@ -21,6 +21,7 @@ for (const [name, engine] of [['Chromium', chromium], ['WebKit', webkit]]) {
     const profile = await mkdtemp('.local/history-browser-profile-');
     const browser = await engine.launchPersistentContext(profile, {headless: true});
     try {
+      await enableAllModes(browser);
       const bytes = Buffer.alloc(1644);
       bytes.write('RIFF', 0); bytes.writeUInt32LE(bytes.length - 8, 4); bytes.write('WAVEfmt ', 8);
       bytes.writeUInt32LE(16, 16); bytes.writeUInt16LE(1, 20); bytes.writeUInt16LE(1, 22);

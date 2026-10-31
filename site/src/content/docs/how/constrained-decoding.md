@@ -23,7 +23,3 @@ Reading scores are written by the local **Aria** model under constraints, the wa
 Aria then writes the score note by note, choosing only among the tokens those rules allow: its pitch tokens are limited to the hand position and largest interval, onsets are fixed to the beat grid, and duration tokens to the bar's allowed rhythms. Each new score continues the one shown before it. Your weaker notes and intervals add weight to Aria's own probabilities, so practice stays targeted while the model supplies the musical continuation. Repeating one note three times or swinging between two notes for five is ruled out wherever the hand position allows another note. A score you have already seen is simply rewritten. Writing a score takes 0.1–0.7 s, the score is saved before it appears and never changes while visible, and model errors are surfaced rather than silently switching to random exercises. Introductions show single notes and need no model.
 
 At each step the decoder masks every token the rules forbid, adds practice weights to the remaining logits, and samples with temperature 0.95 and a min-p cutoff. A token the rules leave no choice about is written without calling the model. Each new score is conditioned on the four bars before it, so consecutive scores continue each other musically.
-
-## In Duet
-
-Duet uses the same model with lighter constraints. The estimated key restricts pitch tokens, and **Reply difficulty** limits attack speed, notes per chord and hand, register, span and jumps, all before sampling. See [Duet and Variations](/docs/modes/duet/).

@@ -3,7 +3,7 @@ title: Architecture
 description: The local-first browser foundation and the Python reference implementation.
 ---
 
-The browser rebuild is in progress. Its app lives at `/`, and these docs live under `/docs`. The browser reuses the interface in `src/piano_duet/static/`; its API requests go through an injectable local service. A dedicated worker keeps an append-only event log in SQLite using OPFS; model files and piano samples are cached on the device by version and digest. Guided Practice and Reading use the shared curriculum and local inference; Drills use Transkun for recorded takes; Library imports MIDI, MusicXML and recordings. Duet and Variations use full-phrase transcription and Aria. Account sync exchanges the event log with Supabase and rebuilds progress on each device; Google sign-in is configured, with its first real account test pending. The iOS shell remains incomplete. [Inference measurements](/docs/how/performance/) include real Safari on a Mac; iPhone measurements are pending.
+The browser rebuild is in progress. Its app lives at `/`, and these docs live under `/docs`. The browser reuses the interface in `src/piano_duet/static/`; its API requests go through an injectable local service. A dedicated worker keeps an append-only event log in SQLite using OPFS; model files and piano samples are cached on the device by version and digest. Reading uses the shared curriculum and local inference; Drills use Transkun for recorded takes; Library imports MIDI, MusicXML and recordings. Account sync exchanges the event log with Supabase and rebuilds progress on each device; Google sign-in is configured, with its first real account test pending. The iOS shell remains incomplete. [Inference measurements](/docs/how/performance/) include real Safari on a Mac; iPhone measurements are pending.
 
 ```text
  Shared interface ──▶ local service ──▶ TypeScript curriculum, scoring and library
@@ -45,14 +45,13 @@ The existing Python app remains the reference implementation. It serves a browse
 | `practice.py`, `assessment.py`, `profile.py` | Task selection, scoring and the learner profile |
 | `drills.py` | Drill plans, take analysis and levels |
 | `library.py`, `score_import.py`, `score_model.py`, `youtube.py` | Songs, MIDI and MusicXML import, and recording-to-score |
-| `key_tracking.py`, `difficulty.py`, `phrasing.py` | Key estimates and playability constraints for Duet |
 
 ## Reference models
 
 | Model | Runs on | Used for |
 | --- | --- | --- |
-| [Aria](https://github.com/EleutherAI/aria), about 650M parameters | Mac GPU via MLX, 4-bit | Duet replies, Variations surprise, Reading scores |
-| [High-resolution Piano Transcription](https://github.com/bytedance/piano_transcription) | ONNX Runtime | Live recognition in Reading, Library, Practice and Duet |
+| [Aria](https://github.com/EleutherAI/aria), about 650M parameters | Mac GPU via MLX, 4-bit | Reading scores |
+| [High-resolution Piano Transcription](https://github.com/bytedance/piano_transcription) | ONNX Runtime | Live recognition in Reading and Library |
 | [Transkun 2.0](https://github.com/Yujia-Yan/Transkun) | Mac GPU | Drill takes and recordings |
 | [MIDI2ScoreTransformer](https://github.com/TimFelixBeyer/MIDI2ScoreTransformer) | CPU, separate environment | Writing a score from a recording |
 

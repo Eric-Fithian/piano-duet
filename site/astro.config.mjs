@@ -27,7 +27,7 @@ export default defineConfig({
       ],
       sidebar: [
         {label: 'Start here', items: ['start/install', 'start/first-session']},
-        {label: 'Modes', items: ['modes/reading', 'modes/drills', 'modes/library', 'modes/practice', 'modes/duet', 'modes/viewing']},
+        {label: 'Modes', items: ['modes/reading', 'modes/drills', 'modes/library', 'modes/viewing']},
         {label: 'How it works', items: ['how/architecture', 'how/constrained-decoding', 'how/listening', 'how/performance', 'how/privacy']},
         {label: 'Contributing', items: ['contributing/development', 'contributing/ci']},
         {label: 'Credits', link: '/credits/'},
