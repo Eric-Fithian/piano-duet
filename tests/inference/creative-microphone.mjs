@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 import { chromium } from "playwright";
 import { MODEL_CATALOG } from "../../site/app/src/model-catalog.ts";
 import { startServer } from "./server.mjs";
-import { startTestServer } from "../web/server.mjs";
+import { startTestServer, enableAllModes } from "../web/server.mjs";
 import { browserProfile } from "./browser-profile.mjs";
 import { waitForCreativeProgress } from "./creative-progress.mjs";
 import { hasSpacedOnsets } from "./capture-onsets.mjs";
@@ -34,6 +34,7 @@ let browser;
 try {
   browser = await chromium.launchPersistentContext(profile.path, { channel: "chrome", headless: true, permissions: ["microphone"],
     args: ["--use-fake-ui-for-media-stream", "--autoplay-policy=no-user-gesture-required"] });
+  await enableAllModes(browser);
   const base = `http://127.0.0.1:${models.address().port}`;
   const local = (model) => MODEL_CATALOG[model].map((asset) => ({ ...asset, revision: "local-fixture", url: `${base}/models/local-fixture/${asset.name}` }));
   const catalog = process.env.PIANO_CREATIVE_REMOTE_MODELS === "1" ? MODEL_CATALOG
@@ -101,6 +102,7 @@ try {
   }, { selectedProvider: provider, selectedPhraseProvider: phraseProvider });
   await page.goto(`http://127.0.0.1:${site.port}/`);
   await page.waitForFunction(() => document.querySelector("#practiceTitle")?.textContent === "C major scale", null, { timeout: 30000 });
+  await page.locator("#modeMenuButton").click();
   await page.locator("#duetMode").click();
   await page.locator("#openSettings").click();
   await page.locator("#length").evaluate((input) => { input.value = "2"; input.dispatchEvent(new Event("input", { bubbles: true })); });
@@ -237,6 +239,7 @@ try {
   assert.ok(again.recent.length >= 2 && again.recent.slice(0, 2).every((attempt) => attempt.mode === "duet" && attempt.note_count >= 3),
     await diagnostic(`Duet attempts were not saved with enough notes: ${JSON.stringify(again.recent.slice(0, 2))}`));
   await waitForListening("Variations mode switch");
+  await page.locator("#modeMenuButton").click();
   await page.locator("#learningMode").click();
   await waitForListening("Variations idea");
   await play([60, 64, 67], 0.7, 0.45);

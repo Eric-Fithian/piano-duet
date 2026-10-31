@@ -168,7 +168,9 @@ export class LocalService {
     }
     if (method === "POST" && url.pathname === "/api/library/import-audio") {
       const filename = url.searchParams.get("filename"), rights = url.searchParams.get("rights");
+      const youtubeTitle = url.searchParams.get("youtubeTitle"), youtubeChannel = url.searchParams.get("youtubeChannel"), youtubeUrl = url.searchParams.get("youtubeUrl");
       if (!filename || filename.length > 200 || rights !== "1") return Response.json({ detail: "Confirm that you have the rights to transcribe this recording" }, { status: 400 });
+      if ((youtubeTitle?.length ?? 0) > 200 || (youtubeChannel?.length ?? 0) > 200 || (youtubeUrl?.length ?? 0) > 2048) return Response.json({ detail: "Invalid video details" }, { status: 400 });
       if (!(options.body instanceof ArrayBuffer) || !options.body.byteLength || options.body.byteLength > 256_000_000) {
         return Response.json({ detail: "Import an audio file under 256 MB" }, { status: 400 });
       }
@@ -179,13 +181,14 @@ export class LocalService {
       try {
         const parsed = parseScore(source, new TextEncoder().encode(musicXml));
         const title = filename.lastIndexOf(".") > 0 ? filename.slice(0, filename.lastIndexOf(".")) : filename;
-        draft = buildSong({ ...parsed, bpm: performanceTempo(notes, parsed) }, title, null, source, true);
+        draft = buildSong({ ...parsed, bpm: performanceTempo(notes, parsed) }, youtubeTitle || title, youtubeChannel || null, youtubeTitle ? "YouTube" : source, true);
       }
       catch (error) {
         if (!(error instanceof ScoreError)) throw error;
         return Response.json({ detail: `Could not write ${filename}: ${error.message}` }, { status: 400 });
       }
-      const id = crypto.randomUUID(), song = { id, ...draft };
+      options.signal?.throwIfAborted();
+      const id = crypto.randomUUID(), song = { id, ...draft, ...(youtubeTitle ? { transcribed: true, url: youtubeUrl } : {}) };
       const event = await this.store.append("song", { action: "import", song } as unknown as LocalJsonValue, id);
       return Response.json(await songSummary({ ...song, created_at: Date.parse(event.createdAt) / 1000 }, []));
     }
@@ -209,8 +212,8 @@ export class LocalService {
     }
     if (method === "GET" && url.pathname === "/api/drills") {
       const attempts = attemptsFromEvents(await this.store.list());
-      const { progress, streak_days } = drillProgress(attempts as unknown as DrillAttempt[], this.now());
-      return Response.json({ catalog: DRILL_CATALOG, progress, levels: drillLevels(progress), streak_days });
+      const { progress, practice_days } = drillProgress(attempts as unknown as DrillAttempt[]);
+      return Response.json({ catalog: DRILL_CATALOG, progress, levels: drillLevels(progress), practice_days });
     }
     if (method === "POST" && url.pathname === "/api/drills/next") {
       if (this.responseBusy) return Response.json({ detail: "Finish the current performance first" }, { status: 409 });
@@ -230,7 +233,7 @@ export class LocalService {
         return Response.json({ detail: "Invalid drill request" }, { status: 422 });
       }
       const attempts = attemptsFromEvents(await this.store.list());
-      const { progress } = drillProgress(attempts as unknown as DrillAttempt[], this.now());
+      const { progress } = drillProgress(attempts as unknown as DrillAttempt[]);
       const coached = request.drill == null ? coachDrill(progress, request.avoid ?? [], this.now(), request.focus ?? null) : null;
       const config: DrillSelection = coached?.config ?? { drill: request.drill!, variant: request.variant!, tonic: request.tonic!,
         hands: request.hands!, octaves: request.octaves!, inversion: request.inversion ?? 0, practice: request.practice ?? "even" };
@@ -334,6 +337,18 @@ export class LocalService {
       return Response.json(task);
     }
     if (method === "POST" && url.pathname === "/api/reading/listen") return this.listen(url, options);
+    if (method === "POST" && parts.length === 4 && parts[0] === "api" && parts[1] === "reading" && parts[3] === "retry") {
+      const path = validatePathUuid(parts[2], "task_id");
+      if (path.errors.length) return Response.json({ detail: path.errors }, { status: 422 });
+      if (this.responseBusy) return Response.json({ detail: "Finish the current performance first" }, { status: 409 });
+      const entry = this.tasks.get(path.value!);
+      if (!entry || entry.task.family !== "reading" || !entry.completed) return Response.json({ detail: "Complete a reading score before trying again" }, { status: 409 });
+      const task = structuredClone(entry.task);
+      task.id = crypto.randomUUID();
+      task.context.familiar = true;
+      await this.saveTask(task);
+      return Response.json(task);
+    }
     if (method === "POST" && url.pathname === "/api/reading/complete") return this.completeReading(options);
     if (method === "POST" && url.pathname === "/api/respond" && url.searchParams.get("mode") === "drills") return this.respondDrill(url, options);
     if (method === "POST" && url.pathname === "/api/respond" && (url.searchParams.get("mode") ?? "duet") === "duet") return this.duetService.respond(url, options);

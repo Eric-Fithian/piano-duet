@@ -6,7 +6,7 @@ import {tmpdir} from 'node:os';
 import {join, resolve} from 'node:path';
 import {test} from 'node:test';
 import {chromium} from 'playwright';
-import {startTestServer} from '../web/server.mjs';
+import {startTestServer, enableAllModes} from '../web/server.mjs';
 
 const config = JSON.parse(execFileSync('supabase', ['status', '-o', 'json'], {encoding: 'utf8'}));
 const staticBase = `/@fs${resolve('src/piano_duet/static')}`;
@@ -51,6 +51,7 @@ test('two signed-in devices rebuild the same progress after practising offline',
     for (const name of ['first', 'second']) {
       const context = await chromium.launchPersistentContext(join(directory, name), {headless: true});
       contexts.push(context);
+      await enableAllModes(context);
       await context.route('**/sync-config.json', (route) => route.fulfill({json: {url: config.API_URL, anonKey: config.ANON_KEY, emailEnabled: true}}));
       await context.route('**/src/piano-samples.ts', (route) => route.fulfill({contentType: 'text/javascript',
         body: `export const SAMPLE_REVISION = "sync-fixture"; export const PIANO_SAMPLES = ${JSON.stringify([sample])};`}));
@@ -88,6 +89,7 @@ test('two signed-in devices rebuild the same progress after practising offline',
           if (updates.some((update) => update.type === 'error')) throw new Error(JSON.stringify(updates));
         }
       }, {path: staticBase, index});
+      await page.locator('#modeMenuButton').click();
       await page.locator('#libraryMode').click();
       const title = `Offline song ${index}`;
       const score = `<score-partwise><work><work-title>${title}</work-title></work><part id="P1"><measure number="1"><attributes><divisions>1</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes><note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note></measure></part></score-partwise>`;
@@ -104,7 +106,11 @@ test('two signed-in devices rebuild the same progress after practising offline',
     await pages[0].getByText('Up to date', {exact: true}).waitFor({timeout: 30000});
     for (const page of pages) {
       await page.locator('#settingsDialog').evaluate((dialog) => dialog.close());
+      await page.locator('#modeMenuButton').click();
+      await page.locator('#readingMode').click();
+      await page.waitForFunction(() => document.body.dataset.mode === 'reading');
       await page.locator('#openProfile').click();
+      await page.locator('#allProgress').click();
       await page.waitForFunction(() => document.querySelector('#profileSummary')?.textContent.includes('8 included attempts'), null, {timeout: 30000});
     }
     const profiles = await Promise.all(pages.map((page) => page.evaluate(async (path) => {

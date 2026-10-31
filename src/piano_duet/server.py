@@ -239,10 +239,10 @@ class ReadingRequest(BaseModel):
         previous = -1
         for group in self.groups:
             if not group:
-                raise ValueError("Reading attacks cannot be empty")
+                raise ValueError("Reading note groups cannot be empty")
             start = min(note.start for note in group)
             if start < previous:
-                raise ValueError("Reading attacks must be chronological")
+                raise ValueError("Reading note groups must be chronological")
             previous = start
         return self
 
@@ -739,8 +739,8 @@ def create_app(
 
     @app.get("/api/drills")
     async def drills():
-        progress, streak = drill_progress(app.state.store.attempts())
-        return {"catalog": catalog(), "progress": progress, "levels": drill_levels(progress), "streak_days": streak}
+        progress, practice_days = drill_progress(app.state.store.attempts())
+        return {"catalog": catalog(), "progress": progress, "levels": drill_levels(progress), "practice_days": practice_days}
 
     @app.post("/api/drills/next")
     async def drills_next(payload: DrillRequest):
@@ -796,6 +796,18 @@ def create_app(
             return {"notes": notes, "inference_ms": round((time.perf_counter() - started) * 1000)}
         finally:
             app.state.reading_busy = False
+
+    @app.post("/api/reading/{task_id}/retry")
+    async def retry_reading(task_id: UUID):
+        if app.state.busy:
+            raise HTTPException(409, "Finish the current performance first")
+        previous = app.state.store.task(str(task_id))
+        if not previous or previous["family"] != "reading" or not previous["completed"]:
+            raise HTTPException(409, "Complete a reading score before trying again")
+        task = {**previous, "id": str(uuid4()), "context": {**previous["context"], "familiar": True}}
+        task.pop("completed")
+        app.state.store.add_task(task)
+        return task
 
     @app.post("/api/reading/complete")
     async def complete_reading(payload: ReadingRequest):

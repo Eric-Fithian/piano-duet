@@ -3,32 +3,45 @@ import {ScoreView} from './score_view.mjs';
 import {LearningCycle, pitchName, renderAnalysis} from './learning.mjs';
 import {PracticeCycle, localFetch, localRequest, renderPractice, renderProfile, renderAttempt, beatGroups} from './practice.mjs';
 import {ReadingStream} from './reading.mjs';
-import {TEMPO_LIMITS, renderCareer, renderLevel, renderReadingHud, showBanner, showXpToast} from './game.mjs';
+import {TEMPO_LIMITS, renderCareer, renderLevel, renderReadingHud, renderReadingResult, showBanner} from './game.mjs';
 import {currentOrdinal, renderLibrary, renderSongHud, sessionAccuracy} from './library.mjs';
 import {DrillPicker, attackPlan, followPosition, heardAttacks, planSession, playedGap, streakText, takeEnded, tempoLabel} from './drills.mjs';
 import {METERS, SongEditor, musicalKey} from './song_editor.mjs';
 import {readLearnerSetting, refreshLearnerSettings, writeLearnerSetting} from './learner-settings.mjs';
+import {ENABLED_MODES} from './enabled_modes.mjs';
+import {setupAppearance} from './appearance.mjs';
 
 const $ = id => document.getElementById(id);
+const appearance = setupAppearance({root: document.documentElement, theme: $('appearanceTheme'), night: $('nightPage'), themeColor: $('themeColor'), storage: localStorage, system: matchMedia('(prefers-color-scheme: dark)')});
+const ALL_MODES = ['practice', 'reading', 'drills', 'library', 'duet', 'learning'];
 const EMPTY_SCORE = '<span aria-hidden="true">𝄞</span><p>Start with a few notes.</p><small>Your music will appear here.</small>';
 // What each part of the app shows on top of the music. The player's own layout, zoom, look-ahead and following
 // are remembered separately for each part; `scale` is its staff size at 100% zoom.
 const SCORE_VIEWS = {
   reading: {scale: 1.8, cursor: true, feedback: true, heard: true, pace: true, focus: true, barNumbers: 'all'},
   library: {scale: 1.05, cursor: true, feedback: true, heard: true},
-  editor: {scale: 1.05, preferences: 'library', settings: ['layout', 'zoom']},
+  editor: {scale: 1.05, preferences: 'library', settings: ['layout', 'zoom'], stableFit: true},
   drills: {scale: 1.25, sounding: true},
   practice: {scale: 1.15, sounding: true, headings: true, followNewest: true, empty: EMPTY_SCORE},
   duet: {scale: 1, sounding: true, headings: true, followNewest: true, empty: EMPTY_SCORE},
   learning: {scale: 1, sounding: true, headings: true, followNewest: true, empty: EMPTY_SCORE},
 };
 const sheet = new ScoreView($('sheetMusic'));
+$('scoreControlsSlot').append(sheet.controls);
+sheet.controlsToggle.setAttribute('aria-controls', 'scoreOptions');
+$('scoreOptions').append(...[...sheet.controls.children].filter(node => node !== sheet.controlsToggle), sheet.menu, sheet.resumeButton);
+$('scoreOptions').addEventListener('pointerdown', event => event.stopPropagation());
+$('listenSlot').append($('hudListen'), $('drillListen'));
+$('drillMore').before($('drillDetails'));
 sheet.onError = error => {
   console.error(error);
   $('scoreError').textContent = `Sheet music could not render: ${error.message}`;
   $('scoreError').hidden = false;
 };
-sheet.use('practice', SCORE_VIEWS.practice);
+sheet.use(ENABLED_MODES[0], SCORE_VIEWS[ENABLED_MODES[0]]);
+window.addEventListener('resize', () => sheet.relayout());
+screen.orientation?.addEventListener('change', () => sheet.relayout());
+window.visualViewport?.addEventListener('resize', () => sheet.relayout());
 const context = new AudioContext();
 const piano = new PianoSound(context);
 const detector = new PhraseDetector();
@@ -54,7 +67,7 @@ let reply = [];
 let turn = 0;
 let exchangeOffset = 0;
 let lateNotes = 0;
-let mode = 'practice';
+let mode = ENABLED_MODES[0];
 const learning = new LearningCycle();
 const practice = new PracticeCycle();
 const drills = new DrillPicker();
@@ -74,13 +87,15 @@ let practiceScorePhrase = null;
 let lastAttempt = null;
 let targetScore = null;
 let lastReadingAttempt = null;
-// The score just finished stays above the current one as context until the next one is finished too.
-let readingPast = null;
 let readingProfile = null;
 let readingNext = null;
 let readingNextPromise = null;
+let readingResult = null;
+let readingResultBefore = null;
+let readingProfilePending = false;
+let readingDiscardNext = false;
+let readingFinishing = false;
 let readingRevision = 0;
-let sessionXp = 0;
 let readingTempo = null;
 let replayStage = null;
 const TEMPO_STEP = 4;
@@ -90,7 +105,6 @@ let songPhrase = null;
 let previewing = null;
 let listening = false;
 let playbackScale = 1;
-let pendingImport = null;
 const songStream = new ReadingStream({
   threshold: () => $('threshold').value,
   onChange: () => songReady(),
@@ -136,9 +150,9 @@ function practiceReady() {
 function readingReady() {
   if (mode !== 'reading' || !reading.progress || !practice.task) return;
   const progress = reading.progress;
-  renderReadingHud(practice.task, progress, readingProfile?.curriculum, sessionXp, replayStage !== null);
+  renderReadingHud(practice.task, progress, readingProfile?.curriculum, replayStage !== null);
   sheet.progress(practiceScorePhrase, progress, readingNext?.phrase);
-  status(microphone || busy ? '' : progress.groups.length || sessionXp ? 'Paused' : '');
+  status(microphone || busy ? '' : progress.groups.length ? 'Paused' : '');
 }
 
 // The player chooses the tempo, never below a curriculum minimum; grading uses only onsets.
@@ -164,37 +178,114 @@ function readingTiming(task) {
 async function finishReading(progress) {
   const revision = readingRevision;
   const task = practice.task;
-  const saving = localRequest('/api/reading/complete', {
-    task: task.id, attempt: crypto.randomUUID(), groups: progress.groups,
-    interruptions: [...progress.interruptions],
-    threshold: Number($('threshold').value),
-  }).then(async result => {
+  readingFinishing = true;
+  try {
+    await stop();
+    const result = await localRequest('/api/reading/complete', {
+      task: task.id, attempt: crypto.randomUUID(), groups: progress.groups,
+      interruptions: [...progress.interruptions], threshold: Number($('threshold').value),
+    });
     if (revision !== readingRevision || mode !== 'reading') return;
     lastReadingAttempt = lastAttempt = result.id;
-    const before = readingProfile;
+    readingResult = result;
+    readingResultBefore = readingProfile;
+    readingProfilePending = true;
+    readingDiscardNext = false;
+    await ensureReadingNext(revision, task);
+  } finally {
+    if (revision === readingRevision && mode === 'reading' && readingResult) {
+      readingReady();
+      renderReadingResult($('readingResultTray'), task, readingResult, readingResultBefore,
+        readingProfilePending ? null : readingProfile, {
+          review: () => openReview(readingResult.id),
+          next: () => advanceReading().catch(fail),
+          retry: () => retryReading().catch(fail),
+        });
+    }
+    readingFinishing = false;
+    buttons();
+  }
+}
+
+async function refreshReadingResult(revision) {
+  if (readingProfilePending) {
     await refreshProfile();
     if (revision !== readingRevision || mode !== 'reading') return;
-    sessionXp += result.xp.total;
-    showXpToast(task, result, readingProfile.xp, () => openReview(result.id));
-    celebrate(before, readingProfile);
-    readingReady();
-  });
-  const next = readingNext || (await Promise.all([readingNextPromise, saving]))[0];
+    readingProfilePending = false;
+    readingDiscardNext = readingResultBefore.curriculum.number !== readingProfile.curriculum.number && replayStage === null;
+  }
+}
+
+async function ensureReadingNext(revision, task) {
+  await refreshReadingResult(revision);
   if (revision !== readingRevision || mode !== 'reading') return;
-  if (!next) throw new Error('The next reading score is not ready. Choose a fresh score to continue.');
-  const completed = practiceScorePhrase;
+  const waitForNext = () => {
+    const pending = readingNextPromise;
+    return pending.catch(error => {
+      if (readingNextPromise === pending) readingNextPromise = null;
+      throw error;
+    });
+  };
+  if (readingDiscardNext) {
+    if (readingNextPromise) await waitForNext();
+    if (revision !== readingRevision || mode !== 'reading') return;
+    if (readingNext) sheet.remove(readingNext.phrase);
+    readingNext = null;
+    readingNextPromise = null;
+    readingDiscardNext = false;
+  }
+  if (!readingNext && readingNextPromise) await waitForNext();
+  if (revision !== readingRevision || mode !== 'reading') return;
+  if (!readingNext) {
+    readingNextPromise = prepareReadingNext(revision, task);
+    await waitForNext();
+  }
+}
+
+async function advanceReading() {
+  if (!readingResult) throw new Error('There is no completed score to advance from.');
+  const revision = readingRevision;
+  await ensureReadingNext(revision, practice.task);
+  if (revision !== readingRevision || mode !== 'reading') return;
+  if (!readingNext) throw new Error('The next reading score is not ready.');
+  const next = readingNext;
+  readingResult = null;
+  $('readingResultTray').hidden = true;
+  sheet.remove(practiceScorePhrase);
   practice.acceptTask(next.task);
   practiceScorePhrase = next.phrase;
   readingNext = null;
   reading.advance(next.task.target, readingTiming(next.task));
-  if (readingPast) sheet.remove(readingPast);
-  readingPast = completed;
   for (const details of $('exerciseDialog').querySelectorAll('details')) details.open = false;
   showKey(next.task.key);
+  readingNextPromise = prepareReadingNext(readingRevision, next.task);
+  readingNextPromise.catch(fail);
   practiceReady();
   buttons();
-  readingNextPromise = prepareReadingNext(revision, next.task, saving);
+}
+
+async function retryReading() {
+  if (!readingResult) throw new Error('There is no completed score to retry.');
+  const revision = readingRevision;
+  await refreshReadingResult(revision);
+  if (revision !== readingRevision || mode !== 'reading') return;
+  const task = await localRequest(`/api/reading/${practice.task.id}/retry`, {});
+  if (revision !== readingRevision || mode !== 'reading') return;
+  ++readingRevision;
+  if (readingNext) sheet.remove(readingNext.phrase);
+  readingNext = null;
+  readingResult = null;
+  $('readingResultTray').hidden = true;
+  sheet.clear();
+  practice.acceptTask(task);
+  practiceScorePhrase = addReadingPhrase(task);
+  reading.reset(task.target, readingTiming(task));
+  for (const details of $('exerciseDialog').querySelectorAll('details')) details.open = false;
+  readingNextPromise = prepareReadingNext(readingRevision, task);
   readingNextPromise.catch(fail);
+  showKey(task.key);
+  practiceReady();
+  buttons();
 }
 
 function addReadingPhrase(task) {
@@ -210,15 +301,12 @@ export async function loadLibrary() {
 function showLibrary() {
   renderLibrary(library, $('librarySearch').value, {
     onOpen: id => openSong(id).catch(fail),
-    onImport: item => { pendingImport = item; $('libraryFile').click(); },
     onDelete: item => deleteSong(item).catch(fail),
   });
 }
 
 async function importSong(file) {
   const params = new URLSearchParams({filename: file.name});
-  if (pendingImport) { params.set('title', pendingImport.title); params.set('artist', pendingImport.artist); }
-  pendingImport = null;
   const response = await localFetch(`/api/library/import?${params}`, {
     method: 'POST', headers: {'Content-Type': 'application/octet-stream', 'X-Duet-Client': '1'}, body: await file.arrayBuffer(),
   });
@@ -307,6 +395,7 @@ async function openEditor() {
   songEditor = new SongEditor(song);
   document.body.classList.add('song-editing');
   $('songEditBar').hidden = false;
+  $('editMore').setAttribute('aria-expanded', 'false');
   sheet.use('editor', SCORE_VIEWS.editor);
   editPhrase = sheet.add('target', songEditor.draft.notes, {bpm: songEditor.draft.bpm, key: songEditor.key, title: song.title,
     exact: true, meter: songEditor.draft.meter});
@@ -439,18 +528,11 @@ function previewTick() {
   songReady();
 }
 
-function celebrate(before, after) {
-  const cleared = after.curriculum.path.filter(stage => stage.status === 'Complete'
-    && before.curriculum.path.find(previous => previous.id === stage.id).status !== 'Complete');
-  for (const stage of cleared) {
-    const next = after.curriculum.path[stage.number];
-    showBanner({kind: 'stage', caption: `Stage ${stage.number} cleared`, title: stage.label, detail: next ? `Unlocked · ${next.label}` : 'Every stage cleared'});
-  }
-  if (after.xp.level > before.xp.level) showBanner({kind: 'level', caption: 'Level up', title: `Level ${after.xp.level}`});
-}
-
 function openReview(id) {
   reading.interrupt();
+  const reviewOnly = !ENABLED_MODES.includes('practice');
+  $('profileDialog').classList.toggle('review-only', reviewOnly);
+  $('profileTitle').textContent = reviewOnly ? 'Your score' : 'Your progress';
   $('profileDialog').showModal();
   inspectAttempt(id).catch(fail);
 }
@@ -542,6 +624,8 @@ async function loadPractice() {
   const revision = ++readingRevision;
   readingNext = null;
   readingNextPromise = null;
+  readingResult = null;
+  $('readingResultTray').hidden = true;
   reading.pause();
   busy = true;
   detector.reset();
@@ -556,8 +640,7 @@ async function loadPractice() {
     if (!request) {
       const saved = drills.saved();
       if (saved) { drills.sync(saved); request = drills.next(); }
-      // A first visit opens the options so the choice of drills is visible.
-      else { showDrillOptions(true); request = {}; }
+      else request = {};
     }
     adopt = !request.drill;
     task = await localRequest('/api/drills/next', request);
@@ -587,7 +670,6 @@ async function loadPractice() {
   heard = []; reply = []; transcript = [];
   sheet.clear();
   practiceScorePhrase = null;
-  readingPast = null;
   $('scoreError').hidden = true;
   if (practice.visible) showPracticeTarget();
   else sheet.message(task.family === 'ear' ? 'Let your ears lead. Hear the melody, then find it on the keys.' : 'Find the notes yourself. Reveal the score whenever you need help.');
@@ -891,6 +973,7 @@ function clearLearning() {
 }
 
 async function selectMode(value, persist = true) {
+  if (!ENABLED_MODES.includes(value)) throw new Error(`Playing mode ${value} is disabled.`);
   if (value === mode) return;
   if (mode === 'library') await closeSong();
   reading.pause();
@@ -905,6 +988,14 @@ async function selectMode(value, persist = true) {
 function updateModeControls() {
   const value = mode;
   document.body.dataset.mode = value;
+  if (value !== 'reading') { readingResult = null; $('readingResultTray').hidden = true; $('noteStatus').textContent = ''; }
+  $('currentMode').textContent = $(`${value}Mode`).textContent;
+  $('openProfile').hidden = value === 'library' && !ENABLED_MODES.includes('practice');
+  for (const selector of ['.session-info', '.session-actions', '.key-settings', '.score-settings']) {
+    document.querySelector(selector).hidden = !['practice', 'duet', 'learning'].includes(value);
+  }
+  $('modeMenuButton').setAttribute('aria-expanded', 'false');
+  $('drillMore').setAttribute('aria-expanded', 'false');
   const practicing = isPracticeMode();
   $('practiceMode').setAttribute('aria-pressed', value === 'practice');
   $('readingMode').setAttribute('aria-pressed', value === 'reading');
@@ -926,7 +1017,7 @@ function updateModeControls() {
   $('sheetMusic').setAttribute('aria-label', value === 'reading' ? 'Reading music' : 'Sheet music');
   $('practiceChallenge').classList.toggle('reading-caption', value === 'reading');
   $('readingHelpActions').hidden = value !== 'reading';
-  $('autoReplyControls').hidden = value === 'reading';
+  $('autoReplyControls').hidden = !['practice', 'duet', 'learning'].includes(value);
   $('practiceFinishHelp').textContent = value === 'reading'
     ? 'Play the highlighted note. The score advances automatically when you find the right key.'
     : 'Take your time, then press Finish attempt or space.';
@@ -955,16 +1046,22 @@ function status(text, color = '#9ab89d') {
 }
 
 function buttons() {
+  sheet.setActive(Boolean(microphone || busy || listening || previewing));
+  appearance.setLocked(Boolean(microphone));
+  document.body.classList.toggle('is-playing', Boolean(microphone));
   $('songEdit').disabled = busy || Boolean(songEditor);
-  $('start').disabled = !ready || (!microphone && busy && !previewing) || (mode === 'library' && !song);
+  $('start').disabled = readingFinishing || Boolean(readingResult) || !ready || (!microphone && busy && !previewing) || (mode === 'library' && !song);
   $('start').setAttribute('aria-pressed', Boolean(microphone));
+  $('micState').textContent = microphone ? 'Mic on' : 'Mic ready';
+  $('drillProgress').hidden = mode !== 'drills';
+  $('drillBest').hidden = mode !== 'drills';
   const following = mode === 'reading' || mode === 'library';
   $('start').classList.toggle('no-key', Boolean(microphone) && !following);
-  $('micLabel').textContent = previewing ? 'Stop preview' : microphone ? (following ? 'Pause' : 'Mic off')
-    : mode === 'reading' && (reading.progress?.groups.length || sessionXp) ? 'Resume'
+  $('micLabel').textContent = previewing ? 'Stop preview' : microphone ? (following ? 'Stop' : 'Mic off')
+    : mode === 'reading' && reading.progress?.groups.length ? 'Resume'
       : mode === 'library' && songStream.progress?.groups.length ? 'Resume' : 'Start';
   $('answer').disabled = !microphone || busy || calibrating > 0 || !detector.active;
-  $('answer').hidden = mode === 'reading' || mode === 'library' || !microphone || busy || (isPracticeMode() && (!practice.canPlay || practice.completed));
+  $('answer').hidden = mode === 'reading' || mode === 'library' || (mode === 'drills' && !detector.active) || !microphone || busy || (isPracticeMode() && (!practice.canPlay || practice.completed));
   $('nextPractice').hidden = mode === 'reading' || mode === 'library' || mode === 'drills' || !isPracticeMode() || !practice.completed || busy;
   $('stop').disabled = !microphone && !busy;
   $('stop').hidden = !busy || mode === 'library';
@@ -979,12 +1076,14 @@ function buttons() {
   for (const id of ['practiceMode', 'readingMode', 'practiceFocus', 'practicePiece', 'nextPractice', 'skipPractice']) $(id).disabled = !ready || busy || detector.active;
   for (const id of ['drillNext', 'drillAuto', 'drillSession']) $(id).disabled = !ready || busy || detector.active;
   $('drillSession').classList.toggle('active', Boolean(coachSession));
-  for (const id of ['revealPractice', 'practiceBeat', 'hudBeat', 'drillBeat']) $(id).disabled = !ready || busy || detector.active || !practice.task;
-  for (const id of ['hearPractice', 'hudListen', 'drillListen']) $(id).disabled = !ready || (busy && !listening) || detector.active || !practice.task;
+  for (const id of ['revealPractice', 'practiceBeat', 'hudBeat', 'drillBeat']) $(id).disabled = readingFinishing || !ready || busy || detector.active || !practice.task;
+  for (const id of ['hearPractice', 'hudListen', 'drillListen']) $(id).disabled = readingFinishing || !ready || (busy && !listening) || detector.active || !practice.task;
   if (listening) $('hearPractice').textContent = 'Stop playback';
+  $('hudListen').textContent = listening ? 'Stop' : 'Listen';
   $('hudListen').classList.toggle('playing', listening);
   $('hudListen').setAttribute('aria-label', listening ? 'Stop playback' : 'Hear this score (halves its XP)');
   $('hudListen').title = $('hudListen').getAttribute('aria-label');
+  $('drillListen').textContent = listening ? 'Stop' : 'Listen';
   $('drillListen').classList.toggle('playing', listening);
   $('drillListen').setAttribute('aria-label', listening ? 'Stop playback' : 'Hear it played');
   $('drillListen').title = $('drillListen').getAttribute('aria-label');
@@ -1064,8 +1163,9 @@ async function initialize() {
     if (!['build', 'mix'].includes(savedFlow)) throw new Error('The saved drill flow is invalid.');
     $('drillFlow').value = savedFlow;
   }
-  const savedMode = readLearnerSetting('piano-duet.mode') || 'practice';
-  if (!['practice', 'reading', 'drills', 'library', 'duet', 'learning'].includes(savedMode)) throw new Error('The saved playing mode is invalid.');
+  const storedMode = readLearnerSetting('piano-duet.mode') || ENABLED_MODES[0];
+  if (!ALL_MODES.includes(storedMode)) throw new Error('The saved playing mode is invalid.');
+  const savedMode = ENABLED_MODES.includes(storedMode) ? storedMode : ENABLED_MODES[0];
   const response = await localFetch('/api/status');
   if (!response.ok) throw new Error('The local piano server is not available. Restart Piano Duet.');
   await Promise.all([piano.load(), sheet.ready()]);
@@ -1263,7 +1363,7 @@ async function requestReply(audio, {source = 'microphone'} = {}) {
         turn++;
         $('turnCount').textContent = `LEARNING · ${turn} ROUND${turn === 1 ? '' : 'S'} COMPLETE`;
         $('learningScore').textContent = `${event.score} / 100`;
-        const rhythm = event.rhythm_accuracy === null ? 'Rhythm: not enough matching attacks to measure' : `Rhythm ${event.rhythm_accuracy}%`;
+        const rhythm = event.rhythm_accuracy === null ? 'Rhythm: not enough matching notes to measure' : `Rhythm ${event.rhythm_accuracy}%`;
         $('learningFeedback').textContent = `Pitch accuracy ${event.pitch_accuracy}% · ${rhythm}. ${event.matched} notes matched, ${event.wrong} wrong pitches, ${event.missing} missing, ${event.extra} extra. Practice tempo: ${event.tempo_percent}% of the target.`;
         $('learningResult').hidden = false;
         $('timing').textContent = `Playback score: ${event.score} / 100`;
@@ -1394,7 +1494,6 @@ function reset() {
   heard = [];
   reply = [];
   sheet.use(mode, SCORE_VIEWS[mode]);
-  readingPast = null;
   $('scoreError').hidden = true;
   $('keyName').textContent = 'Listening for a key…';
   $('keyDetail').textContent = 'Each reply follows the key of just your latest phrase.';
@@ -1516,7 +1615,9 @@ function draw() {
 
 $('start').addEventListener('click', () => (microphone || previewing ? stop() : startMicrophone()).catch(fail));
 $('librarySearch').addEventListener('input', showLibrary);
+$('chooseScore').addEventListener('click', () => $('libraryFile').click());
 $('libraryFile').addEventListener('change', () => {
+  $('importMenu').open = false;
   const [file] = $('libraryFile').files;
   $('libraryFile').value = '';
   if (file) importSong(file).catch(fail);
@@ -1529,6 +1630,7 @@ $('libraryPanel').addEventListener('drop', event => {
   for (const file of event.dataTransfer.files) importSong(file).catch(fail);
 });
 $('songBack').addEventListener('click', () => closeSong().catch(fail));
+$('importMenu').addEventListener('click', event => { if (event.target.closest('button')) $('importMenu').open = false; });
 $('openYoutube').addEventListener('click', () => { $('youtubeError').hidden = true; $('youtubeProgress').hidden = true; $('youtubeDialog').showModal(); });
 $('youtubeForm').addEventListener('submit', event => importYoutube(event).catch(error => youtubeError(error.message)));
 $('songEdit').addEventListener('click', () => openEditor().catch(fail));
@@ -1540,6 +1642,10 @@ $('editKey').addEventListener('change', () => editAction(() => {
 }));
 $('barsEarlier').addEventListener('click', () => editAction(() => songEditor.moveBarLines(1)));
 $('barsLater').addEventListener('click', () => editAction(() => songEditor.moveBarLines(-1)));
+$('editMore').addEventListener('click', () => {
+  const button = $('editMore');
+  button.setAttribute('aria-expanded', button.getAttribute('aria-expanded') !== 'true');
+});
 $('editUndo').addEventListener('click', () => editAction(() => songEditor.undo()));
 $('editSave').addEventListener('click', () => saveEdits().catch(fail));
 $('editRevert').addEventListener('click', () => revertEdits().catch(fail));
@@ -1547,6 +1653,13 @@ $('editCancel').addEventListener('click', cancelEdits);
 $('sheetMusic').addEventListener('click', event => editClick(event, false));
 $('sheetMusic').addEventListener('dblclick', event => editClick(event, true));
 document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && $('editMore').getAttribute('aria-expanded') === 'true') {
+    $('editMore').setAttribute('aria-expanded', 'false');
+    $('editMore').focus();
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    return;
+  }
   if (!songEditor || typing(event) || document.querySelector('dialog[open]')) return;
   const octave = event.shiftKey ? 12 : 1;
   const actions = {
@@ -1567,9 +1680,35 @@ $('answer').addEventListener('click', answer);
 $('demo').addEventListener('click', () => demo().catch(fail));
 $('reset').addEventListener('click', reset);
 $('export').addEventListener('click', () => exportMidi().catch(fail));
-for (const value of ['practice', 'reading', 'drills', 'library', 'duet', 'learning']) {
-  $(`${value}Mode`).addEventListener('click', () => selectMode(value).catch(fail));
+for (const value of ALL_MODES) {
+  $(`${value}Mode`).hidden = !ENABLED_MODES.includes(value);
+  $(`${value}Mode`).addEventListener('click', () => { $('modeMenuButton').setAttribute('aria-expanded', 'false'); selectMode(value).catch(fail); });
 }
+$('allProgress').hidden = !ENABLED_MODES.includes('practice');
+$('modeMenuButton').addEventListener('click', () => {
+  const button = $('modeMenuButton');
+  button.setAttribute('aria-expanded', button.getAttribute('aria-expanded') !== 'true');
+});
+$('drillMore').addEventListener('click', () => {
+  const button = $('drillMore');
+  button.setAttribute('aria-expanded', button.getAttribute('aria-expanded') !== 'true');
+});
+document.addEventListener('click', event => {
+  if (!event.target.closest('#modeMenu, #modeMenuButton')) $('modeMenuButton').setAttribute('aria-expanded', 'false');
+  if (!event.target.closest('#drillExtra, #drillMore')) $('drillMore').setAttribute('aria-expanded', 'false');
+  if (!event.target.closest('#editOptions, #editMore')) $('editMore').setAttribute('aria-expanded', 'false');
+});
+document.addEventListener('scroll', event => {
+  $('drillMore').setAttribute('aria-expanded', 'false');
+  if (!$('editOptions').contains(event.target)) $('editMore').setAttribute('aria-expanded', 'false');
+}, true);
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') {
+    $('modeMenuButton').setAttribute('aria-expanded', 'false');
+    $('drillMore').setAttribute('aria-expanded', 'false');
+    $('editMore').setAttribute('aria-expanded', 'false');
+  }
+});
 $('nextPractice').addEventListener('click', () => loadPractice().catch(fail));
 for (const id of ['drillKind', 'drillVariant', 'drillKey', 'drillHands', 'drillOctaves', 'drillInversion', 'drillPractice']) {
   $(id).addEventListener('change', () => { drills.sync(drills.read()); drills.save(); loadDrill(drills.next()); });
@@ -1602,6 +1741,10 @@ $('reviewPractice').addEventListener('click', () => {
 $('openProfile').addEventListener('click', () => {
   reading.interrupt();
   if (mode === 'reading') { openCareer(); return; }
+  if (mode === 'drills' && !ENABLED_MODES.includes('practice')) { openLevels().catch(fail); return; }
+  if (!ENABLED_MODES.includes('practice')) return;
+  $('profileDialog').classList.remove('review-only');
+  $('profileTitle').textContent = 'Your progress';
   $('profileDialog').showModal(); $('profileDialog').scrollTop = 0;
 });
 $('allProgress').addEventListener('click', () => { $('readingProgressDialog').close(); $('profileDialog').showModal(); });
@@ -1722,7 +1865,8 @@ async function applyLearnerSettings(selectSavedMode = true) {
   sheet.configure({tempo: $('scoreTempo').value, bpm: Number($('scoreBpm').value), meter: $('scoreMeter').value,
     flats: $('scoreAccidentals').value === 'auto' ? null : $('scoreAccidentals').value === 'flats'});
   const selected = readLearnerSetting('piano-duet.mode');
-  if (selectSavedMode && selected && selected !== mode) await selectMode(selected, false);
+  if (selectSavedMode && selected && !ALL_MODES.includes(selected)) throw new Error('The saved playing mode is invalid.');
+  if (selectSavedMode && selected && ENABLED_MODES.includes(selected) && selected !== mode) await selectMode(selected, false);
 }
 window.addEventListener('pagehide', () => { controller?.abort(); microphone?.getTracks().forEach(track => track.stop()); piano.stop(); });
 const initialized = initialize();

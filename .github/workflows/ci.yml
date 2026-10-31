@@ -47,6 +47,8 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 24
+      - run: node design/brand/generate-css-tokens.mjs --check
+      - run: node design/brand/contrast.mjs
       - run: node --test tests/*.test.mjs
 
   core:
@@ -110,8 +112,10 @@ jobs:
       - run: npm ci
       - run: npm ci --prefix site
       - run: npx playwright install chromium webkit
+      - run: uv sync --frozen
+        timeout-minutes: 5
       - run: npm run test:web
-        timeout-minutes: 4
+        timeout-minutes: 10
       - run: uv run --frozen python tests/inference/audio_fixtures.py
       - run: node tests/inference/audio-decoding.mjs
         timeout-minutes: 3

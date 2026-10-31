@@ -41,10 +41,12 @@ try {
   });
   await page.goto(`http://127.0.0.1:${site.port}/`);
   await page.locator("#sheetMusic svg").first().waitFor({ timeout: 30000 });
+  await page.locator("#modeMenuButton").click();
   await page.locator("#libraryMode").click();
-  await page.locator("#importAudio").waitFor({ state: "visible" });
+  await page.locator("#importMenu > summary").waitFor({ state: "visible" });
   const importOnce = async (count) => {
     const started = Date.now();
+    await page.locator("#importMenu > summary").click();
     await page.locator(microphone ? "#recordAudio" : "#importAudio").click();
     if (microphone) {
       await page.locator("#recordingToggle").click();
@@ -64,7 +66,7 @@ try {
   };
   const firstMs = await importOnce(1), firstDownloads = downloads;
   await page.reload();
-  await page.locator("#importAudio").waitFor({ state: "visible", timeout: 30000 });
+  await page.locator("#importMenu > summary").waitFor({ state: "visible", timeout: 30000 });
   const single = realHub || microphone;
   const cachedMs = single ? null : await importOnce(2), cachedDownloads = downloads;
   const warmMs = single ? null : await importOnce(3);
@@ -72,7 +74,7 @@ try {
   assert.equal(cachedDownloads, firstDownloads);
   assert.equal(downloads, firstDownloads);
   await page.reload();
-  await page.locator("#importAudio").waitFor({ state: "visible", timeout: 30000 });
+  await page.locator("#importMenu > summary").waitFor({ state: "visible", timeout: 30000 });
   assert.equal(await page.locator("#songRows .song-row").count(), single ? 1 : 3);
   console.log(JSON.stringify({ firstMs, cachedMs, warmMs, firstDownloads, cachedDownloads, warmDownloads: downloads,
     modelFiles: realHub ? "public Hugging Face catalog assets" : "local hash-verified catalog assets", microphone, saved: true, persisted: true }));

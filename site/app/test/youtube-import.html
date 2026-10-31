@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>YouTube import checks</title></head>
+<body>
+<button id="openYoutube">From YouTube link</button><button id="recordAudio">Record audio</button>
+<p id="recordingImportStatus"></p>
+<dialog id="youtubeDialog"><button data-close="youtubeDialog">Done</button><form id="youtubeForm">
+<input id="youtubeUrl" type="url" required><input id="youtubeRights" type="checkbox" required>
+<input id="youtubeVideoTitle" value="YouTube recording"><input id="youtubeChannel">
+<button id="youtubeGo" type="submit">Start</button><button id="youtubeStop" type="button" hidden>Stop and write score</button>
+<p id="youtubeSupport" hidden></p><button id="youtubeRecord" type="button" hidden>Record with microphone</button>
+<div id="youtubeProgress" hidden><span id="youtubeStage"></span><i id="youtubeFill"></i></div>
+<p id="youtubeError" hidden></p></form></dialog>
+<script type="module" src="./youtube-import.ts"></script></body></html>

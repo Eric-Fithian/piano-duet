@@ -10,7 +10,7 @@ import type { TimedObservation, TimingContext } from "./reading-timing.ts";
 
 export interface HeardNote { pitch: number; start: number; velocity: number; confidence: number }
 export interface ReadingObservation extends TimedObservation { expected: number; heard: number[]; tries: number[][] }
-export interface ReadingAssessmentContext extends TimingContext { hearings: number; reveals: number; hints: number; introduction?: boolean }
+export interface ReadingAssessmentContext extends TimingContext { hearings: number; reveals: number; hints: number; introduction?: boolean; familiar?: boolean }
 export interface ReadingEvidence { skill: string; facet: string; label: string; value: number; weight: number; challenge: number }
 
 export function matchesReading(pitches: number[], expected: number[]): boolean {
@@ -79,9 +79,9 @@ export function assessReading(task: ReadingScore, groups: HeardNote[][], context
   const strengths: number[] = [];
   let attempts: number[][] = [], cursor = 0, previous = -1;
   groups.forEach((group, groupIndex) => {
-    if (!group.length) throw new Error("Reading attacks cannot be empty");
+    if (!group.length) throw new Error("Reading note groups cannot be empty");
     const start = Math.min(...group.map((note) => note.start));
-    if (start < previous || cursor >= attacks.length) throw new Error("Reading attacks must be chronological and end with the last target");
+    if (start < previous || cursor >= attacks.length) throw new Error("Reading note groups must be chronological and end with the last target");
     previous = start;
     const pitches = group.map((note) => note.pitch);
     attempts.push(pitches);
@@ -97,7 +97,7 @@ export function assessReading(task: ReadingScore, groups: HeardNote[][], context
   if (cursor !== attacks.length) throw new Error("Finish every note in the score before saving the reading");
   const firstTry = observations.filter((row) => row.matched).length, accuracy = firstTry / target.length;
   const usable = mean(strengths) >= 0.75 && mean(strengths.map((value) => Number(value >= 0.6))) >= 0.8;
-  const assisted = Boolean(context.hearings || context.reveals || context.hints || context.introduction);
+  const assisted = Boolean(context.hearings || context.reveals || context.hints || context.introduction || context.familiar);
   const fluency = positionChanges(task, observations, context, usable, assisted);
   const rhythm = readingTiming(task, observations, context);
   const assessment = { version: 1, score: { score: roundEven(accuracy * 100), pitch_accuracy: roundEven(accuracy * 100),

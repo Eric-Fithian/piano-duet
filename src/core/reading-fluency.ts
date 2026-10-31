@@ -23,7 +23,7 @@ export function measureLandings(changes: PositionChange[], observations: TimedOb
     else if (!context.reading_timing) reason = "Recording continuity was not tracked.";
     else if (Math.min(previous.confidence, landing.confidence) < 0.8) reason = "Recognition at the change was uncertain.";
     else if (context.reading_timing.interruptions.some((point) => previous.group < point && point <= landing.group)) reason = "Recording was interrupted during this change.";
-    else if (gap <= 0) reason = "The two attacks could not be timed separately.";
+    else if (gap <= 0) reason = "The two notes could not be timed separately.";
     else if (gap > PAUSE_LIMIT) reason = "A long pause made this change unsuitable for timing.";
     measured.push({ ...change, arrival_seconds: reason === null ? roundDecimal(gap, 3) : null, arrival_reason: reason });
   }

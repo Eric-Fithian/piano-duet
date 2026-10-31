@@ -18,6 +18,7 @@ export interface ReadingContext {
   hearings: number;
   reveals: number;
   hints: number;
+  familiar?: boolean;
 }
 
 export interface RewardItem {
@@ -55,6 +56,7 @@ export function scoreXp(
   assessment: ReadingAssessment,
   context: ReadingContext,
 ): { items: RewardItem[]; total: number } {
+  if (context.familiar) return { items: [], total: 0 };
   const reading = prompt.reading ?? {};
   const value = noteValue(reading.stage_number ?? 1);
   if (reading.introduce != null) {

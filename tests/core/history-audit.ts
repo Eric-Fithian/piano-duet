@@ -18,8 +18,8 @@ with sqlite3.connect(path, uri=True) as db:
     attempts = [{'id': ident, 'created_at': at, **json.loads(inputs), 'assessment': json.loads(assessment), 'excluded': bool(excluded)} for ident, at, inputs, assessment, excluded in rows]
     counts = {table: db.execute('SELECT count(*) FROM ' + table).fetchone()[0] for table in ('attempts', 'tasks', 'pieces', 'songs', 'song_plays')}
 profile = build_profile(attempts)
-progress, streak = drill_progress(attempts)
-print(json.dumps({'counts': counts, 'profile': profile, 'drills': {'progress': progress, 'levels': drill_levels(progress), 'streak_days': streak}}))
+progress, practice_days = drill_progress(attempts)
+print(json.dumps({'counts': counts, 'profile': profile, 'drills': {'progress': progress, 'levels': drill_levels(progress), 'practice_days': practice_days}}))
 `, path], { encoding: "utf8", maxBuffer: 100_000_000 });
   if (reference.status !== 0) throw new Error(`Python reference failed: ${reference.stderr}`);
   const expected = JSON.parse(reference.stdout);
@@ -41,7 +41,7 @@ print(json.dumps({'counts': counts, 'profile': profile, 'drills': {'progress': p
     levels: JSON.stringify(profile.skills) === JSON.stringify(expected.profile.skills),
     drill_levels: JSON.stringify(drills.levels) === JSON.stringify(expected.drills.levels),
     drill_progress: JSON.stringify(drills.progress) === JSON.stringify(expected.drills.progress),
-    streak_days: drills.streak_days === expected.drills.streak_days,
+    practice_days: drills.practice_days === expected.drills.practice_days,
     profile_totals: ["attempts", "included_attempts", "notes", "days", "creative_phrases"].every((key) => profile[key] === expected.profile[key]),
   };
   console.log(JSON.stringify({ counts, checks }));

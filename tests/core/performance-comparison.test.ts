@@ -39,16 +39,16 @@ test("drill take analysis and progress match Python for controlled synthetic per
   }
   const attempts: DrillAttempt[] = fixtures.flatMap((fixture, index) => Array.from({ length: fixture.scenario === "clean" ? 3 : 1 }, (_, repeat) => ({
     mode: "drills", excluded: index % 17 === 0, context: fixture.context, notes: fixture.notes, prompt: fixture.task,
-    recognition: fixture.quality, created_at: 1700000000 + index * 10 + repeat,
+    recognition: fixture.quality, created_at: 1700000000 + Math.floor(index / 54) * 172800 + index * 10 + repeat,
   })));
   const replay = spawnSync("uv", ["run", "--frozen", "python", "-c", `
 import json, sys
 from piano_duet.drills import DRILLS, coach_config, drill_levels, drill_progress, ladder, milestone
 attempts = json.load(sys.stdin)
-progress, streak = drill_progress(attempts)
+progress, practice_days = drill_progress(attempts)
 levels = drill_levels(progress)
 requests = [([], None), (['five_finger'], None), (list(DRILLS), None)] + [([], drill) for drill in DRILLS]
-print(json.dumps({"progress": progress, "streak_days": streak, "levels": drill_levels(progress),
+print(json.dumps({"progress": progress, "practice_days": practice_days, "levels": drill_levels(progress),
                   "milestones": {drill: [milestone(drill, rung) for rung in range(len(ladder(drill)))] for drill in DRILLS},
                   "data": {drill: spec['milestones'] for drill, spec in DRILLS.items()},
                   "coaches": [coach_config(progress, levels, avoid, now=1800000000, focus=focus) for avoid, focus in requests],
@@ -57,7 +57,16 @@ print(json.dumps({"progress": progress, "streak_days": streak, "levels": drill_l
   assert.equal(replay.status, 0, replay.stderr);
   const expected = JSON.parse(replay.stdout);
   const actual = drillProgress(attempts);
-  assert.deepEqual(actual, { progress: expected.progress, streak_days: expected.streak_days });
+  assert.deepEqual(actual, { progress: expected.progress, practice_days: expected.practice_days });
+  assert.equal(actual.practice_days, 4);
+  const take = attempts.find((attempt) => !attempt.excluded && attempt.notes.length)!;
+  const extraDay = 1700000000 + 40 * 86400;
+  assert.equal(drillProgress([...attempts,
+    { ...take, created_at: extraDay, excluded: true },
+    { ...take, created_at: extraDay, context: { source: "demo" } },
+    { ...take, created_at: extraDay, notes: [] },
+    { ...take, created_at: extraDay, mode: "reading" },
+  ]).practice_days, 4);
   assert.deepEqual(drillLevels(actual.progress), expected.levels);
   const drills = Object.keys(DRILL_CATALOG.drills) as DrillId[];
   const requests: [DrillId[], DrillId | null][] = [[[], null], [["five_finger"], null], [drills, null], ...drills.map((drill): [DrillId[], DrillId | null] => [[], drill])];
@@ -74,7 +83,7 @@ print(json.dumps({"progress": progress, "streak_days": streak, "levels": drill_l
   });
   const service = new LocalService({ async list() { return events; } });
   assert.deepEqual(await (await service.fetch("/api/drills")).json(),
-    { catalog: DRILL_CATALOG, progress: expected.progress, levels: expected.levels, streak_days: expected.streak_days });
+    { catalog: DRILL_CATALOG, progress: expected.progress, levels: expected.levels, practice_days: expected.practice_days });
   assert.deepEqual(DRILL_MILESTONES, expected.data);
   for (const drill of Object.keys(DRILL_CATALOG.drills) as DrillId[]) {
     assert.deepEqual(DRILL_CATALOG.drills[drill].ladder.map((_, rung) => drillMilestone(drill, rung)), expected.milestones[drill]);

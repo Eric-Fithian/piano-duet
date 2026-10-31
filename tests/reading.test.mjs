@@ -66,6 +66,7 @@ test('the streak counts clean first tries, resets on a mistake, and carries into
   assert.equal(stream.progress.streak, 2);
   await stream.accept([note(63, 1.3)], 0, 2);
   assert.equal(stream.progress.streak, 0);
+  assert.equal(stream.progress.bestStreak, 2);
   await stream.accept([note(64, 1.8), note(65, 2.4)], 0, 3);
   assert.equal(stream.progress.target[0].pitch, 65);
   assert.equal(stream.progress.streak, 1);
@@ -202,6 +203,12 @@ test('written chords advance as a single attack, with every exact pitch required
   progress.accept([note(62, 2.1)], 0, 3);
   assert.ok(progress.complete);
   assert.equal(progress.groups.length, 3);
+});
+
+test('a first-try chord contributes one group to the run', () => {
+  const progress = new ReadingProgress([note(48, 0), note(60, 0), note(64, 0), note(62, 1)]);
+  progress.accept([note(48, .5), note(60, .51), note(64, .52), note(62, 1.5)], 0, 2);
+  assert.equal(progress.bestStreak, 2);
 });
 
 test('polyphonic reading preserves quieter written chord members after confirmation', () => {

@@ -3,6 +3,8 @@ import "../../../src/piano_duet/static/style.css";
 import "../../../src/piano_duet/static/score.css";
 import "../../../src/piano_duet/static/practice.css";
 import "../../../src/piano_duet/static/game.css";
+import "../../../src/piano_duet/static/chrome.css";
+import "../../../src/piano_duet/static/progress.css";
 import { setLocalService } from "../../../src/piano_duet/static/practice.mjs";
 import { LocalService } from "../../../src/core/local-service.ts";
 import { AriaPhrase } from "../../../src/core/aria-phrase.ts";
@@ -25,6 +27,8 @@ import { SampleStore } from "./sample-store";
 import { BrowserRecordingImporter } from "./browser-recording-import";
 import { NativeRecordingImporter } from "./native-recording-import";
 import { recordingStage, setupRecordingUi } from "./recording-ui";
+import { setupYoutubeImport } from "./youtube-import";
+import { setupModelSettings } from "./model-settings";
 import { setupHistoryImport } from "./history-import";
 import { setupSyncUi } from "./sync-ui";
 import { initializeLearnerSettings } from "../../../src/piano_duet/static/learner-settings.mjs";
@@ -50,7 +54,17 @@ indicator.append(label, bar);
 document.body.append(indicator);
 const received = new Map<string, number>();
 const sampleBytes = PIANO_SAMPLES.reduce((sum, sample) => sum + sample.bytes, 0);
+let reportSettingsProgress: (progress: DownloadProgress) => void = () => {};
 function report(progress: DownloadProgress): void {
+  reportSettingsProgress(progress);
+  const youtube = document.querySelector<HTMLDialogElement>("#youtubeDialog");
+  const stop = document.querySelector<HTMLButtonElement>("#youtubeStop");
+  const youtubeStage = document.querySelector<HTMLElement>("#youtubeStage");
+  if (youtube?.open && stop && !stop.hidden && stop.disabled && youtubeStage
+      && (progress.model === "recording-transcription" || progress.model === "midi-to-score")) {
+    const percent = progress.total ? ` · ${Math.round(progress.received / progress.total * 100)}%` : "";
+    youtubeStage.textContent = `Preparing a transcription model${percent}`;
+  }
   indicator.hidden = false;
   if (progress.model === "piano-samples") {
     received.set(progress.file, progress.received);
@@ -74,10 +88,16 @@ async function start(): Promise<void> {
   const backend = native ? new NativeInference(new WebKitInferenceTransport(native, window)) : new BrowserInference(MODEL_CATALOG);
   const settings = document.querySelector<HTMLElement>("#settingsDialog");
   if (!settings) throw new Error("The settings dialog is missing");
+  const modelSettings = document.querySelector<HTMLDetailsElement>("#modelSettings");
+  if (!modelSettings) throw new Error("The model settings section is missing");
+  const modelPanel = native ? undefined : setupModelSettings(modelSettings, backend);
+  if (modelPanel) reportSettingsProgress = modelPanel.progress;
+  if (!native) modelSettings.hidden = false;
   const backendStatus = document.createElement("p"), backends = new Map<ModelId, string>();
   backendStatus.setAttribute("aria-live", "polite");
-  settings.append(backendStatus);
+  if (native) settings.append(backendStatus);
   const reportBackend = (model: ModelId, record: InferenceBackendRecord) => {
+    modelPanel?.backend(model, record);
     backends.set(model, describeInferenceBackend({ model, provider: record.provider, fallback: record.fallback }));
     backendStatus.textContent = `Model backends: ${[...backends.values()].join("; ")}`;
   };
@@ -146,6 +166,9 @@ async function start(): Promise<void> {
   if (!recordingAssets || !scoreAssets) throw new Error("Recording import models are missing from the catalog");
   const importStage = (stage: string) => {
     indicator.hidden = true; recordingStage(stage);
+    const youtube = document.querySelector<HTMLDialogElement>("#youtubeDialog");
+    const youtubeStage = document.querySelector<HTMLElement>("#youtubeStage");
+    if (youtube?.open && youtubeStage) youtubeStage.textContent = stage;
   };
   const importer = native ? new NativeRecordingImporter(backend, report, importStage)
     : new BrowserRecordingImporter(recordingAssets, scoreAssets, report, importStage, (record) => reportBackend("midi-to-score", record));
@@ -154,6 +177,7 @@ async function start(): Promise<void> {
   if (import.meta.env.PROD && "serviceWorker" in navigator) await navigator.serviceWorker.register("/service-worker.js");
   const app = await import("../../../src/piano_duet/static/app.mjs");
   setupRecordingUi(importer, app.loadLibrary);
+  setupYoutubeImport(app.loadLibrary);
   setupHistoryImport(log, async () => { await app.refreshProfile(); await app.loadLibrary(); });
   void setupSyncUi(log, app.refreshSyncedData).catch((error: unknown) => {
     const panel = document.querySelector<HTMLElement>("#accountSync");

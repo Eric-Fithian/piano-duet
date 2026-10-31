@@ -117,6 +117,7 @@ for (const backend of selected ? [selected] : ["python", "split-fp32"]) {
     await page.goto(`http://127.0.0.1:${server.address().port}/`);
     await page.waitForFunction(() => !document.querySelector("#start").disabled);
     await page.evaluate(() => { window.__latency.tasks = []; });
+    await page.locator("#modeMenuButton").click();
     await page.locator("#readingMode").click();
     await page.waitForFunction(() => document.querySelector("#readingMode").getAttribute("aria-pressed") === "true"
       && !document.querySelector("#start").disabled && window.__latency.tasks.length > 0

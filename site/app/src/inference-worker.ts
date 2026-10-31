@@ -47,7 +47,7 @@ async function initializeProvider<T>(create: () => Promise<T>): Promise<T> {
   }
 }
 
-async function open(id: number, name: ModelId, files: ModelAsset[], preference: "auto" | "wasm", signal: AbortSignal): Promise<{ provider: "webgpu" | "wasm"; recordingWorkers?: { provider: "wasm"; threads: number }[] }> {
+async function open(id: number, name: ModelId, files: ModelAsset[], preference: "auto" | "wasm", signal: AbortSignal): Promise<{ provider: "webgpu" | "wasm"; fallback?: { provider: "webgpu"; message: string }; recordingWorkers?: { provider: "wasm"; threads: number }[] }> {
   if (session || recordingPool || scoreRuntime) throw new Error("The inference session is already open");
   if (files.some((file) => file.model !== name)) throw new Error("Model catalog contains a mismatched file");
   const gpu = (navigator as Navigator & { gpu?: { requestAdapter(): Promise<unknown> } }).gpu;
@@ -112,7 +112,8 @@ async function open(id: number, name: ModelId, files: ModelAsset[], preference: 
   }
   model = name;
   signal.throwIfAborted();
-  return { provider, ...(name === "recording-transcription" ? { recordingWorkers: recordingPool?.diagnostics
+  return { provider, ...(provider === "wasm" && preference === "auto" && name !== "recording-transcription"
+    ? { fallback: { provider: "webgpu" as const, message: "No compatible WebGPU adapter was available" } } : {}), ...(name === "recording-transcription" ? { recordingWorkers: recordingPool?.diagnostics
     ?? [{ provider: "wasm" as const, threads: wasmThreads }] } : {}) };
 }
 

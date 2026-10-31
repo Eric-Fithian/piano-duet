@@ -1,15 +1,18 @@
 ---
 title: Piano Duet
-description: Learn piano on your own acoustic piano, with an AI partner that listens through your Mac's microphone and runs entirely on your Mac.
+description: Learn on your own piano with listening, sheet music and feedback on your device.
 template: splash
 hero:
-  tagline: Play your real piano. Piano Duet listens through your Mac's microphone, writes fresh sheet music for you to read, coaches your technique, and answers your ideas, with every model running on your Mac.
+  tagline: Real music. Fresh every time. Piano Duet listens as you play your piano, writes fresh sheet music and helps you practise, with models running on your device.
   image:
     file: ../../assets/logo.svg
   actions:
-    - text: Install on your Mac
-      link: /start/install/
+    - text: Open the app
+      link: /
       icon: right-arrow
+    - text: Install on your Mac
+      link: /docs/start/install/
+      variant: secondary
     - text: View on GitHub
       link: https://github.com/Eric-Fithian/piano-duet
       icon: github
@@ -20,15 +23,14 @@ import {Card, CardGrid, LinkCard} from '@astrojs/starlight/components';
 import {Image} from 'astro:assets';
 import reading from '../../assets/screenshots/reading.png';
 import results from '../../assets/screenshots/drill-results.png';
-import duet from '../../assets/screenshots/duet.png';
 
-<Image class="screenshot" src={reading} alt="Reading mode: a four-bar score in G major. Notes already played are green, a late note is red, and a cursor waits on the next note." />
+<Image class="screenshot" src={reading} alt="Reading mode with a highlighted note and a score fitted to the page." />
 
 <div class="rainbow" />
 
 ## Everything you play, heard
 
-There is no on-screen keyboard and no MIDI cable. Put your Mac near an acoustic or digital piano, press **Space**, and play.
+There is no on-screen keyboard and no MIDI cable. Put your device near an acoustic or digital piano, tap **Start**, and play.
 
 <CardGrid>
   <Card title="Reading" icon="open-book">
@@ -40,36 +42,25 @@ There is no on-screen keyboard and no MIDI cable. Put your Mac near an acoustic 
   <Card title="Library" icon="document">
     Import MIDI, MusicXML or a piano recording, or record one yourself. The cursor waits for each note, and every section is coloured by how well you've been playing it.
   </Card>
-  <Card title="Duet" icon="comment">
-    Trade musical phrases with Aria. It replies in your key, at a difficulty you choose, and shows the whole conversation as sheet music or a piano roll.
-  </Card>
 </CardGrid>
 
 <div class="rainbow" />
 
 ## Feedback you can read at a glance
 
-<Image class="screenshot" src={results} alt="Drill results: meters for notes, evenness, tempo and loudness, and a note-by-note timeline whose tempo line turns amber where the player sped up." />
+<Image class="screenshot" src={results} alt="A completed five-finger drill with its score and feedback on notes, timing and loudness." />
 
 Drills judge you against **your own** tempo, not a forced one. Three clean takes in a row earn a steady tempo, and ten levels per drill track how many keys you've mastered and how fast. The meters and timeline show exactly where a take went wrong.
-
-<div class="rainbow" />
-
-## A partner that answers
-
-<Image class="screenshot" src={duet} alt="Duet piano roll: the player's phrase in orange followed by Aria's reply in blue." />
-
-Play an idea, pause, and Aria continues it. **Variations** turns your phrase into a practice target, with the notes Aria found most surprising corrected, then scores your playback out of 100.
 
 <div class="rainbow" />
 
 ## How it works
 
 <ol class="pipeline">
-  <li><strong>Listen</strong>Your browser captures microphone audio and sends it only to a server on your own Mac.</li>
+  <li><strong>Listen</strong>Your browser captures microphone audio and processes it on your device.</li>
   <li><strong>Transcribe</strong>Piano transcription models turn audio into notes, timing and loudness.</li>
-  <li><strong>Assess</strong>Each attempt updates a local learner profile across technique, reading, theory, ear and repertoire.</li>
-  <li><strong>Compose</strong>Aria, a 650M-parameter piano transformer, writes music under constraints on your Mac's GPU.</li>
+  <li><strong>Assess</strong>Each attempt updates your local reading and drill progress.</li>
+  <li><strong>Compose</strong>Aria, a 650M-parameter piano transformer, writes music under constraints on your device.</li>
   <li><strong>Play back</strong>Sampled piano sound and engraved notation, both rendered locally.</li>
 </ol>
 
@@ -82,4 +73,4 @@ Play an idea, pause, and Aria continues it. **Variations** turns your phrase int
 
 ## Free and open source
 
-Piano Duet is MIT-licensed and built in the open. It needs an Apple Silicon Mac with macOS 14 or later. [Install it](/docs/start/install/), or [help build it](/docs/contributing/development/).
+Piano Duet is MIT-licensed and built in the open. [Open the app](/), [install the Mac reference](/docs/start/install/), or [help build it](/docs/contributing/development/).

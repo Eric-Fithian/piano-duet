@@ -20,7 +20,7 @@ export function drillMilestone(drill: DrillId, rung: number) {
   return { reached: reached.at(-1)?.[2] ?? null, next: upcoming ? { label: upcoming[2], per_beat: upcoming[0], bpm: upcoming[1] } : null };
 }
 
-export function drillProgress(attempts: DrillAttempt[], now = Date.now() / 1000) {
+export function drillProgress(attempts: DrillAttempt[]) {
   const progress: Record<string, WorkingEntry> = {}, days = new Set<string>();
   for (const attempt of attempts) {
     if (attempt.mode !== "drills" || attempt.excluded || attempt.context.source !== "microphone" || !attempt.notes.length) continue;
@@ -52,23 +52,11 @@ export function drillProgress(attempts: DrillAttempt[], now = Date.now() / 1000)
       best_tempo: entry.best === null ? null : { ...ladder[entry.best] }, goal: entry.best === ladder.length - 1,
       milestone: entry.best === null ? null : drillMilestone(entry.config.drill, entry.best).reached }];
   }));
-  return { progress: finalized, streak_days: streakDays(days, now) };
+  return { progress: finalized, practice_days: days.size };
 }
 
 function localDate(seconds: number): string {
   const date = new Date(seconds * 1000);
   if (!Number.isFinite(date.valueOf())) throw new Error("Invalid attempt time");
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
-
-function previousDay(day: string): string {
-  const [year, month, date] = day.split("-").map(Number);
-  return localDate((new Date(year, month - 1, date).getTime() - 86400000) / 1000);
-}
-
-export function streakDays(days: Set<string>, now = Date.now() / 1000): number {
-  let day = localDate(now), count = 0;
-  if (!days.has(day)) day = previousDay(day);
-  while (days.has(day)) { count++; day = previousDay(day); }
-  return count;
 }

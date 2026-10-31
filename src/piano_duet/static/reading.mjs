@@ -43,6 +43,7 @@ export class ReadingProgress {
     this.seen = new Map();
     this.latest = -1;
     this.streak = 0;
+    this.bestStreak = 0;
     this.locate = locate;
     this.recent = [];
     this.missed = [];
@@ -128,7 +129,10 @@ export class ReadingProgress {
           this.active = {index: this.index, start: group[0].start, scoreStart: attack.start, span, held: duration};
         }
         const clean = !attack.indices.some(index => this.mistakes.has(index));
-        if (clean) this.streak++;
+        if (clean) {
+          this.streak++;
+          this.bestStreak = Math.max(this.bestStreak, this.streak);
+        }
         this.results.set(ordinal, clean);
         this.index += attack.indices.length;
         this.wrong = [];

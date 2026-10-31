@@ -1,9 +1,10 @@
 import {pitchName} from './learning.mjs';
 import {renderLandingHeatmap} from './reading_heatmap.mjs';
+import {levelRing, resultSummary, stagePath, streakBeam} from './progress_components.mjs';
 
 const $ = id => document.getElementById(id);
 export const PHASE_COLORS = {
-  Beginner: 'var(--green)', Developing: 'var(--cyan)', Intermediate: 'var(--yellow)', Advanced: 'var(--red)', Expert: 'var(--pink)',
+  Beginner: 'var(--green)', Developing: 'var(--green)', Intermediate: 'var(--green)', Advanced: 'var(--green)', Expert: 'var(--green)',
 };
 const HANDS = {right: 'Right hand', left: 'Left hand', both: 'Both hands', treble: 'Right hand', bass: 'Left hand', grand: 'Both hands'};
 const number = value => value.toLocaleString('en-US');
@@ -22,30 +23,19 @@ function replay(node, className) {
   node.classList.add(className);
 }
 
-export function scoreRank(accuracy) {
-  return accuracy === 100 ? 'Perfect' : accuracy >= 90 ? 'Great' : accuracy >= 75 ? 'Good' : 'Complete';
-}
-
-export function attackStates(progress) {
-  return progress.attacks.map(attack => {
-    const first = attack.indices[0];
-    if (first === progress.index) return 'now';
-    if (first > progress.index) return '';
-    return attack.indices.some(index => progress.mistakes.has(index)) ? 'fixed' : 'done';
-  });
-}
-
 export function renderLevel(xp) {
   $('levelNumber').textContent = xp.level;
   $('levelXp').textContent = `${number(xp.into)} / ${number(xp.needed)}`;
   $('levelFill').style.width = `${100 * xp.into / xp.needed}%`;
+  $('openProfile').querySelector('.level-diamond').replaceChildren(levelRing(xp));
   $('openProfile').setAttribute('aria-label', `Level ${xp.level}, ${xp.into} of ${xp.needed} XP. Open progress.`);
 }
 
-export function renderReadingHud(task, progress, curriculum, sessionXp, replaying) {
-  const stage = curriculum?.path.find(item => item.number === task.reading.stage_number);
+export function renderReadingHud(task, progress, curriculum, replaying) {
+  const stageNumber = progress.complete && !replaying && curriculum ? curriculum.number : task.reading.stage_number;
+  const stage = curriculum?.path.find(item => item.number === stageNumber);
   const node = $('hudStageNumber');
-  node.textContent = String(task.reading.stage_number).padStart(2, '0');
+  node.textContent = String(stageNumber);
   node.style.setProperty('--phase', PHASE_COLORS[stage?.phase] || PHASE_COLORS.Beginner);
   const introduction = task.reading.introduce ?? null;
   $('hudStageLabel').textContent = introduction !== null ? pitchName(introduction) : stage?.label || task.title;
@@ -63,70 +53,62 @@ export function renderReadingHud(task, progress, curriculum, sessionXp, replayin
     $('tempoUp').disabled = progress.tempo >= TEMPO_LIMITS[1];
     $('tempoUp').title = 'Faster (→)';
   }
-  const states = attackStates(progress);
   const notes = $('hudNotes');
-  if (notes.children.length !== states.length) notes.replaceChildren(...states.map(() => element('i')));
-  states.forEach((state, i) => { notes.children[i].className = state; });
-  notes.setAttribute('aria-label', `${states.filter(state => state === 'done' || state === 'fixed').length} of ${states.length} notes played`);
+  notes.removeAttribute('role');
+  if (curriculum) {
+    const signature = `${stageNumber}:${curriculum.path.map(stage => stage.status).join(',')}`;
+    if (notes.dataset.path !== signature) {
+      notes.replaceChildren(stagePath(curriculum.path, stageNumber));
+      notes.dataset.path = signature;
+    }
+  }
   const streak = $('hudStreak');
-  const value = streak.querySelector('b');
-  if (Number(value.textContent) < progress.streak) replay(value, 'pop');
-  value.textContent = progress.streak;
-  streak.classList.toggle('hot', progress.streak >= 5 && progress.streak < 15);
-  streak.classList.toggle('blazing', progress.streak >= 15);
-  $('hudXp').querySelector('b').textContent = number(sessionXp);
-  const wrong = $('readingFeedback');
+  streak.classList.add('progress-streak');
+  streak.setAttribute('role', 'img');
+  const run = progress.complete ? progress.bestStreak : progress.streak;
+  streak.hidden = run === 0;
+  streak.setAttribute('aria-label', `${run} first-try notes in a row`);
+  streak.replaceChildren(streakBeam(run), element('b', '', String(run)), element('span', '', 'first-try notes in a row'));
+  const wrong = $('noteStatus');
+  const expected = progress.expected.map(pitch => pitchName(pitch, task.key)).join(' + ');
   const heard = progress.wrong.map(pitch => pitchName(pitch, task.key)).join(' + ');
-  if (heard && wrong.textContent !== `✕ ${heard}`) replay(wrong, 'hud-wrong');
-  wrong.textContent = heard ? `✕ ${heard}` : '';
-  wrong.hidden = !heard;
+  wrong.textContent = heard ? `${expected} expected · ${heard} heard` : '';
 }
 
-let toastTimer = null;
-export function showXpToast(task, result, xp, onOpen) {
-  const toast = $('xpToast');
-  clearTimeout(toastTimer);
-  toast.classList.remove('leaving');
-  toast.replaceChildren();
-  const head = element('div', 'xp-toast-head');
-  const introduction = task.reading.introduce ?? null;
-  const {score, rhythm} = result.assessment;
-  head.append(element('span', 'xp-toast-label', introduction !== null ? 'New note' : scoreRank(score.score)));
-  const value = element('span', 'xp-toast-score', introduction !== null ? pitchName(introduction) : `${score.score}%`);
-  if (introduction === null && task.reading.rhythm_required && rhythm.accuracy !== null) value.append(element('small', '', `♩ ${rhythm.accuracy}%`));
-  head.append(value);
-  const list = element('ul');
-  result.xp.items.forEach((item, i) => {
-    const row = element('li', item.xp < 0 ? 'negative' : '');
-    row.style.setProperty('--i', i);
-    const count = item.count === undefined ? '' : item.id === 'rhythm' ? ` ${item.count}%` : ` ×${item.count}`;
-    row.append(element('span', '', `${item.label}${count}`), element('b', '', `${item.xp > 0 ? '+' : ''}${number(item.xp)}`));
-    list.append(row);
-  });
-  const total = element('div', 'xp-toast-total');
-  const amount = element('b', '', '+0');
-  const track = element('span', 'xp-track');
-  const fill = element('i');
-  const before = Math.max(0, xp.into - result.xp.total);
-  fill.style.width = `${100 * before / xp.needed}%`;
-  track.append(fill);
-  total.append(amount, track);
-  toast.append(head, list, total);
-  toast.hidden = false;
-  toast.onclick = onOpen;
-  const delay = 200 + result.xp.items.length * 110;
-  const start = performance.now() + delay;
-  const count = now => {
-    const fraction = Math.min(1, Math.max(0, (now - start) / 600));
-    amount.textContent = `+${number(Math.round(result.xp.total * fraction))} XP`;
-    if (fraction < 1) requestAnimationFrame(count);
+export function renderReadingResult(container, task, result, before, after, actions) {
+  const summary = resultSummary(task, result, before, after);
+  const head = element('div', 'reading-result-head');
+  const mark = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  mark.setAttribute('viewBox', '0 0 48 40');
+  mark.setAttribute('class', 'reading-result-mark');
+  mark.setAttribute('aria-hidden', 'true');
+  const fill = summary.milestone ? 'var(--gold)' : 'var(--folio-successSurface)';
+  const ink = summary.milestone ? 'var(--folio-onReward, #0b100d)' : 'currentColor';
+  mark.innerHTML = `<ellipse class="progress-result-fill" cx="24" cy="20" rx="20" ry="14" transform="rotate(-22 24 20)" fill="${fill}" stroke="${ink}" stroke-width="2"/><path d="M16 20l5 5 11-12" fill="none" stroke="${ink}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`;
+  const heading = element('div');
+  heading.append(element('h2', '', summary.title), element('p', '', summary.detail));
+  head.append(mark, heading);
+  const detail = element('div', 'reading-result-detail');
+  const mistake = summary.mistake;
+  const heard = mistake ? mistake.tries[0].map(pitch => pitchName(pitch, task.key)).join(' + ') : '';
+  const status = mistake ? `${pitchName(mistake.expected, task.key)} expected · ${heard} heard` : '';
+  $('noteStatus').textContent = status;
+  const text = status ? `${status} · ` : '';
+  const review = element('button', 'secondary', 'Review');
+  review.addEventListener('click', actions.review);
+  detail.append(element('span', '', `${text}${summary.xp === null ? 'Progress will update when available' : `${number(summary.xp)} XP earned`}`), review);
+  const buttons = element('div', 'reading-result-actions');
+  const next = element('button', 'primary', 'Next score');
+  const retry = element('button', 'secondary', 'Try again');
+  const perform = action => {
+    next.disabled = retry.disabled = true;
+    action().finally(() => { next.disabled = retry.disabled = false; });
   };
-  requestAnimationFrame(count);
-  setTimeout(() => { fill.style.width = `${100 * xp.into / xp.needed}%`; }, delay);
-  toastTimer = setTimeout(() => {
-    toast.classList.add('leaving');
-    toastTimer = setTimeout(() => { toast.hidden = true; }, 300);
-  }, 5200);
+  next.addEventListener('click', () => perform(actions.next));
+  retry.addEventListener('click', () => perform(actions.retry));
+  buttons.append(next, retry);
+  container.replaceChildren(head, detail, buttons);
+  container.hidden = false;
 }
 
 const banners = [];
@@ -222,7 +204,7 @@ function renderPath(curriculum, playing, onPlay) {
       const dot = element('button', `stage-dot ${stage.status === 'Complete' ? 'complete' : stage.status === 'Current' ? 'current' : ''}${stage.number === playing ? ' playing' : ''}`);
       dot.dataset.stage = stage.id;
       dot.setAttribute('aria-label', `Stage ${stage.number}: ${stage.label}, ${stage.status}`);
-      dot.append(element('span', '', stage.number));
+      dot.append(element('span', '', stage.status === 'Complete' ? '✓' : stage.number));
       dot.addEventListener('click', () => detail(stage));
       nodes.append(dot);
     }
@@ -256,7 +238,7 @@ function renderRecent(history, onReview) {
   for (const round of history) {
     const bar = element('button', 'recent-score');
     bar.style.setProperty('--accuracy', `${Math.max(4, round.accuracy)}%`);
-    bar.style.setProperty('--tone', round.accuracy >= 90 ? 'var(--green)' : round.accuracy >= 75 ? 'var(--gold)' : 'var(--red)');
+    bar.style.setProperty('--tone', 'var(--green)');
     const date = new Date(round.at * 1000).toLocaleString([], {month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'});
     bar.title = `Stage ${round.stage} · ${round.accuracy}% first try${round.rhythm === null ? '' : ` · ♩ ${round.rhythm}%`} · +${round.xp} XP · ${date}`;
     bar.setAttribute('aria-label', `Review: ${bar.title}`);

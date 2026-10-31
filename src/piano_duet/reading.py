@@ -109,7 +109,7 @@ def assess_reading(task, groups, context):
     for group_index, group in enumerate(groups):
         start = min(note["start"] for note in group)
         if start < previous or cursor >= len(attacks):
-            raise ValueError("Reading attacks must be chronological and end with the last target")
+            raise ValueError("Reading note groups must be chronological and end with the last target")
         previous = start
         pitches = [note["pitch"] for note in group]
         attempts.append(pitches)
@@ -142,9 +142,7 @@ def assess_reading(task, groups, context):
     first_try = sum(item["matched"] for item in observations)
     accuracy = first_try / len(target)
     usable = mean(strengths) >= 0.75 and mean(value >= 0.6 for value in strengths) >= 0.8
-    assisted = any(context[name] for name in ("hearings", "reveals", "hints")) or context.get(
-        "introduction", False
-    )
+    assisted = any(context[name] for name in ("hearings", "reveals", "hints")) or context.get("introduction", False) or context.get("familiar", False)
     fluency = measure_position_changes(task, observations, context, usable, assisted)
     rhythm = reading_rhythm(task, observations, context)
     assessment = {

@@ -114,7 +114,7 @@ def measure_landings(changes, observations, context):
         ):
             reason = "Recording was interrupted during this change."
         elif gap <= 0:
-            reason = "The two attacks could not be timed separately."
+            reason = "The two notes could not be timed separately."
         elif gap > POSITION_PAUSE_LIMIT:
             reason = "A long pause made this change unsuitable for timing."
         measured.append(
@@ -218,7 +218,7 @@ def reading_progress(attempts):
             )
         )
         introduction = attempt["prompt"].get("reading", {}).get("introduce")
-        if introduction is not None:
+        if introduction is not None and not attempt["context"].get("familiar"):
             introduced[attempt["prompt"]["reading"]["clef"]].add(introduction)
         if not any(item["skill"] == "reading.pitch" for item in assessment["evidence"]):
             continue

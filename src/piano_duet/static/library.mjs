@@ -10,7 +10,7 @@ function element(tag, className, text) {
 }
 
 export function tone(accuracy) {
-  return accuracy === null ? 'var(--line-strong)' : accuracy >= 90 ? 'var(--green)' : accuracy >= 75 ? 'var(--gold)' : 'var(--red)';
+  return accuracy === null ? 'var(--line-strong)' : 'var(--green)';
 }
 
 export function ago(seconds, now = Date.now() / 1000) {
@@ -24,7 +24,7 @@ export function ago(seconds, now = Date.now() / 1000) {
 
 const duration = seconds => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 
-export function renderLibrary(library, query, {onOpen, onImport, onDelete}) {
+export function renderLibrary(library, query, {onOpen, onDelete}) {
   const rows = $('songRows');
   rows.replaceChildren();
   const match = item => `${item.title} ${item.artist || ''}`.toLowerCase().includes(query.trim().toLowerCase());
@@ -32,14 +32,15 @@ export function renderLibrary(library, query, {onOpen, onImport, onDelete}) {
   songs.forEach((song, i) => {
     const row = element('div', 'song-row');
     row.setAttribute('role', 'row');
-    row.tabIndex = 0;
     const meter = element('span', 'song-meter');
     const bar = element('i');
     bar.style.width = `${song.accuracy ?? 0}%`;
     bar.style.background = tone(song.accuracy);
     meter.append(element('span', 'song-track'), element('b', '', song.accuracy === null ? '—' : `${song.accuracy}%`));
     meter.firstChild.append(bar);
-    const title = element('span', 'song-name');
+    const title = element('button', 'song-name');
+    title.type = 'button';
+    title.setAttribute('aria-label', `Open ${song.title}`);
     title.append(element('strong', '', song.title), element('small', '', song.artist || `${song.key} · ${song.meter}`));
     const remove = element('button', 'icon-button song-delete', '✕');
     remove.setAttribute('aria-label', `Remove ${song.title}`);
@@ -48,7 +49,6 @@ export function renderLibrary(library, query, {onOpen, onImport, onDelete}) {
       meter, element('span', '', song.best === null ? '—' : `${song.best}%`), element('span', '', `${song.coverage}%`),
       element('span', '', ago(song.last_played)), element('span', '', duration(song.seconds)), remove);
     row.addEventListener('click', () => onOpen(song.id));
-    row.addEventListener('keydown', event => { if (event.key === 'Enter') onOpen(song.id); });
     rows.append(row);
   });
   $('songEmpty').hidden = songs.length > 0;
@@ -56,16 +56,13 @@ export function renderLibrary(library, query, {onOpen, onImport, onDelete}) {
   const catalog = $('catalogRows');
   catalog.replaceChildren();
   for (const item of library.catalog.filter(match)) {
-    const row = element('div', 'catalog-row');
+    const row = element('a', 'catalog-row');
+    row.href = item.url;
+    row.target = '_blank';
+    row.rel = 'noopener';
     const title = element('span', 'song-name');
     title.append(element('strong', '', item.title), element('small', '', item.artist));
-    const get = element('a', 'text-button', 'Get sheet music ↗');
-    get.href = item.url;
-    get.target = '_blank';
-    get.rel = 'noopener';
-    const add = element('button', 'secondary', 'Import file');
-    add.addEventListener('click', () => onImport(item));
-    row.append(title, get, add);
+    row.append(title, element('span', 'catalog-link', 'Get sheet music'), element('span', 'catalog-arrow', '↗'));
     catalog.append(row);
   }
   $('catalogHeading').hidden = !catalog.childElementCount;
@@ -93,6 +90,8 @@ export function renderSongHud(song, stats, progress, onJump) {
       button.addEventListener('click', () => onJump(section.start));
       return button;
     }));
+    $('songSectionSelect').replaceChildren(...stats.sections.map((section, index) => new Option(section.label, String(index))));
+    $('songSectionSelect').onchange = event => onJump(stats.sections[Number(event.target.value)].start);
     strip.dataset.song = song.id;
   }
   stats.sections.forEach((section, i) => {
@@ -103,6 +102,8 @@ export function renderSongHud(song, stats, progress, onJump) {
     button.style.setProperty('--at', here ? `${100 * (ordinal - section.start) / (section.end - section.start)}%` : '0%');
     button.title = `${section.label} · ${section.accuracy === null ? 'not played yet' : `${section.accuracy}% first try`}`;
     button.setAttribute('aria-label', `Jump to ${button.title}`);
+    $('songSectionSelect').options[i].textContent = button.title;
+    if (here) $('songSectionSelect').value = String(i);
   });
   const accuracy = sessionAccuracy(progress);
   $('songAccuracy').querySelector('b').textContent = accuracy === null ? '—' : `${accuracy}%`;

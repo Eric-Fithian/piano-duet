@@ -1,0 +1,59 @@
+:root {
+  --brand-bg: #14211a;
+  --brand-surface: #203027;
+  --brand-raised: #304338;
+  --brand-text: #f7f2e8;
+  --brand-muted: #d4decf;
+  --brand-border: #98ab9a;
+  --brand-action: #286b4c;
+  --brand-onAction: #ffffff;
+  --brand-focus: #d5c7f4;
+  --brand-paper: #e9dfcd;
+  --brand-ink: #0b100d;
+  --brand-correct: #174f2b;
+  --brand-error: #a83e1f;
+  --brand-cursor: #357db0;
+  --brand-nightPaper: #1c2a23;
+  --brand-nightInk: #f5ebd8;
+  --brand-progress: #9dd5b0;
+  --brand-successSurface: #304b39;
+  --brand-nightError: #c36e48;
+  --brand-success: #a8dbb2;
+  --brand-warning: #f2cf8b;
+  --brand-errorText: #ffb9aa;
+  --brand-mark: #9dd5b0;
+  --brand-rewardFill: #efc15d;
+  --brand-onReward: #0b100d;
+  --brand-nightCursor: #65b6e8;
+  --brand-nightCorrect: #9dd5b0;
+}
+
+:root[data-theme='light'] {
+  --brand-bg: #f5f1e8;
+  --brand-surface: #fffdf8;
+  --brand-raised: #eee8db;
+  --brand-text: #1c2821;
+  --brand-muted: #4e5d52;
+  --brand-border: #6c796d;
+  --brand-action: #286b4c;
+  --brand-onAction: #ffffff;
+  --brand-focus: #56447e;
+  --brand-paper: #fffdf8;
+  --brand-ink: #0b100d;
+  --brand-correct: #174f2b;
+  --brand-error: #a83e1f;
+  --brand-cursor: #357db0;
+  --brand-nightPaper: #1c2a23;
+  --brand-nightInk: #f5ebd8;
+  --brand-progress: #286b4c;
+  --brand-successSurface: #d6eddd;
+  --brand-nightError: #c36e48;
+  --brand-success: #18532d;
+  --brand-warning: #785009;
+  --brand-errorText: #9f3c21;
+  --brand-mark: #286b4c;
+  --brand-rewardFill: #e9b949;
+  --brand-onReward: #0b100d;
+  --brand-nightCursor: #65b6e8;
+  --brand-nightCorrect: #9dd5b0;
+}

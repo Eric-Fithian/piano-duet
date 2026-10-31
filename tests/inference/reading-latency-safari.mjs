@@ -21,10 +21,12 @@ try {
       if (!fakeInstalled) throw new Error("Safari did not install the fake microphone before the app started");
       await driver.wait(() => driver.executeScript('return !!document.querySelector("#start") && !document.querySelector("#start").disabled'), 60000);
       if (await driver.executeScript('return document.querySelector("#readingMode").getAttribute("aria-pressed") === "true"')) {
+        await driver.findElement(By.css("#modeMenuButton")).click();
         await driver.findElement(By.css("#practiceMode")).click();
         await driver.wait(() => driver.executeScript('return document.querySelector("#practiceMode").getAttribute("aria-pressed") === "true" && !document.querySelector("#start").disabled'), 60000);
       }
       await driver.executeScript("window.__latency.tasks = []");
+      await driver.findElement(By.css("#modeMenuButton")).click();
       await driver.findElement(By.css("#readingMode")).click();
       await driver.wait(() => driver.executeScript('return document.querySelector("#readingMode").getAttribute("aria-pressed") === "true" && !document.querySelector("#start").disabled && window.__latency.tasks.length > 0 && !!document.querySelector("#sheetMusic svg")'), 60000);
       targetTask ??= await driver.executeScript("return window.__latency.tasks[0]");

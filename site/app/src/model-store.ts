@@ -5,12 +5,54 @@ import type { DownloadProgress, ModelFile } from "./inference.ts";
 export class ModelStore {
   private cache = caches.open("piano-duet-models");
 
+  async status(files: ModelFile[]): Promise<"downloaded" | "partially downloaded" | "not downloaded"> {
+    if (!files.length) throw new Error("A model must have files");
+    const cache = await this.cache;
+    const present = await Promise.all(files.map(async (file) => {
+      validateFile(file);
+      const response = await cache.match(fileKey(file));
+      if (!response) return "missing";
+      const length = response.headers.get("content-length");
+      return (length === null || Number(length) === file.bytes) && Boolean(await cache.match(markerKey(file))) ? "verified" : "incomplete";
+    }));
+    return present.every((state) => state === "verified") ? "downloaded"
+      : present.some((state) => state !== "missing") ? "partially downloaded" : "not downloaded";
+  }
+
+  async delete(files: ModelFile[]): Promise<void> {
+    const cache = await this.cache;
+    await Promise.all(files.map(async (file) => {
+      validateFile(file);
+      await Promise.all([cache.delete(fileKey(file)), cache.delete(markerKey(file))]);
+    }));
+  }
+
+  async verifyStored(file: ModelFile, onProgress: (progress: DownloadProgress) => void, signal?: AbortSignal): Promise<void> {
+    validateFile(file);
+    const cache = await this.cache;
+    const response = await cache.match(fileKey(file));
+    if (!response) throw new Error(`${file.name} is not downloaded`);
+    let valid: boolean;
+    try {
+      valid = await verify(response.body, file, (received) => onProgress({
+        model: file.model, file: file.name, received, total: file.bytes,
+      }), signal);
+    } catch (error) {
+      if (error instanceof Error && error.message === `${file.name} is larger than its manifest`) await cache.delete(markerKey(file));
+      throw error;
+    }
+    if (!valid) {
+      await cache.delete(markerKey(file));
+      throw new Error(`Cached ${file.name} failed its integrity check. Re-download it to try again.`);
+    }
+  }
+
   async get(file: ModelFile, onProgress: (progress: DownloadProgress) => void,
     signal?: AbortSignal): Promise<Response> {
     validateFile(file);
     const cache = await this.cache;
-    const key = new Request(new URL(`/.piano-models/${encodeURIComponent(file.model)}/${encodeURIComponent(file.revision)}/${file.sha256}`, location.origin));
-    const marker = new Request(new URL(`/.piano-models/verified/${encodeURIComponent(file.url)}/${file.sha256}/${file.bytes}`, location.origin));
+    const key = fileKey(file);
+    const marker = markerKey(file);
     const cached = await cache.match(key);
     if (cached) {
       const [blob, recorded] = await Promise.all([cached.blob(), cache.match(marker)]);
@@ -45,6 +87,14 @@ export class ModelStore {
       if (!complete) await Promise.all([cache.delete(key), cache.delete(marker)]);
     }
   }
+}
+
+function fileKey(file: ModelFile): Request {
+  return new Request(new URL(`/.piano-models/${encodeURIComponent(file.model)}/${encodeURIComponent(file.revision)}/${file.sha256}`, location.origin));
+}
+
+function markerKey(file: ModelFile): Request {
+  return new Request(new URL(`/.piano-models/verified/${encodeURIComponent(file.url)}/${file.sha256}/${file.bytes}`, location.origin));
 }
 
 function validateFile(file: ModelFile): void {

@@ -1,12 +1,15 @@
 import { defineConfig } from "vite";
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
+import { extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const headers = {
   "Cross-Origin-Opener-Policy": "same-origin",
   "Cross-Origin-Embedder-Policy": "require-corp",
 };
+const brandDir = fileURLToPath(new URL("../src/piano_duet/static/brand/", import.meta.url));
+const brandTypes: Record<string, string> = { ".svg": "image/svg+xml", ".ico": "image/x-icon", ".png": "image/png", ".webmanifest": "application/manifest+json" };
 
 export default defineConfig({
   root: "app",
@@ -53,18 +56,24 @@ export default defineConfig({
           if (html.split(before).length !== 2) throw new Error(`Expected exactly one reference interface element: ${before}`);
           html = html.replace(before, after);
         };
-        for (const file of ["style.css", "score.css", "practice.css", "game.css"]) {
+        for (const file of ["style.css", "score.css", "practice.css", "game.css", "chrome.css", "progress.css"]) {
           replace(`  <link rel="stylesheet" href="/static/${file}">\n`, "");
         }
         replace('  <script src="/notation-assets/vexflow.js" defer></script>\n', "");
         replace('  <script type="module" src="/static/app.mjs"></script>', '  <script type="module" src="/src/main.ts"></script>');
         replace('href="/static/credits.html"', 'href="/docs/credits/"');
-        replace('id="openYoutube" class=', 'id="openYoutube" hidden class=');
-        replace('        <p class="profile-explanation">', `        <div class="history-import"><label class="secondary">Import history from the Mac app <input id="historyFile" type="file" accept=".sqlite3,.sqlite,.db"></label><p>Quit the Mac app before selecting its .local/learner.sqlite3 file, so all history is saved in the file.</p><progress id="historyImportProgress" aria-label="Importing history" hidden></progress><p id="historyImportStatus" aria-live="polite"></p></div>
-        <p class="profile-explanation">`);
-        replace('      <h3>Listening</h3>', '      <h3>Account and sync</h3><section id="accountSync" aria-label="Account and sync"></section>\n      <h3>Listening</h3>');
+        replace('<button id="openYoutube"', '<button id="importAudio" type="button">Audio file</button><button id="recordAudio" type="button">Record audio</button><button id="openYoutube"');
+        replace('>From YouTube</button></div></details>', '>From YouTube link</button></div></details>');
+        replace('      <button id="youtubeGo" class="primary" type="submit">Transcribe</button>', `      <label>Title <input id="youtubeVideoTitle" type="text" maxlength="200" value="YouTube recording" required></label>
+      <label>Channel (optional) <input id="youtubeChannel" type="text" maxlength="200"></label>
+      <p class="setting-help">Choose the YouTube tab and keep “Also share tab audio” checked. Start the video after sharing begins; capture happens in real time.</p>
+      <button id="youtubeGo" class="primary" type="submit">Start</button><button id="youtubeStop" class="secondary" type="button" hidden>Stop and write score</button>
+      <p id="youtubeSupport" role="status" hidden></p><button id="youtubeRecord" class="secondary" type="button" hidden>Record with microphone</button>`);
+        replace('      <h3>Listening</h3>', `      <h3>Account and sync</h3><section id="accountSync" aria-label="Account and sync"></section>
+      <details class="history-import"><summary>Import history from the Mac app</summary><p>Quit the Mac app before selecting its .local/learner.sqlite3 file, so all history is saved in the file.</p><label class="secondary">Choose history file <input id="historyFile" type="file" accept=".sqlite3,.sqlite,.db"></label><progress id="historyImportProgress" aria-label="Importing history" hidden></progress><p id="historyImportStatus" aria-live="polite"></p></details>
+      <h3>Listening</h3>`);
         replace('        <div class="song-table" role="table" aria-label="Your songs">',
-          `        <div class="recording-import" aria-label="Recording import"><button id="importAudio" class="secondary" type="button">Import audio</button><button id="recordAudio" class="secondary" type="button">Record audio</button><p id="recordingImportStatus" aria-live="polite"></p></div>
+          `        <p id="recordingImportStatus" aria-live="polite"></p>
         <dialog id="recordingDialog" class="settings-dialog" aria-labelledby="recordingTitle"><div class="dialog-heading"><h2 id="recordingTitle">Import a recording</h2><button id="recordingClose" class="quiet-button" type="button">Done</button></div>
         <form id="recordingForm" class="controls youtube-form"><label id="recordingFileLabel">Audio file <input id="recordingFile" type="file" accept="audio/*"></label>
         <button id="recordingToggle" class="secondary" type="button" hidden>Start recording</button><p id="recordingSelection" aria-live="polite"></p>
@@ -73,6 +82,39 @@ export default defineConfig({
         <div class="song-table" role="table" aria-label="Your songs">`);
         return html;
       },
+    },
+  }, {
+    name: "brand-assets",
+    configureServer(server) {
+      server.middlewares.use((request, response, next) => {
+        const path = request.url?.split("?")[0];
+        if (!path?.startsWith("/static/brand/")) return next();
+        const name = path.slice("/static/brand/".length);
+        if (!readdirSync(brandDir).includes(name)) { response.writeHead(404).end(); return; }
+        const type = brandTypes[extname(name)];
+        if (!type) throw new Error(`Unknown brand asset type: ${name}`);
+        response.setHeader("Content-Type", type);
+        response.end(readFileSync(join(brandDir, name)));
+      });
+    },
+    generateBundle() {
+      for (const name of readdirSync(brandDir)) {
+        if (!brandTypes[extname(name)]) throw new Error(`Unknown brand asset type: ${name}`);
+        this.emitFile({ type: "asset", fileName: `static/brand/${name}`, source: readFileSync(join(brandDir, name)) });
+      }
+    },
+  }, {
+    name: "appearance-bootstrap",
+    configureServer(server) {
+      server.middlewares.use((request, response, next) => {
+        if (request.url?.split("?")[0] !== "/static/appearance-bootstrap.js") return next();
+        response.setHeader("Content-Type", "text/javascript");
+        response.end(readFileSync(new URL("../src/piano_duet/static/appearance-bootstrap.js", import.meta.url)));
+      });
+    },
+    generateBundle() {
+      this.emitFile({ type: "asset", fileName: "static/appearance-bootstrap.js",
+        source: readFileSync(new URL("../src/piano_duet/static/appearance-bootstrap.js", import.meta.url)) });
     },
   }, {
     name: "offline-app-shell",
