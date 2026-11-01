@@ -85,7 +85,7 @@ jobs:
           version: "0.10.12"
           enable-cache: true
       - run: uv sync --frozen
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: .cache/ci-models
           key: published-models-${{ hashFiles('site/app/src/model-catalog.ts', 'tests/inference/download-models.mjs') }}
@@ -122,7 +122,7 @@ jobs:
         timeout-minutes: 3
       - run: node tests/inference/media-recording.mjs
         timeout-minutes: 3
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: |
             .cache/ci-models/recording-transcription
@@ -205,7 +205,7 @@ jobs:
         env:
           ENGINES: chromium,firefox
         timeout-minutes: 20
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: visual-audit
@@ -221,7 +221,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 24
-      - uses: supabase/setup-cli@v1
+      - uses: supabase/setup-cli@v3
         with:
           version: 2.115.0
       - run: npm ci
