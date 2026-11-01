@@ -148,10 +148,14 @@ export function setupModelSettings(root: HTMLDetailsElement, backend: InferenceB
           results.set(entry.id, result); row.result.textContent = result.text;
           if (result.backend && entry.id !== "piano-samples") reportBackend(entry.id, result.backend);
         } finally { release(); }
+      } else if (action === "download") {
+        // Downloading only adds verified files, so it can share the model with sessions that are using it.
+        const release = await acquireModelLock(entry.id, controller.signal);
+        try { await download(entry, controller.signal); } finally { release(); }
       } else {
         await withModelWriteLock(entry.id, async () => {
-          if (action === "delete" || action === "redownload") await store.delete(entry.files);
-          if (action === "download" || action === "redownload") await download(entry, controller.signal);
+          await store.delete(entry.files);
+          if (action === "redownload") await download(entry, controller.signal);
         });
       }
     } catch (error) {

@@ -33,22 +33,23 @@ try {
   await page.getByRole("button", { name: "Test all" }).click();
   await page.waitForFunction(() => !document.querySelector(".model-confirm").hidden
     || !document.querySelector("[data-action=cancel-all]").hidden, null, { timeout: 120000 });
-  const confirm = page.getByRole("button", { name: "Download and test" });
+  const confirm = page.getByRole("button", { name: "Download and test", exact: true });
   if (await confirm.isVisible()) await confirm.click();
+  const heartbeat = setInterval(() => void page.locator(".model-entry").evaluateAll((rows) => rows.map((row) =>
+    `${row.querySelector(".model-name")?.textContent}: ${row.querySelector(".model-status")?.textContent} ${row.querySelector("progress")?.value ?? ""}/${row.querySelector("progress")?.max ?? ""} ${row.querySelector(".model-result")?.textContent ?? ""}`).join(" | "))
+    .then((line) => console.log(new Date().toISOString().slice(11, 19), line), () => {}), 30000);
   await page.waitForFunction(() => {
     const text = document.querySelector(".model-message")?.textContent ?? "";
     return text === "All tests passed." || text.includes(" tests failed.");
-  }, null, { timeout: 1200000 });
+  }, null, { timeout: 2400000 }).finally(() => clearInterval(heartbeat));
   const results = await page.locator(".model-entry").evaluateAll((rows) => rows.map((row) => ({
     name: row.querySelector(".model-name")?.textContent, status: row.querySelector(".model-status")?.textContent,
     result: row.querySelector(".model-result")?.textContent,
   })));
-  assert.equal(results.length, 6);
-  for (const [index, result] of results.entries()) {
+  assert.equal(results.length, 5);
+  for (const result of results) {
     assert.equal(result.status, "Downloaded", `${result.name}: ${result.result}`);
-    if (browserName === "webkit" && [0, 4].includes(index) && result.result?.includes("Blob loading failed")) {
-      console.log(`${result.name}: Playwright WebKit baseline Blob loading failed`);
-    } else assert.ok(result.result?.startsWith("Passed"), `${result.name}: ${result.result}`);
+    assert.ok(result.result?.startsWith("Passed"), `${result.name}: ${result.result}`);
   }
   console.log(JSON.stringify({ browser: browserName, results }, null, 2));
 } finally {

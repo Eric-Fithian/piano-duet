@@ -5,7 +5,7 @@ import { createReadStream } from "node:fs";
 import { mkdtemp, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { chromium } from "playwright";
+import { chromium, webkit } from "playwright";
 import { startServer } from "./server.mjs";
 
 const stageId = process.argv[2] ?? "pairs";
@@ -22,7 +22,10 @@ assert.equal(reference.status, 0, reference.stderr);
 const progress = JSON.parse(reference.stdout);
 const server = await startServer();
 const profile = await mkdtemp(join(tmpdir(), "piano-duet-composer-"));
-const browser = await chromium.launchPersistentContext(profile, { channel: "chrome", headless: true });
+const browserName = process.argv[3] ?? "chrome";
+if (!["chrome", "webkit"].includes(browserName)) throw new Error("Expected chrome or webkit");
+const browser = browserName === "chrome" ? await chromium.launchPersistentContext(profile, { channel: "chrome", headless: true })
+  : await webkit.launchPersistentContext(profile, { headless: true });
 const page = await browser.newPage();
 const files = [];
 for (const [role, name] of [["graph", "model.onnx"], ["weights", "model.onnx.data"]]) {

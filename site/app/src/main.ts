@@ -189,6 +189,14 @@ async function start(): Promise<void> {
     phraseTranscriber, duetGenerator, variationAnalyzer));
   if (import.meta.env.PROD && "serviceWorker" in navigator) await navigator.serviceWorker.register("/service-worker.js");
   const app = await import("../../../src/piano_duet/static/app.mjs");
+  // Only the first Reading exercise is written without the music writer, so fetch it while that one is played.
+  // Automated browsers skip this so test runs do not each download 470 MB.
+  const prefetchAria = () => {
+    if (native || aria || navigator.webdriver || document.body.dataset.mode !== "reading") return;
+    void openAria().catch((error: unknown) => console.error("The music writer could not be prepared ahead of time; the next Reading score will retry", error));
+  };
+  new MutationObserver(prefetchAria).observe(document.body, { attributes: true, attributeFilter: ["data-mode"] });
+  prefetchAria();
   setupRecordingUi(importer, app.loadLibrary);
   setupYoutubeImport(app.loadLibrary);
   setupHistoryImport(log, async () => { await app.refreshProfile(); await app.loadLibrary(); });

@@ -55,14 +55,17 @@ export class ModelStore {
     const marker = markerKey(file);
     const cached = await cache.match(key);
     if (cached) {
-      const [blob, recorded] = await Promise.all([cached.blob(), cache.match(marker)]);
-      const verified = blob.size === file.bytes && (Boolean(recorded) || await verify(blob.stream(), file, () => {}, signal));
+      // WebKit cannot read a cached model this large back as one Blob, so the response is only ever streamed.
+      const length = cached.headers.get("content-length");
+      const recorded = await cache.match(marker);
+      const verified = (length === null || Number(length) === file.bytes)
+        && (Boolean(recorded) || await verify(cached.clone().body, file, () => {}, signal));
       if (!verified) {
         await Promise.all([cache.delete(key), cache.delete(marker)]);
         throw new Error(`Cached ${file.name} failed its integrity check. Retry to download it again.`);
       }
       if (!recorded) await cache.put(marker, new Response("verified"));
-      return new Response(blob, { headers: cached.headers, status: cached.status });
+      return cached;
     }
     const host = new URL(file.url).host;
     const response = await fetch(file.url, { signal, mode: "cors" }).catch((error: unknown) => {
@@ -91,6 +94,23 @@ export class ModelStore {
       if (!complete) await Promise.all([cache.delete(key), cache.delete(marker)]);
     }
   }
+}
+
+export async function readModelBytes(response: Response, file: ModelFile, signal?: AbortSignal): Promise<Uint8Array<ArrayBuffer>> {
+  if (!response.body) throw new Error(`No data for ${file.name}`);
+  const bytes = new Uint8Array(file.bytes);
+  const reader = response.body.getReader();
+  let offset = 0;
+  while (true) {
+    signal?.throwIfAborted();
+    const chunk = await reader.read();
+    if (chunk.done) break;
+    if (offset + chunk.value.byteLength > file.bytes) throw new Error(`${file.name} is larger than its manifest`);
+    bytes.set(chunk.value, offset);
+    offset += chunk.value.byteLength;
+  }
+  if (offset !== file.bytes) throw new Error(`${file.name} ended after ${offset} of ${file.bytes} bytes`);
+  return bytes;
 }
 
 function fileKey(file: ModelFile): Request {

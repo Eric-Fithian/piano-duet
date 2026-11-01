@@ -9,7 +9,7 @@ import { ScoreRuntime } from "./score-runtime";
 import { resample16To441 } from "../../../src/core/resample.ts";
 import { scoreInput } from "../../../src/core/score-input.ts";
 import { scoreMusicXml } from "../../../src/core/score-output.ts";
-import { ModelStore } from "./model-store";
+import { ModelStore, readModelBytes } from "./model-store";
 import type { ModelAsset, ModelRole } from "./browser-inference";
 import type { ModelId, ModelInputs } from "./inference";
 
@@ -53,17 +53,18 @@ async function open(id: number, name: ModelId, files: ModelAsset[], preference: 
   const gpu = (navigator as Navigator & { gpu?: { requestAdapter(): Promise<unknown> } }).gpu;
   provider = name !== "recording-transcription" && (name !== "phrase-transcription" || files.some((file) => file.role === "convolution"))
     && preference === "auto" && gpu && await gpu.requestAdapter() ? "webgpu" : "wasm";
-  const asset = async (role: ModelRole): Promise<Response> => {
+  const asset = async (role: ModelRole): Promise<ArrayBuffer> => {
     const matches = files.filter((file) => file.role === role);
     if (matches.length !== 1) throw new Error(`${name} needs exactly one ${role} file`);
-    return store.get(matches[0], (progress) => self.postMessage({ progress, id }), signal);
+    const response = await store.get(matches[0], (progress) => self.postMessage({ progress, id }), signal);
+    return (await readModelBytes(response, matches[0], signal)).buffer;
   };
   const options: ort.InferenceSession.SessionOptions = { executionProviders: [provider] };
   if (name === "aria") {
-    const graph = await (await asset("graph")).arrayBuffer();
+    const graph = await asset("graph");
     const weights = files.find((file) => file.role === "weights");
     if (!weights) throw new Error("Aria weights are missing");
-    const external = await (await asset("weights")).blob();
+    const external = new Uint8Array(await asset("weights"));
     options.externalData = [{ path: weights.name, data: external }];
     if (provider === "webgpu") {
       options.preferredOutputLocation = Object.fromEntries(Array.from({ length: 16 }, (_, index) =>
@@ -73,18 +74,18 @@ async function open(id: number, name: ModelId, files: ModelAsset[], preference: 
     resetCache();
   } else if (name === "phrase-transcription") {
     if (provider === "webgpu") {
-      const convolution = await (await asset("convolution")).arrayBuffer();
-      const remainder = await (await asset("recurrent")).arrayBuffer();
+      const convolution = await asset("convolution");
+      const remainder = await asset("recurrent");
       session = await initializeProvider(() => ort.InferenceSession.create(convolution, { executionProviders: ["webgpu"], graphOptimizationLevel: "disabled" }));
       recurrent = await ort.InferenceSession.create(remainder, { executionProviders: ["wasm"], graphOptimizationLevel: "disabled" });
     }
     if (provider === "wasm") {
-      const graph = await (await asset("graph")).arrayBuffer();
+      const graph = await asset("graph");
       session = await ort.InferenceSession.create(graph, { executionProviders: ["wasm"], graphOptimizationLevel: "disabled" });
     }
   } else if (name === "recording-transcription") {
-    const features = await (await asset("features")).arrayBuffer();
-    const attributes = await (await asset("attributes")).arrayBuffer();
+    const features = await asset("features");
+    const attributes = await asset("attributes");
     const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 0;
     const count = self.crossOriginIsolated && navigator.hardwareConcurrency >= 12 && memory >= 8 ? (memory >= 16 ? 4 : 3) : 1;
     if (count > 1) recordingPool = await RecordingPool.open(features, attributes, count, Math.floor(navigator.hardwareConcurrency / count));
@@ -93,20 +94,20 @@ async function open(id: number, name: ModelId, files: ModelAsset[], preference: 
       recurrent = await ort.InferenceSession.create(attributes, { executionProviders: ["wasm"] });
     }
   } else if (name === "midi-to-score") {
-    const encoder = await (await asset("score-encoder")).arrayBuffer();
-    const first = await (await asset("score-first")).arrayBuffer();
-    const context = await (await asset("score-context")).arrayBuffer();
-    const step = await (await asset("score-step")).arrayBuffer();
+    const encoder = await asset("score-encoder");
+    const first = await asset("score-first");
+    const context = await asset("score-context");
+    const step = await asset("score-step");
     scoreRuntime = await ScoreRuntime.open({ encoder, first, context, step }, provider);
   } else {
     options.graphOptimizationLevel = "disabled";
     if (provider === "webgpu") {
-      const convolution = await (await asset("convolution")).arrayBuffer();
-      const remainder = await (await asset("recurrent")).arrayBuffer();
+      const convolution = await asset("convolution");
+      const remainder = await asset("recurrent");
       session = await initializeProvider(() => ort.InferenceSession.create(convolution, options));
       recurrent = await ort.InferenceSession.create(remainder, { ...options, executionProviders: ["wasm"] });
     } else {
-      const graph = await (await asset("graph")).arrayBuffer();
+      const graph = await asset("graph");
       session = await ort.InferenceSession.create(graph, options);
     }
   }
