@@ -28,6 +28,9 @@ const profile = await mkdtemp(join(tmpdir(), "piano-duet-inference-"));
 const context = await (browserName === "chrome" ? chromium : webkit).launchPersistentContext(profile,
   browserName === "chrome" ? { channel: "chrome", headless: true } : { headless: true });
 const page = await context.newPage();
+page.on("crash", () => console.error("page crashed"));
+page.on("console", (message) => console.error(`console ${message.type()}: ${message.text()}`));
+page.on("framenavigated", (frame) => { if (frame === page.mainFrame()) console.error(`navigated to ${frame.url()}`); });
 const files = [];
 for (const [role, path] of Object.entries(paths)) {
   const hash = createHash("sha256");

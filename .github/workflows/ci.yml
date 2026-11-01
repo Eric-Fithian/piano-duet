@@ -200,7 +200,7 @@ jobs:
       - run: npm ci
       - run: npm ci --prefix site
       - run: npx playwright install chromium firefox webkit
-      # WebKit joins once the music writer model loads there; today Reading cannot start in WebKit.
+      # WebKit profiles share state between runs, so later Reading screens there need a 470 MB model download.
       - run: node tests/web/visual/run.mjs visual-audit
         env:
           ENGINES: chromium,firefox

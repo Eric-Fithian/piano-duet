@@ -6,7 +6,7 @@ import { scoreMusicXml } from "../../../src/core/score-output.ts";
 import type { ScoreInputNote } from "../../../src/core/score-input.ts";
 import { describeInferenceBackend, initializeWithWebGPUFallback } from "./inference";
 import type { InferenceBackendRecord } from "./inference";
-import { ModelStore } from "./model-store";
+import { ModelStore, readModelBytes } from "./model-store";
 import type { ModelAsset, ModelRole } from "./browser-inference";
 import { RecordingPool } from "./recording-pool";
 import { ScoreRuntime } from "./score-runtime";
@@ -31,7 +31,7 @@ async function open(id: number, recording: ModelAsset[], files: ModelAsset[], si
   const load = async (list: ModelAsset[], role: ModelRole) => {
     const matches = list.filter((asset) => asset.role === role);
     if (matches.length !== 1) throw new Error(`Recording import needs exactly one ${role} file`);
-    return (await store.get(matches[0], (progress) => self.postMessage({ id, progress }), cancellation.signal)).arrayBuffer();
+    return (await readModelBytes(await store.get(matches[0], (progress) => self.postMessage({ id, progress }), cancellation.signal), matches[0], cancellation.signal)).buffer;
   };
   const gpu = (navigator as Navigator & { gpu?: { requestAdapter(): Promise<unknown> } }).gpu;
   const provider = gpu && await gpu.requestAdapter() ? "webgpu" : "wasm";
